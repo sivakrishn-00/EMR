@@ -1,0 +1,533 @@
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import { 
+  Activity, 
+  Search, 
+  Thermometer, 
+  Heart, 
+  User, 
+  ArrowRight, 
+  X, 
+  UserCheck, 
+  Clock, 
+  Wind, 
+  Droplet, 
+  Clipboard, 
+  FileText,
+  Scale,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const Vitals = () => {
+  const [activeVisits, setActiveVisits] = useState([]);
+  const [selectedVisit, setSelectedVisit] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [vitalsData, setVitalsData] = useState({
+    temperature_c: '', 
+    blood_pressure_sys: '', 
+    blood_pressure_dia: '', 
+    heart_rate: '', 
+    respiratory_rate: '',
+    spo2: '',
+    weight_kg: '', 
+    height_cm: '',
+    symptoms: '',
+    notes: '',
+    // Personal History
+    smoking: 'NO',
+    alcohol: 'NO',
+    physical_activity: 'NO',
+    food_habit: 'VEG',
+    allergy_food: 'NO',
+    allergy_drug: 'NO',
+    // Family History
+    family_dm: 'NO',
+    family_htn: 'NO',
+    family_cancer: 'NO',
+    family_cvs: 'NO',
+    family_thyroid: 'NO',
+    family_tb: 'NO',
+    family_others: '',
+    // Systemic Examination
+    sys_respiratory: 'NAD',
+    sys_cvs: 'NAD',
+    sys_cns: 'NAD',
+    sys_gis: 'NAD',
+    sys_mss: 'NAD',
+    sys_gus: 'NAD',
+    // Known History
+    known_dm: 'NO',
+    known_htn: 'NO',
+    known_cancer: 'NO',
+    known_cvs: 'NO',
+    known_thyroid: 'NO',
+    known_tb: 'NO',
+    known_others: ''
+  });
+  const [formAttempted, setFormAttempted] = useState(false);
+
+  useEffect(() => {
+    fetchActiveVisits();
+  }, []);
+
+  const fetchActiveVisits = async (pageNum = 1) => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}`);
+      if (res.data.results) {
+          setActiveVisits(res.data.results);
+          setTotalCount(res.data.count);
+      } else {
+          setActiveVisits(res.data);
+          setTotalCount(res.data.length);
+      }
+      setPage(pageNum);
+    } catch (err) {
+      toast.error("Failed to fetch triage queue");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveVitals = async (e) => {
+    e.preventDefault();
+    setFormAttempted(true);
+    const loadingToast = toast.loading('Recording vitals...');
+    try {
+      const cleanedData = Object.fromEntries(
+        Object.entries(vitalsData).map(([key, value]) => {
+          if (value === '' || value === undefined) return [key, null];
+          if (['temperature_c', 'blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm'].includes(key)) {
+            const num = Number(value);
+            return [key, isNaN(num) ? null : num];
+          }
+          return [key, value];
+        })
+      );
+      
+      await api.post(`clinical/visits/${selectedVisit.id}/record_vitals/`, cleanedData);
+      toast.success("Vitals captured! Patient moved to consultation.", { id: loadingToast });
+      setSelectedVisit(null);
+      resetForm();
+      setFormAttempted(false);
+      fetchActiveVisits();
+    } catch (err) {
+      toast.error("Validation error. Please check formatting.", { id: loadingToast });
+    }
+  };
+
+  const resetForm = () => {
+    setVitalsData({ 
+        temperature_c: '', blood_pressure_sys: '', blood_pressure_dia: '', 
+        heart_rate: '', respiratory_rate: '', spo2: '', 
+        weight_kg: '', height_cm: '', symptoms: '', notes: '',
+        smoking: 'NO', alcohol: 'NO', physical_activity: 'NO', food_habit: 'VEG', allergy_food: 'NO', allergy_drug: 'NO',
+        family_dm: 'NO', family_htn: 'NO', family_cancer: 'NO', family_cvs: 'NO', family_thyroid: 'NO', family_tb: 'NO', family_others: '',
+        sys_respiratory: 'NAD', sys_cvs: 'NAD', sys_cns: 'NAD', sys_gis: 'NAD', sys_mss: 'NAD', sys_gus: 'NAD',
+        known_dm: 'NO', known_htn: 'NO', known_cancer: 'NO', known_cvs: 'NO', known_thyroid: 'NO', known_tb: 'NO', known_others: ''
+    });
+    setFormAttempted(false);
+  };
+
+  return (
+    <div className="fade-in">
+      <header style={{ marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Triage & Nursing Station</h1>
+        <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
+      </header>
+
+      <div style={{ gap: '2rem', alignItems: 'start' }}>
+        {/* Waiting List - Only show if NO patient is selected */}
+        {!selectedVisit && (
+          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Nurse Queue ({activeVisits.length})</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Updated just now</p>
+               </div>
+               <button onClick={() => fetchActiveVisits()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Clock size={18} color="#6366f1" />
+               </button>
+            </div>
+            
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Name</th>
+                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</th>
+                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registration</th>
+                     <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeVisits.map(v => (
+                    <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid #f1f5f9', transition: 'all 0.2s ease' }}>
+                      <td style={{ padding: '1.25rem 1.5rem' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{ width: '42px', height: '42px', background: '#f0fdf4', color: '#10b981', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem', boxShadow: 'inset 0 0 0 1px rgba(16, 185, 129, 0.1)' }}>
+                               {v.patient_details?.first_name[0].toLowerCase()}
+                            </div>
+                            <div>
+                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#1e293b' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>UHID: #{1000 + v.id}</p>
+                            </div>
+                         </div>
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>{v.reason || 'Routine Checkup...'}</td>
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>{new Date(v.visit_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                      <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                        <button 
+                          onClick={() => {
+                              setSelectedVisit(v);
+                              if (v.vitals) {
+                                  setVitalsData({
+                                      temperature_c: v.vitals.temperature_c || '',
+                                      blood_pressure_sys: v.vitals.blood_pressure_sys || '',
+                                      blood_pressure_dia: v.vitals.blood_pressure_dia || '',
+                                      heart_rate: v.vitals.heart_rate || '',
+                                      respiratory_rate: v.vitals.respiratory_rate || '',
+                                      spo2: v.vitals.spo2 || '',
+                                      weight_kg: v.vitals.weight_kg || '',
+                                      height_cm: v.vitals.height_cm || '',
+                                      symptoms: v.vitals.symptoms || '',
+                                      notes: v.vitals.notes || '',
+                                      smoking: v.vitals.smoking || 'NO',
+                                      alcohol: v.vitals.alcohol || 'NO',
+                                      physical_activity: v.vitals.physical_activity || 'NO',
+                                      food_habit: v.vitals.food_habit || 'VEG',
+                                      allergy_food: v.vitals.allergy_food || 'NO',
+                                      allergy_drug: v.vitals.allergy_drug || 'NO',
+                                      family_dm: v.vitals.family_dm || 'NO',
+                                      family_htn: v.vitals.family_htn || 'NO',
+                                      family_cancer: v.vitals.family_cancer || 'NO',
+                                      family_cvs: v.vitals.family_cvs || 'NO',
+                                      family_thyroid: v.vitals.family_thyroid || 'NO',
+                                      family_tb: v.vitals.family_tb || 'NO',
+                                      family_others: v.vitals.family_others || '',
+                                      sys_respiratory: v.vitals.sys_respiratory || 'NAD',
+                                      sys_cvs: v.vitals.sys_cvs || 'NAD',
+                                      sys_cns: v.vitals.sys_cns || 'NAD',
+                                      sys_gis: v.vitals.sys_gis || 'NAD',
+                                      sys_mss: v.vitals.sys_mss || 'NAD',
+                                      sys_gus: v.vitals.sys_gus || 'NAD',
+                                      known_dm: v.vitals.known_dm || 'NO',
+                                      known_htn: v.vitals.known_htn || 'NO',
+                                      known_cancer: v.vitals.known_cancer || 'NO',
+                                      known_cvs: v.vitals.known_cvs || 'NO',
+                                      known_thyroid: v.vitals.known_thyroid || 'NO',
+                                      known_tb: v.vitals.known_tb || 'NO',
+                                      known_others: v.vitals.known_others || ''
+                                  });
+                              } else {
+                                  resetForm();
+                              }
+                          }}
+                          style={{ 
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.625rem 1.5rem',
+                            borderRadius: '12px',
+                            fontSize: '0.8125rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                          onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                           Assess <ArrowRight size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!isLoading && activeVisits.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '3.5rem', color: '#94a3b8' }}>
+                         <UserCheck size={40} style={{ marginBottom: '1rem', opacity: 0.2 }} />
+                         <p>Queue is empty. Well done!</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            {totalCount > 10 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                          className="btn btn-secondary" disabled={page === 1} onClick={() => fetchActiveVisits(page - 1)}
+                          style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
+                      >
+                          <ChevronLeft size={16} />
+                      </button>
+                      <button 
+                          className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchActiveVisits(page + 1)}
+                          style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
+                      >
+                          <ChevronRight size={16} />
+                      </button>
+                  </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Vitals & Observations Form - Only show if a patient is selected */}
+        {selectedVisit && (
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <div className="card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '0.5rem' }}>
+                 <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                    <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                       <Activity size={24} color="white" />
+                    </div>
+                    <div>
+                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
+                       <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> UHID: #{1000 + selectedVisit.id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
+                    <X size={20} />
+                 </button>
+              </div>
+              
+              {/* Patient Profile Summary */}
+              <div style={{ background: '#f8fafc', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9', display: 'flex', gap: '3rem' }}>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
+                 </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
+                 </div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{selectedVisit.reason || 'OPD Consultation'}</p>
+                 </div>
+                 <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Status</p>
+                    <span style={{ fontSize: '0.6875rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content', marginLeft: 'auto' }}>WAITING</span>
+                 </div>
+              </div>
+
+            <form onSubmit={handleSaveVitals}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+                   <div className="form-group">
+                      <label><Scale size={14} /> Weight <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" step="0.01" required value={vitalsData.weight_kg} onChange={e => setVitalsData({...vitalsData, weight_kg: e.target.value})} placeholder="e.g. 70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && !vitalsData.weight_kg) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
+                      </div>
+                      {formAttempted && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                   </div>
+                   <div className="form-group">
+                      <label>Height <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" step="0.1" required value={vitalsData.height_cm} onChange={e => setVitalsData({...vitalsData, height_cm: e.target.value})} placeholder="e.g. 175" style={{ paddingRight: '3rem !important', border: (formAttempted && !vitalsData.height_cm) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>CM</span>
+                      </div>
+                      {formAttempted && !vitalsData.height_cm && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                   </div>
+                </div>
+
+                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Vital Signs</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                   <div className="form-group">
+                      <label><Thermometer size={14} /> Temperature <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" step="0.1" required value={vitalsData.temperature_c} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder="36.5" style={{ paddingRight: '2.5rem !important', border: (formAttempted && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>°C</span>
+                      </div>
+                      {formAttempted && !vitalsData.temperature_c && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                   </div>
+                   <div className="form-group">
+                      <label><Heart size={14} /> Pulse</label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" required value={vitalsData.heart_rate} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>BPM</span>
+                      </div>
+                   </div>
+                   <div className="form-group">
+                      <label><Wind size={14} /> Resp Rate</label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" required value={vitalsData.respiratory_rate} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>B/M</span>
+                      </div>
+                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                   <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.75rem', display: 'block' }}>Blood Pressure (Sys / Dia)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                         <div style={{ position: 'relative', flex: 1 }}>
+                            <input type="number" required value={vitalsData.blood_pressure_sys} onChange={e => setVitalsData({...vitalsData, blood_pressure_sys: e.target.value})} placeholder="120" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
+                            <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>SYS</span>
+                         </div>
+                         <span style={{ fontSize: '1.25rem', color: '#cbd5e1', fontWeight: 300 }}>/</span>
+                         <div style={{ position: 'relative', flex: 1 }}>
+                            <input type="number" required value={vitalsData.blood_pressure_dia} onChange={e => setVitalsData({...vitalsData, blood_pressure_dia: e.target.value})} placeholder="80" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
+                            <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>DIA</span>
+                         </div>
+                      </div>
+                   </div>
+                   <div className="form-group" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <label><Droplet size={14} /> Oxygen (SPO2)</label>
+                      <div style={{ position: 'relative' }}>
+                         <input type="number" required value={vitalsData.spo2} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>%</span>
+                      </div>
+                   </div>
+                </div>
+
+               <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Observations</p>
+               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label><Clipboard size={14} /> Current Symptoms</label>
+                  <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during triage..."></textarea>
+               </div>
+               
+               <div className="form-group" style={{ marginBottom: '2.5rem' }}>
+                  <label><FileText size={14} /> Nursing Notes</label>
+                  <textarea rows="2" value={vitalsData.notes} onChange={e => setVitalsData({...vitalsData, notes: e.target.value})} placeholder="Any additional observations or patient behavioral notes..."></textarea>
+               </div>
+
+               {/* Medical History Sections */}
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+                  {/* Personal History */}
+                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Personal History</p>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <ToggleField label="Smoking (Tobacco)" value={vitalsData.smoking} onChange={val => setVitalsData({...vitalsData, smoking: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Alcohol" value={vitalsData.alcohol} onChange={val => setVitalsData({...vitalsData, alcohol: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Physical Activity" value={vitalsData.physical_activity} onChange={val => setVitalsData({...vitalsData, physical_activity: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Food Habit" value={vitalsData.food_habit} onChange={val => setVitalsData({...vitalsData, food_habit: val})} options={['VEG', 'NON-VEG']} />
+                        <ToggleField label="Allergy: Food" value={vitalsData.allergy_food} onChange={val => setVitalsData({...vitalsData, allergy_food: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Allergy: Drug" value={vitalsData.allergy_drug} onChange={val => setVitalsData({...vitalsData, allergy_drug: val})} options={['YES', 'NO']} />
+                     </div>
+                  </div>
+
+                  {/* Family History */}
+                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Family History (Parents/Siblings)</p>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <ToggleField label="DM (Diabetes)" value={vitalsData.family_dm} onChange={val => setVitalsData({...vitalsData, family_dm: val})} options={['YES', 'NO']} />
+                        <ToggleField label="HTN (Hypertension)" value={vitalsData.family_htn} onChange={val => setVitalsData({...vitalsData, family_htn: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Cancer" value={vitalsData.family_cancer} onChange={val => setVitalsData({...vitalsData, family_cancer: val})} options={['YES', 'NO']} />
+                        <ToggleField label="CVS" value={vitalsData.family_cvs} onChange={val => setVitalsData({...vitalsData, family_cvs: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Thyroid" value={vitalsData.family_thyroid} onChange={val => setVitalsData({...vitalsData, family_thyroid: val})} options={['YES', 'NO']} />
+                        <ToggleField label="TB" value={vitalsData.family_tb} onChange={val => setVitalsData({...vitalsData, family_tb: val})} options={['YES', 'NO']} />
+                        <div className="form-group-mini">
+                           <label style={{ fontSize: '0.7rem' }}>Other Family History</label>
+                           <input type="text" style={{ padding: '0.4rem !important', fontSize: '0.75rem' }} value={vitalsData.family_others} onChange={e => setVitalsData({...vitalsData, family_others: e.target.value})} placeholder="e.g. Asthma..." />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Systemic Examination */}
+                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Systemic Examination</p>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <ToggleField label="Respiratory" value={vitalsData.sys_respiratory} onChange={val => setVitalsData({...vitalsData, sys_respiratory: val})} options={['FND', 'NAD']} />
+                        <ToggleField label="C.V.S" value={vitalsData.sys_cvs} onChange={val => setVitalsData({...vitalsData, sys_cvs: val})} options={['FND', 'NAD']} />
+                        <ToggleField label="C.N.S" value={vitalsData.sys_cns} onChange={val => setVitalsData({...vitalsData, sys_cns: val})} options={['FND', 'NAD']} />
+                        <ToggleField label="G.I.S" value={vitalsData.sys_gis} onChange={val => setVitalsData({...vitalsData, sys_gis: val})} options={['FND', 'NAD']} />
+                        <ToggleField label="M.S.S" value={vitalsData.sys_mss} onChange={val => setVitalsData({...vitalsData, sys_mss: val})} options={['FND', 'NAD']} />
+                        <ToggleField label="G.U.S" value={vitalsData.sys_gus} onChange={val => setVitalsData({...vitalsData, sys_gus: val})} options={['FND', 'NAD']} />
+                     </div>
+                  </div>
+
+                  {/* Known History */}
+                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Known History</p>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <ToggleField label="Known DM" value={vitalsData.known_dm} onChange={val => setVitalsData({...vitalsData, known_dm: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Known HTN" value={vitalsData.known_htn} onChange={val => setVitalsData({...vitalsData, known_htn: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Known Cancer" value={vitalsData.known_cancer} onChange={val => setVitalsData({...vitalsData, known_cancer: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Known C.V.S" value={vitalsData.known_cvs} onChange={val => setVitalsData({...vitalsData, known_cvs: val})} options={['YES', 'NO']} />
+                        <ToggleField label="Thyroid Disorder" value={vitalsData.known_thyroid} onChange={val => setVitalsData({...vitalsData, known_thyroid: val})} options={['YES', 'NO']} />
+                        <ToggleField label="TB" value={vitalsData.known_tb} onChange={val => setVitalsData({...vitalsData, known_tb: val})} options={['YES', 'NO']} />
+                        <div className="form-group-mini">
+                           <label style={{ fontSize: '0.7rem' }}>Other History</label>
+                           <input type="text" style={{ padding: '0.4rem !important', fontSize: '0.75rem' }} value={vitalsData.known_others} onChange={e => setVitalsData({...vitalsData, known_others: e.target.value})} placeholder="Any other relevant history..." />
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
+                     Complete Assessment <ArrowRight size={16} style={{ marginLeft: '10px' }} />
+                  </button>
+               </div>
+            </form>
+          </div>
+        </div>
+        )}
+      </div>
+
+      <style>{`
+         .form-group label { display: flex; alignItems: center; gap: 0.5rem; color: #475569; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.8125rem; }
+         input, select, textarea { 
+            border: 1px solid #e2e8f0 !important;
+            background: #fff !important;
+            padding: 0.75rem 1rem !important;
+            border-radius: 10px !important;
+            font-size: 0.875rem !important;
+            font-weight: 600 !important;
+            color: #1e293b !important;
+         }
+         input:focus, textarea:focus {
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important;
+            outline: none !important;
+         }
+         .form-group-mini label { display: block; color: #64748b; margin-bottom: 0.25rem; font-weight: 800; }
+      `}</style>
+    </div>
+  );
+};
+
+const ToggleField = ({ label, value, onChange, options }) => (
+   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{label}</span>
+      <div style={{ display: 'flex', gap: '2px', background: '#e2e8f0', padding: '2px', borderRadius: '6px' }}>
+         {options.map(opt => (
+            <button
+               key={opt}
+               type="button"
+               onClick={() => onChange(opt)}
+               style={{
+                  border: 'none',
+                  padding: '4px 10px',
+                  fontSize: '0.625rem',
+                  fontWeight: 800,
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  background: value === opt ? 'var(--primary)' : 'transparent',
+                  color: value === opt ? 'white' : '#64748b',
+                  transition: 'all 0.2s ease'
+               }}
+            >
+               {opt}
+            </button>
+         ))}
+      </div>
+   </div>
+);
+
+export default Vitals;

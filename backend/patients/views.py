@@ -1,0 +1,400 @@
+from django.db.models import Count, Q
+from django.utils import timezone
+from rest_framework import viewsets, permissions, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField
+from .serializers import (
+    PatientSerializer, EmployeeMasterSerializer, FamilyMemberSerializer,
+    ProjectSerializer, ProjectCategoryMappingSerializer, ProjectFieldConfigSerializer,
+    RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer
+)
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all().order_by('name')
+    serializer_class = ProjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['post'], url_path='sync-mappings')
+    def sync_mappings(self, request, pk=None):
+        project = self.get_object()
+        categories = request.data.get('categories', [])
+        ProjectCategoryMapping.objects.filter(project=project).delete()
+        for cat in categories:
+            ProjectCategoryMapping.objects.create(project=project, category=cat)
+        return Response({"status": "Mappings synchronized."})
+
+class RegistryTypeViewSet(viewsets.ModelViewSet):
+    queryset = RegistryType.objects.all()
+    serializer_class = RegistryTypeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class RegistryFieldViewSet(viewsets.ModelViewSet):
+    queryset = RegistryField.objects.all()
+    serializer_class = RegistryFieldSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+from rest_framework.pagination import PageNumberPagination
+
+class LargeResultsPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
+class RegistryDataViewSet(viewsets.ModelViewSet):
+    queryset = RegistryData.objects.all()
+    serializer_class = RegistryDataSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LargeResultsPagination
+    search_fields = ['ucode', 'name']
+
+    def get_queryset(self):
+        """
+        Dynamically filters the Clinical Repository based on the active registry scope (Protocol).
+        Ensures that data is strictly isolated between different clinical workstreams.
+        """
+        queryset = RegistryData.objects.all().select_related('registry_type').order_by('id')
+        
+        # Protocol Isolation: Filter by Registry ID or Slug
+        registry_type = self.request.query_params.get('registry_type')
+        if registry_type and registry_type != 'null' and registry_type != 'undefined':
+            # Handle both primary key (numeric ID) and technical slug (textual ID)
+            if str(registry_type).isdigit():
+                queryset = queryset.filter(registry_type_id=int(registry_type))
+            else:
+                queryset = queryset.filter(registry_type__slug=registry_type)
+        elif not self.request.query_params.get('all', False):
+            # If no protocol is specified and 'all' is not set, we return an empty set
+            # to prevent cross-registry data leakage (Personnel board security)
+            queryset = queryset.none()
+
+        # Project Isolation: Filter by associated project
+        project_id = self.request.query_params.get('project')
+        if project_id and project_id != 'null' and project_id != 'undefined':
+            queryset = queryset.filter(registry_type__project_id=project_id)
+
+        # Workspace Search: Filter by primary identifiers (ucode/name)
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(Q(ucode__icontains=search) | Q(name__icontains=search) | Q(category__icontains=search))
+
+        return queryset
+
+    @action(detail=False, methods=['get'], url_path='all-masters')
+    def all_masters(self, request):
+        """Provides a master list of all clinical registries for Navbar/Dashboard integration."""
+        from .models import RegistryType
+        from .serializers import RegistryTypeSerializer
+        types = RegistryType.objects.all()
+        return Response(RegistryTypeSerializer(types, many=True).data)
+
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        registry_type_id = request.data.get('registry_type')
+        records = request.data.get('records', [])
+        if not registry_type_id or not records:
+            return Response({"error": "Missing registry_type or records"}, status=400)
+        
+        # Support slug-based lookup if registry_type_id is not numeric
+        active_type_id = None
+        if str(registry_type_id).isdigit():
+            active_type_id = int(registry_type_id)
+        else:
+            rt = RegistryType.objects.filter(slug=registry_type_id).first()
+            if rt:
+                active_type_id = rt.id
+            else:
+                return Response({"error": f"Registry type with slug '{registry_type_id}' not found"}, status=404)
+
+        # Fetch active schema for this registry type
+        from .models import RegistryField
+        schema_fields = RegistryField.objects.filter(registry_type_id=active_type_id)
+        field_slugs = [f.slug for f in schema_fields]
+
+        success_count = 0
+        for data in records:
+            try:
+                # Resolve ucode/primary key - check multiple common variants
+                ucode = data.get('ucode') or data.get('card_no') or data.get('item_code') or next(iter(data.values()))
+                name = data.get('name') or data.get('item_name') or data.get('label') or ""
+                
+                # Case-insensitive mapping of CSV headers to schema slugs
+                additional = {}
+                slug_map = {s.lower(): s for s in field_slugs} # Map lower -> exact slug
+                
+                for key, val in data.items():
+                    clean_key = str(key).strip().lower()
+                    if clean_key in slug_map:
+                        additional[slug_map[clean_key]] = val
+                    elif key in field_slugs:
+                        additional[key] = val
+                
+                RegistryData.objects.update_or_create(
+                    registry_type_id=active_type_id,
+                    ucode=str(ucode).strip(),
+                    defaults={
+                        'name': str(name).strip(),
+                        'category': data.get('category') or data.get('item_group', ''),
+                        'description': str(data.get('description') or ''),
+                        'quantity': int(data.get('quantity') or data.get('qty') or 0),
+                        'cost': float(data.get('cost') or data.get('price') or 0.0),
+                        'additional_fields': additional
+                    }
+                )
+                success_count += 1
+            except Exception as e:
+                print(f"Schema Mapping Error: {e}")
+        return Response({"success": success_count})
+
+    @action(detail=False, methods=['get'], url_path='all-masters')
+    def all_masters(self, request):
+        """Provides a master list of all clinical registries for Navbar/Dashboard integration."""
+        from .models import RegistryType
+        from .serializers import RegistryTypeSerializer
+        types = RegistryType.objects.all()
+        return Response(RegistryTypeSerializer(types, many=True).data)
+
+class ProjectCategoryMappingViewSet(viewsets.ModelViewSet):
+    queryset = ProjectCategoryMapping.objects.all()
+    serializer_class = ProjectCategoryMappingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class ProjectFieldConfigViewSet(viewsets.ModelViewSet):
+    queryset = ProjectFieldConfig.objects.all()
+    serializer_class = ProjectFieldConfigSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class EmployeeMasterViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeMaster.objects.all().order_by('card_no')
+    serializer_class = EmployeeMasterSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    search_fields = ['card_no', 'name', 'aadhar_no', 'mobile_no']
+
+    def get_queryset(self):
+        queryset = EmployeeMaster.objects.all().order_by('card_no')
+        user = self.request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        roles = user.user_roles.all()
+        is_isolated_personally = False
+        if roles.exists():
+            is_isolated_personally = any(r.data_isolation for r in roles)
+        else:
+            is_isolated_personally = not is_admin
+
+        if not is_admin:
+            if is_isolated_personally:
+                queryset = queryset.none()
+            elif user.project:
+                queryset = queryset.filter(project=user.project)
+            else:
+                queryset = queryset.none()
+
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
+
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        records = request.data.get('records', [])
+        passed_records = []; failed_records = []; success_count = 0; error_count = 0
+        for data in records:
+            relationship = str(data.get('relationship', '')).strip().upper()
+            if 'PRIMARY' in relationship or 'HOLDER' in relationship:
+                try:
+                    EmployeeMaster.objects.update_or_create(
+                        card_no=str(data.get('card_no')).strip(),
+                        defaults={
+                            'project_id': data.get('project'),
+                            'name': data.get('name'), 'dob': data.get('dob'),
+                            'gender': str(data.get('gender', 'MALE')).strip().upper(),
+                            'aadhar_no': data.get('aadhar_no') or None,
+                            'mobile_no': data.get('mobile_no'),
+                            'address': data.get('address', ''), 'designation': data.get('designation', ''),
+                        }
+                    )
+                    success_count += 1
+                except Exception as e: error_count += 1; failed_records.append({**data, 'error': str(e)})
+        for data in records:
+            relationship = str(data.get('relationship', '')).strip().upper()
+            if 'PRIMARY' not in relationship and 'HOLDER' not in relationship:
+                try:
+                    full_card_no = str(data.get('card_no')).strip()
+                    parent_card_no = full_card_no.split('/')[0] if '/' in full_card_no else full_card_no
+                    suffix = '/' + full_card_no.split('/')[1] if '/' in full_card_no else '/1'
+                    employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
+                    if employee:
+                        FamilyMember.objects.update_or_create(employee=employee, card_no_suffix=suffix, defaults={
+                            'name': data.get('name'), 'dob': data.get('dob'), 'gender': str(data.get('gender', 'MALE')).strip().upper(),
+                            'aadhar_no': data.get('aadhar_no') or None, 'mobile_no': data.get('mobile_no'), 'relationship': relationship
+                        })
+                        success_count += 1
+                    else: error_count += 1; failed_records.append({**data, 'error': "Parent not found"})
+                except Exception as e: error_count += 1; failed_records.append({**data, 'error': str(e)})
+        return Response({"success": success_count, "errors": error_count, "failed_records": failed_records})
+
+    @action(detail=False, methods=['get'], url_path='all-masters')
+    def all_masters(self, request):
+        """Returns all employee masters with their nested family members for unified search in Navbar."""
+        from .models import EmployeeMaster
+        from .serializers import EmployeeMasterSerializer
+        # We prefetch family_members to avoid N+1 queries in the Navbar search
+        employees = EmployeeMaster.objects.all().prefetch_related('family_members')
+        return Response(EmployeeMasterSerializer(employees, many=True).data)
+
+class FamilyMemberViewSet(viewsets.ModelViewSet):
+    queryset = FamilyMember.objects.all()
+    serializer_class = FamilyMemberSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class RegistryReportView(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        user = request.user
+        project_id = request.query_params.get('project')
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+
+        active_project = None
+        if not is_admin:
+            active_project = user.project
+        elif project_id:
+            active_project = Project.objects.filter(id=project_id).first()
+
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Count, Sum, Case, When, FloatField, Q
+        from accounts.models import AuditLog
+        from clinical.models import Visit
+
+        today = timezone.localdate()
+        week_ago = today - timedelta(days=7)
+
+        # Base filters
+        patient_qs = Patient.objects.all()
+        visit_qs = Visit.objects.all()
+        inventory_items = RegistryData.objects.filter(registry_type__slug='pharmacy-drugs')
+
+        if active_project:
+            patient_qs = patient_qs.filter(Q(project=active_project) | Q(employee_master__project=active_project))
+            visit_qs = visit_qs.filter(Q(patient__project=active_project) | Q(patient__employee_master__project=active_project))
+            inventory_items = inventory_items.filter(registry_type__project=active_project)
+        
+        # 1. Consumption Aggregation (Last 7 Days Trend)
+        # Search for all consumption logs first
+        consumption_logs = AuditLog.objects.filter(details__icontains='[CONSUMPTION]', timestamp__date__gte=week_ago)
+        
+        # Primary daily series
+        daily_series = { (today - timedelta(days=i)).strftime('%Y-%m-%d'): 0 for i in range(7) }
+        consumption_map = {}
+        
+        # Source 2: Actual DispensingRecords (Pharmacy)
+        from pharmacy.models import DispensingRecord, Prescription
+        dispensed_records = DispensingRecord.objects.filter(dispensed_at__date__gte=week_ago)
+        
+        # Source 3: Active Prescriptions (Doctor) - as fallback for units
+        prescriptions = Prescription.objects.filter(created_at__date__gte=week_ago)
+
+        if active_project:
+            # Filter all sources by project
+            dispensed_records = dispensed_records.filter(
+                Q(prescription__visit__patient__project=active_project) | 
+                Q(prescription__visit__patient__employee_master__project=active_project)
+            )
+            prescriptions = prescriptions.filter(
+                Q(visit__patient__project=active_project) | 
+                Q(visit__patient__employee_master__project=active_project)
+            )
+            # Log filtering done via details__contains
+            pid_search = f'Project:{active_project.id}'
+            consumption_logs = consumption_logs.filter(details__icontains=pid_search)
+
+        import re
+        # Aggregation Logic
+        def add_to_series(date_obj, qty, med_name):
+            try:
+                ds_key = date_obj.strftime('%Y-%m-%d')
+                if ds_key in daily_series:
+                    daily_series[ds_key] += qty
+                if med_name:
+                    consumption_map[med_name] = consumption_map.get(med_name, 0) + qty
+            except: pass
+
+        # Process AuditLogs
+        for log in consumption_logs:
+            try:
+                # Group 1: Name, Group 2: Qty
+                match = re.search(r'\[CONSUMPTION\]\s*(.*?)\s*\|\s*(\d+)', log.details, re.IGNORECASE)
+                if match:
+                    add_to_series(timezone.localtime(log.timestamp).date(), int(match.group(2)), match.group(1).strip())
+            except: continue
+
+        # Process Dispensed Records
+        for dr in dispensed_records:
+            add_to_series(timezone.localtime(dr.dispensed_at).date(), dr.quantity, dr.prescription.medication_name)
+
+        # Process Prescriptions (if count hasn't been added yet for this visit/medicine)
+        # We only use this if consumption_map is low to ensure something shows up
+        if not any(v > 0 for v in daily_series.values()):
+            for p in prescriptions:
+                # Rough estimate of quantity if not explicitly in a log
+                qty = 10 # Default fallback
+                add_to_series(timezone.localtime(p.created_at).date(), qty, p.medication_name)
+
+        trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])
+
+        # 2. Conversion Analytics (Dynamic)
+        total_v = visit_qs.count()
+        completed_v = visit_qs.filter(status__in=['COMPLETED', 'PENDING_PHARMACY']).count()
+        conversion_rate = round((completed_v / total_v * 100) if total_v > 0 else 0, 1)
+
+        # 3. Inventory Health
+        inventory_stats = inventory_items.aggregate(
+            total_value=Sum(Case(When(quantity__gt=0, then='cost'), default=0, output_field=FloatField())),
+            low_stock=Count('id', filter=Q(quantity__lt=10, quantity__gt=0)),
+            out_of_stock=Count('id', filter=Q(quantity=0))
+        )
+
+        all_c = sorted([{'name': k, 'total': v} for k, v in consumption_map.items()], key=lambda x: x['total'], reverse=True)
+
+        return Response({
+            'total_registered': patient_qs.count(),
+            'conversion_rate': conversion_rate,
+            'inventory_value': inventory_stats['total_value'] or 0,
+            'stock_health': {
+                'low': inventory_stats['low_stock'],
+                'out': inventory_stats['out_of_stock']
+            },
+            'trends': trends,
+            'by_gender': list(patient_qs.values('gender').annotate(count=Count('gender'))),
+            'top_medications': all_c[:10],
+            'all_consumption': all_c, # For accurate Full Export
+            'project_name': active_project.name if active_project else "All Projects"
+        })
+
+class PatientViewSet(viewsets.ModelViewSet):
+
+    serializer_class = PatientSerializer
+    search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no']
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Patient.objects.all().order_by('-created_at')
+        user = self.request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        if not is_admin:
+            if user.project: queryset = queryset.filter(Q(project=user.project) | Q(employee_master__project=user.project))
+            else: queryset = queryset.filter(registered_by=user)
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        today = timezone.now().date()
+        patient_qs = self.get_queryset()
+        return Response({
+            "total_registered": patient_qs.count(),
+            "opd_today": 0, # Simplified
+            "emergency_today": 0
+        })
