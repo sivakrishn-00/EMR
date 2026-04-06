@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/';
+// Dynamic Cluster Bridge (Handles Dev, LAN, and Public IP Deployments)
+const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isDev 
+  ? 'http://localhost:8000/api/'           // Terminal 1: Dev Loop
+  : `http://${window.location.hostname}:9002/api/`; // Terminal 2: Production Server (9002)
 
 const api = axios.create({
   baseURL: API_BASE_URL,

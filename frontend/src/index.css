@@ -25,6 +25,17 @@
   --radius-lg: 24px;
 }
 
+:root.dark-theme {
+  --background: #0f172a;
+  --surface: #1e293b;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --header-bg: #1e293b;
+  --input-bg: #0f172a;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -131,13 +142,13 @@ body {
 }
 
 .btn-secondary {
-  background: white;
+  background: var(--surface);
   border-color: var(--border);
   color: var(--text-main);
 }
 .btn-secondary:hover {
   background: var(--background);
-  border-color: #cbd5e1;
+  border-color: var(--border);
 }
 
 /* Form Styles */
@@ -158,12 +169,13 @@ input, select, textarea {
   border: 1px solid var(--border);
   font-size: 0.875rem;
   transition: all 0.2s;
-  background: #f8fafc;
+  background: var(--input-bg, #f8fafc);
+  color: var(--text-main);
 }
 input:focus {
   outline: none;
   border-color: var(--primary);
-  background: white;
+  background: var(--surface);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
 }
 
@@ -173,14 +185,14 @@ input:focus {
   overflow-x: auto;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: white;
+  background: var(--surface);
 }
 table {
   width: 100%;
   border-collapse: collapse;
 }
 th {
-  background: #f8fafc;
+  background: var(--background);
   text-align: left;
   padding: 1rem;
   color: var(--text-muted);
@@ -194,12 +206,13 @@ td {
   padding: 1.25rem 1rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.875rem;
+  color: var(--text-main);
 }
 tr:last-child td {
   border-bottom: none;
 }
 tr:hover td {
-  background: #f8fafc;
+  background: var(--background) !important;
 }
 
 /* Badges */
@@ -239,9 +252,9 @@ tr:hover td {
 
 /* Glassmorphism Effects */
 .glass {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.7));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border);
 }
 
 /* Animations */

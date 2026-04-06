@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   Info,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,9 +26,12 @@ const Laboratory = () => {
   // Form States
   const [resultData, setResultData] = useState({ 
     value: '', 
+    values: {},
     reference_range: '', 
     interpretation: '' 
   });
+  const [hardwareMatches, setHardwareMatches] = useState([]);
+  const [isFetchingMatching, setIsFetchingMatching] = useState(false);
 
   const [sampleData, setSampleData] = useState({
     sample_type: 'Blood',
@@ -65,7 +69,6 @@ const Laboratory = () => {
       await api.post(`laboratory/requests/${selectedRequest.id}/collect_sample/`, sampleData);
       toast.success("Sample collection recorded!", { id: loadingToast });
       fetchLabRequests();
-      // Keep selected for result entry if needed, but refresh data
       const updated = await api.get(`laboratory/requests/${selectedRequest.id}/`);
       setSelectedRequest(updated.data);
     } catch (err) {
@@ -77,14 +80,70 @@ const Laboratory = () => {
     e.preventDefault();
     const loadingToast = toast.loading('Publishing lab results...');
     try {
-      await api.post(`laboratory/requests/${selectedRequest.id}/record_result/`, resultData);
+      await api.post(`laboratory/requests/${selectedRequest.id}/record_result/`, {
+        ...resultData,
+        sample_type: sampleData.sample_type
+      });
       toast.success("Results updated! Notifying doctor.", { id: loadingToast });
       setSelectedRequest(null);
-      setResultData({ value: '', reference_range: '', interpretation: '' });
+      setResultData({ value: '', values: {}, reference_range: '', interpretation: '' });
       fetchLabRequests();
     } catch (err) {
       toast.error("Error saving result. Check if fields are valid.", { id: loadingToast });
     }
+  };
+
+  const fetchMatchingHardwareData = async (patientId) => {
+    if (!patientId) return;
+    setIsFetchingMatching(true);
+    try {
+        const res = await api.get(`laboratory/machine-data/?patient_id=${patientId}`);
+        setHardwareMatches(res.data.results || res.data);
+    } catch (err) {
+        console.error("Link to hardware station offline");
+    } finally {
+        setIsFetchingMatching(false);
+    }
+  };
+
+  const applyHardwareResult = (record) => {
+    const newValues = { ...resultData.values };
+    const mappingDict = {
+        'wbc': ['WBC'], 'rbc': ['RBC'], 'hgb': ['HGB', 'HB'], 'hct': ['HCT', 'PCV'], 'plt': ['PLT'],
+        'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'], 'rdw_cv': ['RDW-CV'], 'rdw_sd': ['RDW-SD'],
+        'lym_pct': ['LYM%', 'LYM'], 'mid_pct': ['MID%', 'MID'], 'gran_pct': ['GRAN%', 'GRAN', 'NEU%', 'GRA%'],
+        'neu_pct': ['NEU%', 'NEUTROPHIL%', 'NEU'],
+        'mon_pct': ['MON%', 'MON'], 'eos_pct': ['EOS%', 'EOS'], 'bas_pct': ['BAS%', 'BAS'],
+        'lym_abs': ['LYM#'], 'mid_abs': ['MID#'], 'gran_abs': ['GRAN#'], 'mon_abs': ['MON#'], 'eos_abs': ['EOS#'], 'bas_abs': ['BAS#'], 'neu_abs': ['NEU#'],
+        'mpv': ['MPV'], 'pct': ['PCT'], 'p_lcr': ['P-LCR'], 'p_lcc': ['P-LCC']
+    };
+
+    if (selectedRequest?.test_master_details?.sub_tests) {
+        selectedRequest.test_master_details.sub_tests.forEach(st => {
+            const stName = st.name.toUpperCase();
+            const stCode = (st.code || '').toUpperCase();
+            
+            Object.entries(mappingDict).forEach(([hwKey, aliases]) => {
+                const val = record[hwKey];
+                if (val === undefined || val === null) return;
+                
+                const isMatch = (stName === hwKey.toUpperCase()) || 
+                                (stCode === hwKey.toUpperCase()) ||
+                                aliases.some(a => stName.includes(a.toUpperCase())) || 
+                                aliases.some(a => stCode === a.toUpperCase()) ||
+                                stName.includes(hwKey.toUpperCase());
+                
+                if (isMatch) newValues[st.name] = val;
+            });
+            
+            if (!newValues[st.name] && record[st.name.toLowerCase()] !== undefined) {
+                newValues[st.name] = record[st.name.toLowerCase()];
+            }
+        });
+    }
+
+    setResultData({ ...resultData, values: newValues, interpretation: `Differential Pulse Synced: ${Object.keys(newValues).length} results verified.` });
+    toast.success(`${Object.keys(newValues).length} values captured from machine!`);
   };
 
   return (
@@ -95,9 +154,8 @@ const Laboratory = () => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
-        {/* Diagnostics Queue */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Workload Queue ({labRequests.length})</h3>
              <Beaker size={18} color="#94a3b8" />
           </div>
@@ -127,7 +185,7 @@ const Laboratory = () => {
                           </div>
                           <div>
                              <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{r.patient_name}</p>
-                             <p style={{ fontSize: '0.625rem', color: '#64748b' }}>#{1000 + r.id}</p>
+                             <p style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: 800 }}>ID: {r.patient_id}</p>
                           </div>
                        </div>
                     </td>
@@ -147,58 +205,34 @@ const Laboratory = () => {
                     <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
                       <button className={`btn ${r.status === 'COMPLETED' ? 'btn-secondary' : 'btn-primary'}`} onClick={() => {
                         setSelectedRequest(r);
+                        const hardwareData = r.result?.values || {};
+                        const initValues = {};
+                        if (r.test_master_details?.sub_tests) {
+                           r.test_master_details.sub_tests.forEach(st => {
+                               const hwKey = st.name.toUpperCase().split(' ')[0];
+                               initValues[st.name] = hardwareData[st.name] || hardwareData[hwKey] || r.result?.values?.[st.name] || '';
+                           });
+                        }
                         setResultData({
                             value: r.result?.value || '',
+                            values: initValues,
                             reference_range: r.result?.reference_range || '',
-                            interpretation: r.result?.interpretation || ''
+                            interpretation: r.result?.interpretation || (Object.keys(hardwareData).length > 0 ? "Data synced from hardware instrument." : '')
                         });
-                        setSampleData({
-                            sample_type: r.sample_type || 'Blood',
-                            remarks: r.remarks || ''
-                        });
+                        if (r.patient_id) fetchMatchingHardwareData(r.patient_id);
                       }} style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}>
                          {r.status === 'COMPLETED' ? 'View Report' : 'Process'} <ArrowRight size={14} style={{ marginLeft: '4px' }} />
                       </button>
                     </td>
                   </tr>
                 ))}
-                {!isLoading && labRequests.length === 0 && (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '3.5rem', color: '#94a3b8' }}>
-                       <CheckCircle size={40} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-                       <p>Zero pending laboratory requests.</p>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
-          
-          {/* Pagination */}
-          {totalCount > 10 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                        className="btn btn-secondary" disabled={page === 1} onClick={() => fetchLabRequests(page - 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                        className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchLabRequests(page + 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
-            </div>
-          )}
         </div>
 
-        {/* Action Panel */}
         {selectedRequest && (
-          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
+          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ padding: '0.75rem', background: '#92400e', borderRadius: '14px', color: 'white' }}>
@@ -214,130 +248,115 @@ const Laboratory = () => {
                </button>
             </div>
 
-            {/* Workflow Tabs/Steps */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={{ 
-                    flex: 1, padding: '1rem', borderRadius: '16px', 
-                    background: selectedRequest.status === 'PENDING' ? '#fffbeb' : '#f8fafc',
-                    border: '1px solid',
-                    borderColor: selectedRequest.status === 'PENDING' ? '#fef3c7' : '#e2e8f0',
-                    opacity: selectedRequest.status === 'COMPLETED' ? 0.6 : 1
-                }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#92400e', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Step 1: Sample Collection</p>
-                    {selectedRequest.status === 'PENDING' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <select 
-                                value={sampleData.sample_type} 
-                                onChange={e => setSampleData({...sampleData, sample_type: e.target.value})}
-                                style={{ height: '36px', fontSize: '0.75rem', borderRadius: '8px' }}
-                            >
-                                <option value="Blood">Blood (Whole/Serum)</option>
-                                <option value="Urine">Urine</option>
-                                <option value="Swab">Swab (Throat/Nasal)</option>
-                                <option value="Sputum">Sputum</option>
-                                <option value="Others">Others</option>
-                            </select>
-                            <button className="btn btn-primary" onClick={handleCollectSample} style={{ width: '100%', padding: '0.5rem', background: '#92400e' }}>
-                                Mark Sample Collected
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669' }}>
-                            <ShieldCheck size={16} />
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{selectedRequest.sample_type} Collected</span>
-                        </div>
-                    )}
+            <div style={{ background: 'var(--background)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Investigation Profile</span>
                 </div>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' }}>{selectedRequest.test_name}</div>
+                {selectedRequest.test_master_details?.sub_tests?.length > 0 && (
+                   <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {selectedRequest.test_master_details.sub_tests.filter(st => st.is_active).map(st => (
+                         <span key={st.id} style={{ fontSize: '0.625rem', background: 'var(--surface)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '8px', fontWeight: 700, border: '1px solid var(--border)' }}>
+                            {st.name} {selectedRequest.status === 'COMPLETED' ? `: ${selectedRequest.result?.values?.[st.name] || '-'} ${st.units}` : `(${st.units})`}
+                         </span>
+                      ))}
+                   </div>
+                )}
             </div>
 
-            {/* Result Reporting Form - Only available if sample is collected or reporting exists */}
-            {(selectedRequest.status !== 'PENDING') && (
-                <form onSubmit={handleSaveResult} className="fade-in">
-                    <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #f1f5f9' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileText size={16} color="var(--primary)" /> Reporting Results
-                        </p>
-                        
-                        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Test values / Report findings *</label>
-                            <input 
-                                required 
-                                readOnly={selectedRequest.status === 'COMPLETED'}
-                                value={resultData.value} 
-                                onChange={e => setResultData({...resultData, value: e.target.value})} 
-                                placeholder="e.g. 11.2 g/dL" 
-                                style={{ height: '48px', fontSize: '1.125rem', fontWeight: 800, background: selectedRequest.status === 'COMPLETED' ? '#f1f5f9' : 'white' }} 
-                            />
+            {selectedRequest.status !== 'COMPLETED' && (
+               <div style={{ marginBottom: '2rem', background: 'var(--surface)', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #4f46e5 0%, #312e81 100%)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ShieldCheck size={20} color="white" />
                         </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                            <div className="form-group">
-                                <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Reference Range</label>
-                                <input 
-                                    readOnly={selectedRequest.status === 'COMPLETED'}
-                                    value={resultData.reference_range} 
-                                    onChange={e => setResultData({...resultData, reference_range: e.target.value})} 
-                                    placeholder="e.g. 13.0 - 17.0 g/dL" 
-                                    style={{ background: selectedRequest.status === 'COMPLETED' ? '#f1f5f9' : 'white' }} 
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Clinical Interpretation / Remarks</label>
-                                <textarea 
-                                    rows="3" 
-                                    readOnly={selectedRequest.status === 'COMPLETED'}
-                                    value={resultData.interpretation} 
-                                    onChange={e => setResultData({...resultData, interpretation: e.target.value})} 
-                                    placeholder="Any abnormalities or observations..."
-                                    style={{ background: selectedRequest.status === 'COMPLETED' ? '#f1f5f9' : 'white' }}
-                                ></textarea>
-                            </div>
+                        <div>
+                            <p style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-main)' }}>Hardware Pulse HUB</p>
                         </div>
-
-                        {selectedRequest.status !== 'COMPLETED' && (
-                            <>
-                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', color: '#64748b', fontSize: '0.6875rem', background: '#f1f5f9', padding: '0.75rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
-                                    <Info size={14} />
-                                    <p>Finalizing will move the patient to "Final Prescription" and notify the prescribing doctor.</p>
-                                </div>
-
-                                <button 
-                                    type="submit" 
-                                    className="btn btn-primary" 
-                                    style={{ 
-                                        width: '100%', padding: '1rem', background: '#92400e', 
-                                        borderColor: '#92400e', fontSize: '1rem', fontWeight: 700,
-                                        boxShadow: '0 4px 6px -1px rgba(146, 64, 14, 0.2)'
-                                    }}
-                                >
-                                    Finalize and Transmit Report <ArrowRight size={18} style={{ marginLeft: '10px' }} />
-                                </button>
-                            </>
-                        )}
-                        {selectedRequest.status === 'COMPLETED' && (
-                             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', color: '#166534', fontSize: '0.75rem', background: '#dcfce7', padding: '1rem', borderRadius: '12px' }}>
-                                <ShieldCheck size={20} />
-                                <p style={{ fontWeight: 600 }}>This report has been finalized and transmitted to the doctor. It is now in Read-Only mode.</p>
-                             </div>
-                        )}
                     </div>
-                </form>
+                    <button onClick={() => fetchMatchingHardwareData(selectedRequest.patient_id)} className="btn btn-secondary" style={{ padding: '4px 8px' }}>
+                        <RefreshCw size={14} className={isFetchingMatching ? 'spin' : ''} />
+                    </button>
+                  </div>
+                  
+                  {hardwareMatches.length > 0 ? (
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {hardwareMatches.map(m => (
+                           <div key={m.id} style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                                 <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
+                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: '#4f46e5', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700 }}>Apply All Results</button>
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                 {Object.entries(m).filter(([k, v]) => 
+                                     v !== null && v !== undefined && v !== '' && 
+                                     !['id', 'patient_id', 'patient_name', 'machine_id', 'machine_name', 'received_at_machine', 'lab_id', 'location', 'project', 'project_id', 'sample_id', 'is_processed', 'synced_at_cloud', 'raw_data'].includes(k)
+                                 ).map(([key, value]) => (
+                                     <span key={key} style={{ fontSize: '0.6rem', padding: '2px 8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', fontWeight: 800 }}>
+                                         <span style={{ color: '#4f46e5', fontWeight: 900 }}>{key.toUpperCase()}</span>: {value}
+                                     </span>
+                                 ))}
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  ) : (
+                     <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--background)', borderRadius: '16px' }}>
+                        <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Waiting for {selectedRequest.patient_id} machine data...</p>
+                     </div>
+                  )}
+               </div>
             )}
-            
-            {selectedRequest.status === 'PENDING' && (
-                <div style={{ textAlign: 'center', padding: '2rem', background: '#f1f5f9', borderRadius: '20px', border: '1px dashed #cbd5e1' }}>
-                    <Clock size={32} color="#94a3b8" style={{ margin: '0 auto 1rem' }} />
-                    <p style={{ color: '#64748b', fontWeight: 500 }}>Please record sample collection before entering results.</p>
-                </div>
-            )}
+
+            <form onSubmit={handleSaveResult} className="fade-in">
+               <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
+                  <div style={{ marginBottom: '2rem' }}>
+                      <p style={{ fontSize: '0.9375rem', fontWeight: 950, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem' }}>
+                           Verification Desk
+                      </p>
+                      
+                      {selectedRequest.test_master_details?.sub_tests?.length > 0 && (
+                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                            {selectedRequest.test_master_details.sub_tests.filter(st => st.is_active).map(st => {
+                               const val = resultData.values[st.name];
+                               const hasData = val !== undefined && val !== '';
+                               return (
+                                  <div key={st.id} style={{ padding: '1.25rem', background: 'white', borderRadius: '24px', border: hasData ? '1px solid #e2e8f0' : '1px dashed #cbd5e1' }}>
+                                     <label style={{ fontSize: '0.6rem', fontWeight: 950, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>{st.name}</label>
+                                     <div style={{ fontSize: '1.5rem', fontWeight: 950, color: hasData ? '#1e293b' : '#f1f5f9' }}>{hasData ? val : '---'}</div>
+                                     <div style={{ fontSize: '0.55rem', color: '#cbd5e1', fontWeight: 800 }}>{st.units} | {st.biological_range}</div>
+                                  </div>
+                               );
+                            })}
+                         </div>
+                      )}
+
+                      <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Clinical Interpretation</label>
+                          <textarea 
+                              rows="2" value={resultData.interpretation} 
+                              onChange={e => setResultData({...resultData, interpretation: e.target.value})} 
+                              placeholder="Diagnostic summary..."
+                          ></textarea>
+                      </div>
+
+                      {selectedRequest.status !== 'COMPLETED' ? (
+                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: '#1e293b', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
+                              Finalize & Transmit <ArrowRight size={18} style={{ marginLeft: '8px' }} />
+                          </button>
+                      ) : (
+                           <div style={{ padding: '1rem', background: '#ecfdf5', borderRadius: '20px', color: '#065f46', fontSize: '0.8rem', fontWeight: 800, textAlign: 'center', marginTop: '1.5rem' }}>
+                              Results Transmitted to Doctor
+                           </div>
+                      )}
+                  </div>
+               </div>
+            </form>
           </div>
         )}
       </div>
-      
-      <style>{`
-         input, textarea, select { border-radius: 12px !important; }
-         .badge { border-radius: 8px; padding: 0.35rem 0.75rem; }
-      `}</style>
+      <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

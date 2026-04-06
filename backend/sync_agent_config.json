@@ -1,0 +1,11 @@
+{
+    "db_host": "10.2.1.159",
+    "db_port": 3306,
+    "db_name": "bc_cbc_db",
+    "db_user": "root",
+    "db_pass": "root_123",
+    "emr_endpoint": "http://localhost:8000/api/laboratory/requests/sync_batch/",
+    "sync_key": "emr_lab_sync_bridge_secure_9HqR2S9vXz4P5mN8",
+    "interval": 50,
+    "theme": "Midnight"
+}

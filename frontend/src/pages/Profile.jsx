@@ -29,8 +29,8 @@ const Profile = () => {
       <div className="card" style={{ 
         padding: '2.5rem', 
         borderRadius: '24px', 
-        background: 'linear-gradient(135deg, white 0%, #f8fafc 100%)', 
-        border: '1px solid #e2e8f0', 
+        background: 'linear-gradient(135deg, var(--surface) 0%, var(--background) 100%)', 
+        border: '1px solid var(--border)', 
         marginBottom: '2rem',
         display: 'flex',
         alignItems: 'center',
@@ -60,7 +60,7 @@ const Profile = () => {
         
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.025em', color: '#0f172a' }}>{user.username}</h1>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.025em', color: 'var(--text-main)' }}>{user.username}</h1>
             <span style={{ 
               background: user.is_active ? 'rgba(16, 185, 129, 0.1)' : '#fee2e2', 
               color: user.is_active ? '#059669' : '#dc2626',
@@ -75,11 +75,11 @@ const Profile = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem 1.25rem', borderRadius: '16px', background: 'white', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+          <div style={{ padding: '0.75rem 1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', textAlign: 'center' }}>
             <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', marginBottom: '2px' }}>ROLES</p>
             <p style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--primary)' }}>{user.user_roles_details?.length || 1}</p>
           </div>
-          <div style={{ padding: '0.75rem 1.25rem', borderRadius: '16px', background: 'white', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+          <div style={{ padding: '0.75rem 1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', textAlign: 'center' }}>
             <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', marginBottom: '2px' }}>PERMISSION LEVEL</p>
             <p style={{ fontSize: '1.125rem', fontWeight: 900, color: '#f59e0b' }}>{user.role === 'ADMIN' ? 'EXECUTIVE' : 'STANDARD'}</p>
           </div>
@@ -89,8 +89,8 @@ const Profile = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Identity Card */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'white', border: '1px solid #f1f5f9' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <UserIcon size={18} color="var(--primary)" /> Employment Identity
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
@@ -99,7 +99,7 @@ const Profile = () => {
                   <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{info.label}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <info.icon size={16} color="#cbd5e1" />
-                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#334155' }}>{info.value || 'Not Disclosed'}</p>
+                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{info.value || 'Not Disclosed'}</p>
                   </div>
                 </div>
               ))}
@@ -107,20 +107,20 @@ const Profile = () => {
                 <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Residency/Location Address</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <MapPin size={16} color="#cbd5e1" />
-                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#334155' }}>{user.address || 'No location data mapped to this account.'}</p>
+                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{user.address || 'No location data mapped to this account.'}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Security & Access transparency */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'white', border: '1px solid #f1f5f9' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Shield size={18} color="var(--primary)" /> Corporate Access Scope
             </h3>
-            <div style={{ padding: '1.5rem', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--background)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>Data Governance Model</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>Data Governance Model</p>
                 <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
                   {user.data_isolation 
                     ? 'Strict Isolation Enabled: Access limited to personally registered records.' 
@@ -139,7 +139,7 @@ const Profile = () => {
                 <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Module Authorizations</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem' }}>
                     {(user.permissions || []).map((perm, i) => (
-                        <div key={i} style={{ padding: '0.5rem 0.875rem', borderRadius: '10px', background: 'white', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div key={i} style={{ padding: '0.5rem 0.875rem', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)' }}></div>
                             {perm.replace('/', '').toUpperCase() || 'ROOT'}
                         </div>
@@ -170,20 +170,20 @@ const Profile = () => {
           </div>
 
           {/* Account Status / Metadata */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'white', border: '1px solid #f1f5f9' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b', marginBottom: '1.5rem' }}>Account Integrity</h3>
+          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.5rem' }}>Account Integrity</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Security Clearance</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#10b981' }}>VERIFIED</span>
+                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Security Clearance</p>
+                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--success)' }}>VERIFIED</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Authentication Method</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#334155' }}>SSO / JWT TOKEN</span>
+                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Authentication Method</p>
+                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--text-main)' }}>SSO / JWT TOKEN</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Account Scope</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#6366f1' }}>FACILITY SCOPED</span>
+                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Account Scope</p>
+                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)' }}>FACILITY SCOPED</span>
               </div>
             </div>
           </div>

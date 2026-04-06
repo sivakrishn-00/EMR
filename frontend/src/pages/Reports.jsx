@@ -116,19 +116,19 @@ const Reports = () => {
         padding: '0 0.5rem'
       }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 850, color: 'var(--text-main)', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BarChart3 size={24} style={{ color: '#6366f1' }} /> 
             Analytics Hub
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.8125rem', fontWeight: 500, marginTop: '2px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', fontWeight: 500, marginTop: '2px' }}>
             Tracking {reportData?.project_name} Registry Performance
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-            <CalendarDays size={14} style={{ color: '#64748b' }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>Last 7 Days</span>
+          <div style={{ background: 'var(--surface)', padding: '6px 12px', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+            <CalendarDays size={14} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)' }}>Last 7 Days</span>
           </div>
 
           <div style={{ position: 'relative' }}>
@@ -138,12 +138,12 @@ const Reports = () => {
               style={{
                 appearance: 'none',
                 padding: '6px 2.5rem 6px 1rem',
-                background: 'white',
-                border: '1px solid #e2e8f0',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
                 borderRadius: '10px',
                 fontSize: '0.8125rem',
                 fontWeight: 700,
-                color: '#1e293b',
+                color: 'var(--text-main)',
                 minWidth: '180px',
                 cursor: 'pointer',
                 outline: 'none',
@@ -153,15 +153,15 @@ const Reports = () => {
               <option value="all">Enterprise Global</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <Filter size={12} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+            <Filter size={12} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           </div>
 
           <button 
             onClick={exportToCSV}
             style={{
               padding: '6px 16px',
-              background: '#0f172a',
-              color: 'white',
+              background: 'var(--text-main)',
+              color: 'var(--surface)',
               border: 'none',
               borderRadius: '10px',
               fontSize: '0.8125rem',
@@ -181,15 +181,15 @@ const Reports = () => {
       {/* COMPACT GRID STATS */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(4, 1fr)', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
         gap: '1rem',
         marginBottom: '1.5rem'
       }}>
         {[
-          { label: 'Patient Volume', val: reportData?.total_registered, icon: Users, color: '#6366f1' },
-          { label: 'Units Dispensed', val: reportData?.top_medications?.reduce((a,c)=>a+c.total,0), icon: ShoppingCart, color: '#10b981' },
-          { label: 'Workflow Efficiency', val: `${reportData?.conversion_rate}%`, icon: TrendingUp, color: '#f59e0b' },
-          { label: 'Inventory Assets', val: `₹${reportData?.inventory_value?.toLocaleString()}`, icon: IndianRupee, color: '#ef4444' }
+          { label: 'Patient Volume', val: reportData?.total_registered, icon: Users, gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' },
+          { label: 'Units Dispensed', val: reportData?.top_medications?.reduce((a,c)=>a+c.total,0), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+          { label: 'Workflow Efficiency', val: `${reportData?.conversion_rate}%`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
+          { label: 'Inventory Assets', val: `₹${reportData?.inventory_value?.toLocaleString()}`, icon: IndianRupee, gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' }
         ].map((stat, i) => (
           <motion.div 
             key={i}
@@ -197,32 +197,38 @@ const Reports = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
             style={{
-              background: 'white',
-              padding: '1.25rem',
-              borderRadius: '20px',
-              border: '1px solid #f1f5f9',
+              background: stat.gradient,
+              padding: '1rem 1.25rem',
+              borderRadius: '16px',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              boxShadow: '0 6px 15px rgba(0,0,0,0.12)'
             }}
           >
             <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              borderRadius: '12px', 
-              background: `${stat.color}10`, 
-              color: stat.color,
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '8px', 
+              background: 'rgba(255, 255, 255, 0.25)', 
+              color: 'white',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              backdropFilter: 'blur(8px)',
+              flexShrink: 0
             }}>
-              <stat.icon size={20} />
+              <stat.icon size={16} />
             </div>
-            <div>
-              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.025em' }}>{stat.label}</p>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: '2px 0' }}>{stat.val || 0}</h3>
+            <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <p style={{ margin: 0, fontSize: '0.55rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1 }}>{stat.label}</p>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{stat.val || 0}</h3>
             </div>
+            {/* Subtle background decoration */}
+            <div style={{ position: 'absolute', right: '-8px', bottom: '-8px', width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%' }} />
           </motion.div>
         ))}
       </div>
@@ -234,19 +240,19 @@ const Reports = () => {
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           style={{
-            background: 'white',
+            background: 'var(--surface)',
             borderRadius: '24px',
             padding: '1.5rem',
-            border: '1px solid #f1f5f9',
+            border: '1px solid var(--border)',
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 850, color: '#1e293b' }}>Consumption Velocity</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 850, color: 'var(--text-main)' }}>Consumption Velocity</h3>
             <div style={{ display: 'flex', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1' }}></div>
-                <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b' }}>Daily Units</span>
+                <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)' }}>Daily Units</span>
               </div>
             </div>
           </div>
@@ -260,7 +266,7 @@ const Reports = () => {
                     <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis 
                   dataKey="date" 
                   axisLine={false} 
@@ -324,14 +330,14 @@ const Reports = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
             style={{
-              background: 'white',
+              background: 'var(--surface)',
               borderRadius: '24px',
               padding: '1.25rem',
               flex: 1,
-              border: '1px solid #f1f5f9'
+              border: '1px solid var(--border)'
             }}
           >
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 850, color: '#1e293b', marginBottom: '1rem' }}>Demographic Split</h3>
+            <h3 style={{ fontSize: '0.875rem', fontWeight: 850, color: 'var(--text-main)', marginBottom: '1rem' }}>Demographic Split</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {reportData?.by_gender?.map((g, idx) => {
                 const perc = Math.round((g.count / reportData.total_registered) * 100);
@@ -361,14 +367,14 @@ const Reports = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           borderRadius: '24px',
           padding: '1.5rem',
-          border: '1px solid #f1f5f9'
+          border: '1px solid var(--border)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 850, color: '#1e293b' }}>High Intent Consumption</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 850, color: 'var(--text-main)' }}>High Intent Consumption</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
              <CheckCircle2 size={16} style={{ color: '#10b981' }} />
              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Verified Project Data</span>
@@ -381,17 +387,17 @@ const Reports = () => {
               <div key={i} style={{ 
                 padding: '12px', 
                 borderRadius: '16px', 
-                background: '#f8fafc',
+                background: 'var(--background)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#6366f1', fontSize: '0.75rem', border: '1px solid #e2e8f0' }}>
+                  <div style={{ width: '32px', height: '32px', background: 'var(--surface)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#6366f1', fontSize: '0.75rem', border: '1px solid #e2e8f0' }}>
                     {i + 1}
                   </div>
                   <div>
-                    <h4 style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#1e293b' }}>{m.name}</h4>
+                    <h4 style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)' }}>{m.name}</h4>
                     <p style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600 }}>Active Consumption</p>
                   </div>
                 </div>

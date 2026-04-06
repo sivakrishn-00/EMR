@@ -17,6 +17,7 @@ import ProjectManagement from './pages/ProjectManagement';
 import RoleManagement from './pages/RoleManagement';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
+import LabMachineRegistry from './pages/LabMachineRegistry'; // Project Linking Hub
 import { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children, requiredModule }) => {
@@ -234,6 +235,15 @@ function App() {
             <MainLayout>
               <ProtectedRoute requiredModule="/projects">
                 <ProjectManagement />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
+
+          <Route path="/lab-machines" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/lab-machines">
+                <LabMachineRegistry />
               </ProtectedRoute>
             </MainLayout>
           } />

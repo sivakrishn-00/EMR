@@ -97,8 +97,8 @@ const ProjectManagement = () => {
     return (
         <div className="fade-in">
             <header style={{ marginBottom: '2.5rem' }}>
-                <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', color: '#1e293b' }}>Project Management</h1>
-                <p style={{ color: '#64748b', fontSize: '0.9375rem', fontWeight: 500 }}>Global configuration for Employee (IE) and Outside patient mapping.</p>
+                <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Project Management</h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 500 }}>Global configuration for Employee (IE) and Outside patient mapping.</p>
             </header>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
@@ -117,10 +117,10 @@ const ProjectManagement = () => {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {projects && Array.isArray(projects) && projects.length > 0 ? projects.map(p => (
-                                <div key={p.id} className="card" style={{ background: '#f8fafc', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                                <div key={p.id} className="card" style={{ background: 'var(--background)', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', border: '1px solid var(--border)', boxShadow: 'none' }}>
                                     <div>
                                         <h3 style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '1.0625rem' }}>{p.name}</h3>
-                                        <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '4px 0 12px 0' }}>{p.description || 'No description provided.'}</p>
+                                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>{p.description || 'No description provided.'}</p>
                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                             {p.category_mappings?.map(m => (
                                                 <span 
@@ -143,14 +143,14 @@ const ProjectManagement = () => {
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button 
                                             onClick={() => handleEditProject(p)}
-                                            style={{ border: 'none', background: '#f1f5f9', color: '#64748b', width: '30px', height: '30px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                                            style={{ border: 'none', background: 'var(--surface)', color: 'var(--text-muted)', width: '30px', height: '30px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                                             title="Edit Project Configuration"
                                         >
                                             <Pencil size={14} />
                                         </button>
                                         <button 
                                             onClick={() => handleDeleteProject(p.id)}
-                                            style={{ border: 'none', background: '#fee2e2', color: '#dc2626', width: '30px', height: '30px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                                            style={{ border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', width: '30px', height: '30px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                                             title="Delete Project"
                                         >
                                             <Trash2 size={16} />
@@ -200,7 +200,7 @@ const ProjectManagement = () => {
                                 
                                 <div className="form-group">
                                     <label style={{ fontWeight: 700 }}>Mapping Categories *</label>
-                                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>Select patient types allowed in this project.</p>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Select patient types allowed in this project.</p>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
                                         {[
                                             { id: 'EMPLOYEE', label: 'Company Employees (IE)', hint: 'Primary card holders' },
@@ -214,8 +214,8 @@ const ProjectManagement = () => {
                                                     alignItems: 'center', 
                                                     gap: '1rem', 
                                                     padding: '1rem', 
-                                                    background: projectFormData.categories.includes(cat.id) ? '#f5f7ff' : 'white',
-                                                    border: '1px solid ' + (projectFormData.categories.includes(cat.id) ? 'var(--primary)' : '#e2e8f0'),
+                                                    background: projectFormData.categories.includes(cat.id) ? 'rgba(99, 102, 241, 0.05)' : 'var(--background)',
+                                                    border: '1px solid ' + (projectFormData.categories.includes(cat.id) ? 'var(--primary)' : 'var(--border)'),
                                                     borderRadius: '12px',
                                                     cursor: 'pointer'
                                                 }}
@@ -232,8 +232,8 @@ const ProjectManagement = () => {
                                                     }}
                                                 />
                                                 <div>
-                                                    <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>{cat.label}</p>
-                                                    <p style={{ fontSize: '0.675rem', color: '#64748b' }}>{cat.hint}</p>
+                                                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{cat.label}</p>
+                                                    <p style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>{cat.hint}</p>
                                                 </div>
                                             </label>
                                         ))}

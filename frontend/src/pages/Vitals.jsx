@@ -35,6 +35,9 @@ const Vitals = () => {
     spo2: '',
     weight_kg: '', 
     height_cm: '',
+    height_ft: '',
+    height_in: '',
+    bmi: '',
     symptoms: '',
     notes: '',
     // Personal History
@@ -101,7 +104,7 @@ const Vitals = () => {
       const cleanedData = Object.fromEntries(
         Object.entries(vitalsData).map(([key, value]) => {
           if (value === '' || value === undefined) return [key, null];
-          if (['temperature_c', 'blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm'].includes(key)) {
+          if (['temperature_c', 'blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm', 'bmi'].includes(key)) {
             const num = Number(value);
             return [key, isNaN(num) ? null : num];
           }
@@ -109,6 +112,18 @@ const Vitals = () => {
         })
       );
       
+      // Final Biometric Validation
+      if (cleanedData.weight_kg > 650 || cleanedData.weight_kg < 0.1) {
+          toast.error("Invalid weight detected. Range: 0.1kg - 650kg", { id: loadingToast });
+          setFormAttempted(true);
+          return;
+      }
+      if (cleanedData.height_cm > 300 || cleanedData.height_cm < 20) {
+          toast.error("Invalid height detected. Range: 20cm - 300cm (approx 10ft)", { id: loadingToast });
+          setFormAttempted(true);
+          return;
+      }
+
       await api.post(`clinical/visits/${selectedVisit.id}/record_vitals/`, cleanedData);
       toast.success("Vitals captured! Patient moved to consultation.", { id: loadingToast });
       setSelectedVisit(null);
@@ -124,13 +139,50 @@ const Vitals = () => {
     setVitalsData({ 
         temperature_c: '', blood_pressure_sys: '', blood_pressure_dia: '', 
         heart_rate: '', respiratory_rate: '', spo2: '', 
-        weight_kg: '', height_cm: '', symptoms: '', notes: '',
+        weight_kg: '', height_cm: '', height_ft: '', height_in: '', bmi: '', symptoms: '', notes: '',
         smoking: 'NO', alcohol: 'NO', physical_activity: 'NO', food_habit: 'VEG', allergy_food: 'NO', allergy_drug: 'NO',
         family_dm: 'NO', family_htn: 'NO', family_cancer: 'NO', family_cvs: 'NO', family_thyroid: 'NO', family_tb: 'NO', family_others: '',
         sys_respiratory: 'NAD', sys_cvs: 'NAD', sys_cns: 'NAD', sys_gis: 'NAD', sys_mss: 'NAD', sys_gus: 'NAD',
         known_dm: 'NO', known_htn: 'NO', known_cancer: 'NO', known_cvs: 'NO', known_thyroid: 'NO', known_tb: 'NO', known_others: ''
     });
     setFormAttempted(false);
+  };
+
+  const updateBiometrics = (updates) => {
+    let newData = { ...vitalsData, ...updates };
+    
+    // Hard limits for typing sanity
+    if (newData.weight_kg > 2000) newData.weight_kg = 2000;
+    if (newData.height_ft > 15) newData.height_ft = 15;
+    if (newData.height_in > 100) newData.height_in = 100;
+
+    // Calculate Height in CM
+    const ft = parseFloat(newData.height_ft) || 0;
+    const inch = parseFloat(newData.height_in) || 0;
+    const totalInches = (ft * 12) + inch;
+    const heightCm = totalInches > 0 ? (totalInches * 2.54).toFixed(2) : '';
+    
+    // Calculate BMI
+    let bmiValue = '';
+    if (newData.weight_kg && heightCm && heightCm > 0) {
+      const heightM = heightCm / 100;
+      bmiValue = (newData.weight_kg / (heightM * heightM)).toFixed(1);
+    }
+    
+    setVitalsData({
+      ...newData,
+      height_cm: heightCm,
+      bmi: bmiValue
+    });
+  };
+
+  const getBMIStatus = (bmi) => {
+    if (!bmi) return { label: 'PENDING', color: '#94a3b8' };
+    const val = parseFloat(bmi);
+    if (val < 18.5) return { label: 'Underweight', color: '#0ea5e9' };
+    if (val < 25) return { label: 'Normal', color: '#10b981' };
+    if (val < 30) return { label: 'Overweight', color: '#f59e0b' };
+    return { label: 'Obese', color: '#ef4444' };
   };
 
   return (
@@ -143,10 +195,10 @@ const Vitals = () => {
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting List - Only show if NO patient is selected */}
         {!selectedVisit && (
-          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Nurse Queue ({activeVisits.length})</h3>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Nurse Queue ({activeVisits.length})</h3>
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Updated just now</p>
                </div>
                <button onClick={() => fetchActiveVisits()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -157,7 +209,7 @@ const Vitals = () => {
             <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                  <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                      <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Name</th>
                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</th>
                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registration</th>
@@ -166,15 +218,15 @@ const Vitals = () => {
                 </thead>
                 <tbody>
                   {activeVisits.map(v => (
-                    <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid #f1f5f9', transition: 'all 0.2s ease' }}>
+                    <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <div style={{ width: '42px', height: '42px', background: '#f0fdf4', color: '#10b981', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem', boxShadow: 'inset 0 0 0 1px rgba(16, 185, 129, 0.1)' }}>
                                {v.patient_details?.first_name[0].toLowerCase()}
                             </div>
                             <div>
-                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#1e293b' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>UHID: #{1000 + v.id}</p>
+                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
                             </div>
                          </div>
                       </td>
@@ -194,6 +246,9 @@ const Vitals = () => {
                                       spo2: v.vitals.spo2 || '',
                                       weight_kg: v.vitals.weight_kg || '',
                                       height_cm: v.vitals.height_cm || '',
+                                      height_ft: v.vitals.height_cm ? Math.floor((v.vitals.height_cm / 2.54) / 12) : '',
+                                      height_in: v.vitals.height_cm ? Math.round((v.vitals.height_cm / 2.54) % 12) : '',
+                                      bmi: v.vitals.bmi || '',
                                       symptoms: v.vitals.symptoms || '',
                                       notes: v.vitals.notes || '',
                                       smoking: v.vitals.smoking || 'NO',
@@ -264,7 +319,7 @@ const Vitals = () => {
             
             {/* Pagination */}
             {totalCount > 10 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
@@ -295,8 +350,8 @@ const Vitals = () => {
                        <Activity size={24} color="white" />
                     </div>
                     <div>
-                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                       <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> UHID: #{1000 + selectedVisit.id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
+                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
+                       <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
@@ -305,18 +360,18 @@ const Vitals = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: '#f8fafc', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9', display: 'flex', gap: '3rem' }}>
+              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem' }}>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{selectedVisit.reason || 'OPD Consultation'}</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason || 'OPD Consultation'}</p>
                  </div>
                  <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Status</p>
@@ -325,23 +380,51 @@ const Vitals = () => {
               </div>
 
             <form onSubmit={handleSaveVitals}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics & BMI</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
                    <div className="form-group">
                       <label><Scale size={14} /> Weight <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.01" required value={vitalsData.weight_kg} onChange={e => setVitalsData({...vitalsData, weight_kg: e.target.value})} placeholder="e.g. 70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && !vitalsData.weight_kg) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <input type="number" step="0.01" min="0.1" max="650" required value={vitalsData.weight_kg} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
                       </div>
                       {formAttempted && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
+                   
                    <div className="form-group">
-                      <label>Height <span style={{ color: '#ef4444' }}>*</span></label>
-                      <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.1" required value={vitalsData.height_cm} onChange={e => setVitalsData({...vitalsData, height_cm: e.target.value})} placeholder="e.g. 175" style={{ paddingRight: '3rem !important', border: (formAttempted && !vitalsData.height_cm) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>CM</span>
+                      <label>Height (Feet/Inches) <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                         <div style={{ position: 'relative', flex: 1 }}>
+                            <input type="number" step="1" min="0" max="10" required value={vitalsData.height_ft} onChange={e => updateBiometrics({height_ft: e.target.value})} placeholder="Ft" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_ft > 10 || !vitalsData.height_ft)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                            <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>FT</span>
+                         </div>
+                         <div style={{ position: 'relative', flex: 1 }}>
+                            <input type="number" step="1" min="0" max="11" value={vitalsData.height_in} onChange={e => updateBiometrics({height_in: e.target.value})} placeholder="In" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_in > 11)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                            <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>IN</span>
+                         </div>
                       </div>
-                      {formAttempted && !vitalsData.height_cm && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                      {formAttempted && !vitalsData.height_ft && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                   </div>
+
+                   <div className="form-group" style={{ background: 'var(--background)', padding: '0.875rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ margin: 0, fontSize: '0.7rem' }}>BMI {vitalsData.bmi && <span style={{ color: getBMIStatus(vitalsData.bmi).color, fontWeight: 900 }}>• Auto Calculated</span>}</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 900, color: vitalsData.bmi ? '#1e293b' : '#cbd5e1' }}>
+                           {vitalsData.bmi || '--.-'}
+                        </div>
+                        {vitalsData.bmi && (
+                           <div style={{ 
+                              fontSize: '0.625rem', fontWeight: 900, textTransform: 'uppercase', 
+                              padding: '4px 10px', borderRadius: '6px', 
+                              background: getBMIStatus(vitalsData.bmi).color + '15', 
+                              color: getBMIStatus(vitalsData.bmi).color,
+                              border: `1px solid ${getBMIStatus(vitalsData.bmi).color}30`,
+                              letterSpacing: '0.02em'
+                           }}>
+                              {getBMIStatus(vitalsData.bmi).label}
+                           </div>
+                        )}
+                      </div>
                    </div>
                 </div>
 
@@ -372,7 +455,7 @@ const Vitals = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                   <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                       <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.75rem', display: 'block' }}>Blood Pressure (Sys / Dia)</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                          <div style={{ position: 'relative', flex: 1 }}>
@@ -386,7 +469,7 @@ const Vitals = () => {
                          </div>
                       </div>
                    </div>
-                   <div className="form-group" style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                   <div className="form-group" style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                       <label><Droplet size={14} /> Oxygen (SPO2)</label>
                       <div style={{ position: 'relative' }}>
                          <input type="number" required value={vitalsData.spo2} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important' }} />
@@ -409,8 +492,8 @@ const Vitals = () => {
                {/* Medical History Sections */}
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
                   {/* Personal History */}
-                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Personal History</p>
+                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Personal History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Smoking (Tobacco)" value={vitalsData.smoking} onChange={val => setVitalsData({...vitalsData, smoking: val})} options={['YES', 'NO']} />
                         <ToggleField label="Alcohol" value={vitalsData.alcohol} onChange={val => setVitalsData({...vitalsData, alcohol: val})} options={['YES', 'NO']} />
@@ -422,8 +505,8 @@ const Vitals = () => {
                   </div>
 
                   {/* Family History */}
-                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Family History (Parents/Siblings)</p>
+                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Family History (Parents/Siblings)</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="DM (Diabetes)" value={vitalsData.family_dm} onChange={val => setVitalsData({...vitalsData, family_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="HTN (Hypertension)" value={vitalsData.family_htn} onChange={val => setVitalsData({...vitalsData, family_htn: val})} options={['YES', 'NO']} />
@@ -439,8 +522,8 @@ const Vitals = () => {
                   </div>
 
                   {/* Systemic Examination */}
-                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Systemic Examination</p>
+                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Systemic Examination</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Respiratory" value={vitalsData.sys_respiratory} onChange={val => setVitalsData({...vitalsData, sys_respiratory: val})} options={['FND', 'NAD']} />
                         <ToggleField label="C.V.S" value={vitalsData.sys_cvs} onChange={val => setVitalsData({...vitalsData, sys_cvs: val})} options={['FND', 'NAD']} />
@@ -452,8 +535,8 @@ const Vitals = () => {
                   </div>
 
                   {/* Known History */}
-                  <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Known History</p>
+                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Known History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Known DM" value={vitalsData.known_dm} onChange={val => setVitalsData({...vitalsData, known_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="Known HTN" value={vitalsData.known_htn} onChange={val => setVitalsData({...vitalsData, known_htn: val})} options={['YES', 'NO']} />
@@ -483,13 +566,13 @@ const Vitals = () => {
       <style>{`
          .form-group label { display: flex; alignItems: center; gap: 0.5rem; color: #475569; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.8125rem; }
          input, select, textarea { 
-            border: 1px solid #e2e8f0 !important;
-            background: #fff !important;
+            border: 1px solid var(--border) !important;
+            background: var(--input-bg) !important;
             padding: 0.75rem 1rem !important;
             border-radius: 10px !important;
             font-size: 0.875rem !important;
             font-weight: 600 !important;
-            color: #1e293b !important;
+            color: var(--text-main) !important;
          }
          input:focus, textarea:focus {
             border-color: var(--primary) !important;
@@ -505,7 +588,7 @@ const Vitals = () => {
 const ToggleField = ({ label, value, onChange, options }) => (
    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{label}</span>
-      <div style={{ display: 'flex', gap: '2px', background: '#e2e8f0', padding: '2px', borderRadius: '6px' }}>
+      <div style={{ display: 'flex', gap: '2px', background: 'var(--background)', padding: '2px', borderRadius: '6px' }}>
          {options.map(opt => (
             <button
                key={opt}

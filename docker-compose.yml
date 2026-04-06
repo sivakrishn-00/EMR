@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # 1. Database Hub (Managed MySQL approach)
+  mysql:
+    image: mysql:8.0
+    container_name: emr_mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootx.
+      - MYSQL_DATABASE=emr_v1
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+
+  # 2. Asynchronous Pulse Buffer (Platinum Persistence)
+  redis:
+    image: redis:7-alpine
+    container_name: emr_redis
+    command: redis-server --appendonly yes # Redis-AOF: Recover 100% of data after crash
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Principal EMR Backend (Django Gateway)
+  backend:
+    build:
+      context: ./backend
+    container_name: emr_backend
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379
+      - DB_NAME=emr_v1
+      - DB_USER=root
+      - DB_PASS=rootx.
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  # 4. LANE 1: Urgent Cluster (Critical Result Workers)
+  emr_worker_urgent:
+    build:
+      context: ./backend
+    container_name: emr_worker_urgent
+    command: celery -A emr_backend worker -Q urgent -n worker_urgent@%h --loglevel=info --concurrency=4
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 5. LANE 2: Bulk Cluster (Mass Sync Laboratory Workers)
+  emr_worker_bulk:
+    build:
+      context: ./backend
+    container_name: emr_worker_bulk
+    command: celery -A emr_backend worker -Q bulk -n worker_bulk@%h --loglevel=info --concurrency=10
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 6. LANE 3: Retry / DLQ Cluster (Failover Recovery)
+  emr_worker_retry:
+    build:
+      context: ./backend
+    container_name: emr_worker_retry
+    command: celery -A emr_backend worker -Q celery -n worker_retry@%h --loglevel=info --concurrency=2
+    restart: always
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 5. EMR User Interface (React + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+    container_name: emr_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # 6. Global Sync Monitor (Flower Dashboard)
+  flower:
+    build:
+      context: ./backend
+    container_name: emr_flower
+    command: celery -A emr_backend flower --port=5555
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

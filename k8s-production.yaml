@@ -1,0 +1,227 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: emr-hub-production
+
+---
+# 1. EMR Backend Deployment (Scalable Pods)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emr-backend
+  namespace: emr-hub-production
+spec:
+  replicas: 4 # High-Availability cluster for 1000+ pulses
+  selector:
+    matchLabels:
+      app: emr-backend
+  template:
+    metadata:
+      labels:
+        app: emr-backend
+    spec:
+      containers:
+      - name: backend
+        image: emr-backend:latest # Build from your Dockerfile
+        ports:
+        - containerPort: 8000
+        env:
+        - name: MYSQL_HOST
+          value: "mysql-managed-service" # Point to your cloud mysql
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: user
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: password
+        - name: REDIS_URL
+          value: "redis://emr-redis-service:6379"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+
+---
+# 2. Celery Ingest Engine (Platinum Scaling Cluster)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emr-celery-worker
+  namespace: emr-hub-production
+spec:
+  replicas: 2 # Minimum baseline
+  selector:
+    matchLabels:
+      app: emr-celery-worker
+  template:
+    metadata:
+      labels:
+        app: emr-celery-worker
+    spec:
+      containers:
+      - name: worker
+        image: emr-backend:latest
+        command: ["celery", "-A", "emr_backend", "worker", "--loglevel=info", "--concurrency=10"]
+        env:
+        - name: MYSQL_HOST
+          value: "mysql-managed-service"
+        - name: REDIS_URL
+          value: "redis://emr-redis-service:6379"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+
+---
+# 3. EMR Frontend UI (CDN Approach via Nginx Pods)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emr-frontend
+  namespace: emr-hub-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: emr-frontend
+  template:
+    metadata:
+      labels:
+        app: emr-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: emr-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+
+---
+# 4. Platinum Tier: Horizontal Pod Autoscalers (Elastic Scaling)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: emr-celery-hpa
+  namespace: emr-hub-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: emr-celery-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+---
+# 5. Platinum Observability: Prometheus (The Metrics Brain)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emr-prometheus
+  namespace: emr-hub-production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emr-prometheus
+  template:
+    metadata:
+      labels:
+        app: emr-prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        ports:
+        - containerPort: 9090
+        args:
+          - "--config.file=/etc/prometheus/prometheus.yml"
+          - "--storage.tsdb.retention.time=30d"
+
+---
+# 6. Platinum Observability: Grafana (The Visualization Hub)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emr-grafana
+  namespace: emr-hub-production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emr-grafana
+  template:
+    metadata:
+      labels:
+        app: emr-grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "emr_admin_secure_2026"
+
+---
+# 7. Global Load Balancer (Platinum Ingress)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: emr-ingress
+  namespace: emr-hub-production
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  rules:
+  - host: emr-hub.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: emr-frontend-service
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: emr-backend-service
+            port:
+              number: 8000
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: emr-backend-service
+            port:
+              number: 8000
+      - path: /monitoring/grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: emr-grafana-service
+            port:
+              number: 3000

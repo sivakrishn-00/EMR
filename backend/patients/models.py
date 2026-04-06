@@ -54,11 +54,11 @@ class EmployeeMaster(models.Model):
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     card_no = models.CharField(max_length=20, unique=True, help_text="Primary Card Number (e.g., 0001)")
     name = models.CharField(max_length=150)
-    dob = models.DateField()
+    dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     aadhar_no = models.CharField(max_length=20, unique=True, blank=True, null=True)
-    mobile_no = models.CharField(max_length=15)
-    address = models.TextField()
+    mobile_no = models.CharField(max_length=15, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
     designation = models.CharField(max_length=100, blank=True, null=True)
     additional_fields = models.JSONField(default=dict, blank=True)
     proof_image = models.ImageField(upload_to='employee_proofs/', blank=True, null=True)
@@ -87,7 +87,7 @@ class FamilyMember(models.Model):
     employee = models.ForeignKey(EmployeeMaster, on_delete=models.CASCADE, related_name='family_members')
     card_no_suffix = models.CharField(max_length=10, help_text="e.g., /1, /2, /3")
     name = models.CharField(max_length=150)
-    dob = models.DateField()
+    dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     aadhar_no = models.CharField(max_length=20, blank=True, null=True)
     mobile_no = models.CharField(max_length=15, blank=True, null=True)
@@ -122,13 +122,14 @@ class Patient(models.Model):
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='other_patients')
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    dob = models.DateField()
+    dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
-    phone = models.CharField(max_length=15) # Family members often share a contact number
-    address = models.TextField()
+    phone = models.CharField(max_length=15, blank=True, null=True) # Family members often share a contact number
+    address = models.TextField(blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     
     # New Fields
+    patient_id = models.CharField(max_length=20, unique=True, null=True, blank=True, help_text="Unique Patient ID (e.g., BHSPL0001)")
     id_proof_type = models.CharField(max_length=20, choices=ID_PROOF_CHOICES, default='AADHAAR')
     id_proof_number = models.CharField(max_length=50, unique=True, null=False, help_text="Aadhaar or primary ID number")
     abha_id = models.CharField(max_length=20, blank=True, null=True)
@@ -146,10 +147,31 @@ class Patient(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if not self.patient_id:
+            # Generate BHSPLXXXX
+            # Correctly find the highest current BHSPL ID
+            last_patient = Patient.objects.filter(patient_id__startswith='BHSPL').order_by('patient_id').last()
+            if not last_patient:
+                self.patient_id = 'BHSPL0001'
+            else:
+                try:
+                    # Get the last number from the last patient_id
+                    import re
+                    last_id = last_patient.patient_id
+                    digits = re.findall(r'\d+', last_id)
+                    if digits:
+                        new_num = int(digits[-1]) + 1
+                    else:
+                        new_num = 1
+                    self.patient_id = f'BHSPL{new_num:04d}'
+                except Exception as e:
+                    # Generic fallback just in case
+                    self.patient_id = f'BHSPL{Patient.objects.all().count() + 1:04d}'
+        super(Patient, self).save(*args, **kwargs)
+
     def __str__(self):
-        if self.is_employee_linked:
-            return f"{self.first_name} {self.last_name} ({self.card_no})"
-        return f"{self.first_name} {self.last_name} ({self.id_proof_number})"
+        return f"{self.patient_id} ({self.first_name} {self.last_name})"
 
     @property
     def current_visit(self):

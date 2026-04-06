@@ -3,12 +3,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Visit, Vitals, Consultation, Appointment
 from .serializers import VisitSerializer, VitalsSerializer, ConsultationSerializer, AppointmentSerializer
-from accounts.models import AuditLog, Notification
+from accounts.models import Notification
+from accounts.utils import log_action
 from patients.models import RegistryData, RegistryType
 from django.db import transaction
 
-def log_action(user, module, action, details):
-    AuditLog.objects.create(user=user, module=module, action=action, details=details)
+# Removed local log_action, using accounts.utils instead
 
 def notify_user(recipient, title, message):
     Notification.objects.create(recipient=recipient, title=title, message=message)
@@ -96,6 +96,8 @@ class VisitViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def record_consultation(self, request, pk=None):
         visit = self.get_object()
+        patient = visit.patient
+        project_obj = patient.project or (patient.employee_master.project if patient.is_employee_linked and patient.employee_master else None)
         
         # Check if consultation already exists
         consult_instance = getattr(visit, 'consultation', None)
@@ -107,27 +109,36 @@ class VisitViewSet(viewsets.ModelViewSet):
             next_step = request.data.get('next_step', 'PENDING_PHARMACY')
             visit.status = next_step
             
-            # Handle Lab Request creation if needed
+            # Handle Lab Request(s) creation - Supports both single and bulk investigations
             if next_step == 'PENDING_LAB':
-                from laboratory.models import LabRequest
-                test_name = request.data.get('lab_test_name', 'General Physician Panel')
-                LabRequest.objects.create(
-                    visit=visit,
-                    test_name=test_name,
-                    ordered_by=request.user,
-                    status='PENDING'
-                )
-                log_action(request.user, 'Laboratory', 'Lab Ordered', f"Ordered {test_name} for patient {visit.patient}")
+                from laboratory.models import LabRequest, LabTestMaster
+                investigations = request.data.get('lab_investigations', [])
+                
+                # Support legacy single field if no list provided
+                if not investigations:
+                    test_name = request.data.get('lab_test_name', 'General Physician Panel')
+                    test_master_id = request.data.get('lab_test_master_id')
+                    investigations = [{'name': test_name, 'id': test_master_id}]
+
+                for inv in investigations:
+                    test_master = None
+                    if inv.get('id'):
+                        test_master = LabTestMaster.objects.filter(id=inv.get('id')).first()
+                    
+                    LabRequest.objects.create(
+                        visit=visit,
+                        test_master=test_master,
+                        test_name=inv.get('name', 'General Physician Panel'),
+                        ordered_by=request.user,
+                        status='PENDING'
+                    )
+                log_action(request.user, 'Laboratory', 'Labs Ordered', f"Ordered {len(investigations)} tests for patient {visit.patient}")
 
             # Handle Pharmacy Prescription creation & Inventory Deduction
             if next_step == 'PENDING_PHARMACY':
                 from pharmacy.models import Prescription
                 medications = request.data.get('medications', [])
                 
-                # Retrieve the active project for the patient
-                patient = visit.patient
-                project_obj = patient.project or (patient.employee_master.project if patient.is_employee_linked and patient.employee_master else None)
-
                 with transaction.atomic():
                     for med in medications:
                         med_name = med.get('name')
@@ -160,9 +171,18 @@ class VisitViewSet(viewsets.ModelViewSet):
                                 days = int(''.join(filter(str.isdigit, days_str))) if any(c.isdigit() for c in days_str) else 1
                                 total_needed = per_day * days
 
-                                # 2. Find and update the Pharmacy Master Registry for this Project
+                                # 2. Find and update the Pharmacy Master Registry for this Project (Dynamic Lookup)
+                                from django.db.models import Q
+                                pharma_type = RegistryType.objects.filter(
+                                    project=project_obj
+                                ).filter(
+                                    Q(icon='Pill') | Q(slug__icontains='pharmacy') | Q(name__icontains='pharmacy')
+                                ).first()
+                                
+                                registry_slug = pharma_type.slug if pharma_type else 'pharmacy-drugs'
+
                                 inv_item = RegistryData.objects.select_for_update().filter(
-                                    registry_type__slug='pharmacy-drugs',
+                                    registry_type__slug=registry_slug,
                                     registry_type__project=project_obj,
                                     name__iexact=med_name.strip()
                                 ).first()

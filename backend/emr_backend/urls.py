@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/clinical/", include("clinical.urls")),
     path("api/laboratory/", include("laboratory.urls")),
     path("api/pharmacy/", include("pharmacy.urls")),
+    path("", include("django_prometheus.urls")),
 ]
 
 if settings.DEBUG:

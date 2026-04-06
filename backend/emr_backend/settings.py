@@ -4,6 +4,7 @@ Django settings for emr_backend project.
 
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,10 +39,14 @@ INSTALLED_APPS = [
     "clinical",
     "laboratory",
     "pharmacy",
+    "django_celery_results",
+    "django_prometheus",
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -49,6 +54,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "emr_backend.urls"
@@ -71,16 +77,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "emr_backend.wsgi.application"
 
 
-# Database - Configure for MySQL
-# Use mysqlclient for connecting to MySQL
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "emr_v1",
-        "USER": "root",
-        "PASSWORD": "bhspl25.",
-        "HOST": "localhost",
-        "PORT": "3306",
+        "NAME": os.getenv("MYSQL_DATABASE", "emr_v1"),
+        "USER": os.getenv("MYSQL_USER", "root"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "rootx."),
+        "HOST": os.getenv("MYSQL_HOST", "localhost"),
+        "PORT": os.getenv("MYSQL_PORT", "3306"),
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
         },
@@ -142,6 +146,37 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
+}
+
+# Cloud Sync Bridge Authentication
+# This key is required in the 'X-Machine-Sync-Key' header for machine results synchronization
+MACHINE_SYNC_API_KEY = "emr_lab_sync_bridge_secure_9HqR2S9vXz4P5mN8"
+
+# Redis / Celery Configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"{REDIS_URL}/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Multi-Queue Traffic Routing (1,000+ Location Scale)
+CELERY_TASK_DEFAULT_QUEUE = 'celery'
+CELERY_TASK_QUEUES = {
+    'urgent': {'exchange': 'urgent', 'routing_key': 'urgent'},
+    'bulk': {'exchange': 'bulk', 'routing_key': 'bulk'},
 }
 
 # Media files

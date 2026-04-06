@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Users,
   UserPlus,
@@ -24,12 +25,21 @@ import {
   Settings,
   Layers,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Pill,
+  FlaskConical,
+  Edit2,
+  Power,
+  Clock,
+  ShoppingCart
 } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 
 const AdminMasters = () => {
+  const { user } = useAuth();
   const [employeeMasters, setEmployeeMasters] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,98 +51,14 @@ const AdminMasters = () => {
   const [activeBoard, setActiveBoard] = useState("PROTOCOLS"); // STATS, REGISTRY, PROTOCOLS
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
-  const [exploringProtocolId, setExploringProtocolId] = useState("employee");
-
-  const BASE_PROTOCOLS = [
-    {
-      id: "employee",
-      name: "Employee Master Registry",
-      type_category: "PERSONNEL_PRIMARY",
-      description: "Primary health cards for all staff members",
-      coverage: "DIRECT PERSONNEL",
-      icon: Users,
-      color: "#6366f1",
-      category: "EMPLOYEE",
-      fields: [
-        { slug: "card_no" },
-        { slug: "name" },
-        { slug: "gender" },
-        { slug: "dob" },
-        { slug: "mobile_no" },
-        { slug: "aadhar_no" },
-        { slug: "address" },
-        { slug: "designation" },
-      ],
-    },
-    {
-      id: "family",
-      name: "Family Dependency Mapping",
-      type_category: "PERSONNEL_DEPENDENT",
-      description: "Linked family members and relationships",
-      coverage: "SPOUSE/DEPENDENTS",
-      icon: UserPlus,
-      color: "#10b981",
-      category: "FAMILY",
-      fields: [
-        { slug: "card_no_suffix" },
-        { slug: "name" },
-        { slug: "gender" },
-        { slug: "dob" },
-        { slug: "mobile_no" },
-        { slug: "aadhar_no" },
-        { slug: "relationship" },
-        { slug: "parent_card_no" },
-      ],
-    },
-    {
-      id: "health",
-      name: "Full Health Profiling",
-      type_category: "CLINICAL_REPOSITORY",
-      description: "Consolidated staff + family records",
-      coverage: "ENTIRE ECOSYSTEM",
-      icon: ShieldCheck,
-      color: "#f59e0b",
-      category: "BOTH",
-      fields: [
-        { slug: "card_no" },
-        { slug: "blood_group" },
-        { slug: "allergies" },
-        { slug: "chronic_conditions" },
-        { slug: "height" },
-        { slug: "weight" },
-      ],
-    },
-  ];
+  const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
 
   const getCurrentProtocols = () => {
     const proj = projects.find((p) => String(p.id) === String(selectedProject));
     if (!proj) return [];
-
-    const mappings = proj.category_mappings || [];
-    // Prioritize polymorphic registries if the project is configured to use them for personnel
-    const useRegistry = proj.use_registry_for_personnel;
-
-    const baseSet =
-      mappings.length === 0
-        ? BASE_PROTOCOLS
-        : BASE_PROTOCOLS.filter((proto) => {
-          // If Registry Mode is active, we skip the standard hardcoded ones to prioritize polymorphic
-          if (
-            useRegistry &&
-            (proto.type_category === "PERSONNEL_PRIMARY" ||
-              proto.type_category === "PERSONNEL_DEPENDENT")
-          )
-            return false;
-
-          if (proto.category === "BOTH") {
-            return (
-              mappings.some((m) => m.category === "EMPLOYEE") &&
-              mappings.some((m) => m.category === "FAMILY")
-            );
-          }
-          return mappings.some((m) => m.category === proto.category);
-        });
-
+    
+    // All protocols are now dynamic and fetched from the RegistryType model in the DB.
+    // Standard protocols like the 'Unified Master Registry' are auto-populated via backend signals.
     const customSet = (proj.registry_types || []).map((rt) => ({
       id: rt.slug,
       dbId: rt.id,
@@ -151,7 +77,7 @@ const AdminMasters = () => {
       isCustom: true,
       fields: rt.fields || [],
     }));
-    return [...baseSet, ...customSet];
+    return customSet;
   };
 
   const [showNewProtocolModal, setShowNewProtocolModal] = useState(false);
@@ -181,11 +107,70 @@ const AdminMasters = () => {
     cost: 0,
     additional_fields: {},
   });
-  const [customFieldForm, setCustomFieldForm] = useState({
-    field_label: "",
-    field_type: "VARCHAR",
-    char_length: 100,
+  
+  const [dashboardStats, setDashboardStats] = useState(null);
+  
+  // Laboratory Diagnostic Masters State
+  const [labTests, setLabTests] = useState([]);
+  const [labDepartments, setLabDepartments] = useState([]);
+  const [labTestTypes, setLabTestTypes] = useState([]);
+  const [showLabTestModal, setShowLabTestModal] = useState(false);
+  const [showSubTestModal, setShowSubTestModal] = useState(false);
+  const [showDeptModal, setShowDeptModal] = useState(false);
+  const [showTestTypeModal, setShowTestTypeModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState({ id: null, type: null, label: "" });
+  const [currentLabTest, setCurrentLabTest] = useState(null);
+  const [currentSubTest, setCurrentSubTest] = useState(null);
+  const [isEditingLabTest, setIsEditingLabTest] = useState(false);
+  const [isEditingSubTest, setIsEditingSubTest] = useState(false);
+  const [expandedLabTests, setExpandedLabTests] = useState({});
+
+  const [labTestForm, setLabTestForm] = useState({
+    name: "",
+    code: "",
+    test_type: "",
+    department: "",
+    description: "",
+    is_active: true
   });
+  const [deptForm, setDeptForm] = useState({
+     name: "",
+     description: ""
+  });
+  const [testTypeForm, setTestTypeForm] = useState({
+     name: "",
+     description: ""
+  });
+   const [subTestForm, setSubTestForm] = useState({
+     name: "",
+     code: "",
+     value_type: "INPUT",
+     input_data_type: "text",
+     min_chars: 0,
+     max_chars: 255,
+     units: "",
+     biological_range: "",
+     description: "",
+     dropdown_options: "",
+     is_active: true
+   });
+
+   const resetLabForm = () => {
+     setLabTestForm({ name: "", code: "", test_type: "", department: "", description: "", is_active: true });
+     setIsEditingLabTest(false);
+     setCurrentLabTest(null);
+   };
+
+   const resetSubTestForm = () => {
+     setSubTestForm({ name: "", code: "", value_type: "INPUT", input_data_type: "text", min_chars: 0, max_chars: 255, units: "", biological_range: "", description: "", dropdown_options: "", is_active: true });
+     setIsEditingSubTest(false);
+     setCurrentSubTest(null);
+   };
+
+
+  const customFieldFormBase = { field_label: "", field_type: "VARCHAR", char_length: 100 };
+  const [customFieldForm, setCustomFieldForm] = useState(customFieldFormBase);
   const [activeProjectFields, setActiveProjectFields] = useState([]);
 
   useEffect(() => {
@@ -258,9 +243,187 @@ const AdminMasters = () => {
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
 
   useEffect(() => {
-    fetchEmployeeMasters(1);
+    if (activeBoard === "DIAGNOSTICS") {
+      fetchLabTests();
+      fetchLabDepartments();
+      fetchLabTestTypes();
+    } else if (activeBoard === "STATS") {
+      fetchDashboardStats();
+    } else {
+      fetchEmployeeMasters(1);
+    }
     fetchProjects();
-  }, [selectedProject, exploringProtocolId, searchQuery]);
+  }, [selectedProject, exploringProtocolId, searchQuery, activeBoard]);
+
+  const fetchDashboardStats = async () => {
+    if (!selectedProject) return;
+    try {
+      const res = await api.get(`patients/registry-report/?project=${selectedProject}`);
+      setDashboardStats(res.data);
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats", err);
+    }
+  };
+
+  const fetchLabTests = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`laboratory/lab-tests/?project=${selectedProject || ""}`);
+      setLabTests(res.data.results || res.data);
+    } catch (err) {
+      toast.error("Failed to fetch lab tests");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchLabDepartments = async () => {
+    try {
+      const res = await api.get(`laboratory/departments/?project=${selectedProject || ""}`);
+      setLabDepartments(res.data.results || res.data);
+    } catch (err) {
+      toast.error("Failed to fetch lab departments");
+    }
+  };
+
+  const fetchLabTestTypes = async () => {
+    try {
+      const res = await api.get(`laboratory/test-types/?project=${selectedProject || ""}`);
+      setLabTestTypes(res.data.results || res.data);
+    } catch (err) {
+       toast.error("Failed to fetch test types");
+    }
+  };
+
+
+  const handleLabTestSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (!selectedProject) return toast.error("Please select a project first");
+      if (!labTestForm.department) return toast.error("Please select or create a department");
+      if (!labTestForm.test_type) return toast.error("Please select or create a test type");
+      
+      const data = { ...labTestForm, project: selectedProject };
+      if (isEditingLabTest && currentLabTest) {
+        await api.put(`laboratory/lab-tests/${currentLabTest.id}/`, data);
+        toast.success("Lab Test Updated");
+      } else {
+        await api.post("laboratory/lab-tests/", data);
+        toast.success("Lab Test Master Created");
+      }
+      
+      setShowLabTestModal(false);
+      resetLabForm();
+      fetchLabTests();
+    } catch (err) {
+      toast.error(isEditingLabTest ? "Error updating lab test" : "Error creating lab test");
+    }
+  };
+
+  const handleTestTypeSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (!selectedProject) return toast.error("Select project first");
+      const data = { ...testTypeForm, project: selectedProject };
+      const res = await api.post("laboratory/test-types/", data);
+      toast.success("Test Type Created");
+      setLabTestTypes([...labTestTypes, res.data]);
+      setLabTestForm({ ...labTestForm, test_type: res.data.id });
+      setShowTestTypeModal(false);
+      setTestTypeForm({ name: "", description: "" });
+    } catch (err) {
+      toast.error("Error creating test type");
+    }
+  };
+
+  const handleDeptSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (!selectedProject) return toast.error("Select project first");
+      const data = { ...deptForm, project: selectedProject };
+      const res = await api.post("laboratory/departments/", data);
+      toast.success("Department Created");
+      setLabDepartments([...labDepartments, res.data]);
+      setLabTestForm({ ...labTestForm, department: res.data.id });
+      setShowDeptModal(false);
+      setDeptForm({ name: "", description: "" });
+    } catch (err) {
+      toast.error("Error creating department");
+    }
+  };
+
+  const handleSubTestSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const data = { 
+        ...subTestForm, 
+        lab_test: currentLabTest.id,
+        dropdown_options: subTestForm.dropdown_options ? 
+          (Array.isArray(subTestForm.dropdown_options) ? subTestForm.dropdown_options : subTestForm.dropdown_options.split(',').map(s => s.trim())) 
+          : []
+      };
+
+      if (isEditingSubTest && currentSubTest) {
+        await api.put(`laboratory/sub-tests/${currentSubTest.id}/`, data);
+        toast.success("Sub Test Updated");
+      } else {
+        await api.post("laboratory/sub-tests/", data);
+        toast.success("Sub Test Added");
+      }
+      
+      setShowSubTestModal(false);
+      resetSubTestForm();
+      fetchLabTests();
+    } catch (err) {
+      toast.error(isEditingSubTest ? "Error updating sub test" : "Error adding sub test");
+    }
+  };
+
+  const handleToggleLabStatus = async (test) => {
+    try {
+      await api.patch(`laboratory/lab-tests/${test.id}/`, { is_active: !test.is_active });
+      toast.success(test.is_active ? "Test Deactivated" : "Test Activated");
+      fetchLabTests();
+    } catch (err) {
+      toast.error("Error toggling status");
+    }
+  };
+
+  const handleToggleSubTestStatus = async (sub) => {
+    try {
+      await api.patch(`laboratory/sub-tests/${sub.id}/`, { is_active: !sub.is_active });
+      toast.success(sub.is_active ? "Component Deactivated" : "Component Activated");
+      fetchLabTests();
+    } catch (err) {
+      toast.error("Error toggling status");
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      if (deleteTarget.type === 'LAB') {
+        await api.delete(`laboratory/lab-tests/${deleteTarget.id}/`);
+        toast.success("Lab Test Deleted");
+      } else {
+        await api.delete(`laboratory/sub-tests/${deleteTarget.id}/`);
+        toast.success("Sub Test Deleted");
+      }
+      setShowDeleteModal(false);
+      fetchLabTests();
+    } catch (err) {
+      toast.error("Error deleting record");
+    }
+  };
+
+  const handleDeleteLabTest = (id, name) => {
+    setDeleteTarget({ id, type: 'LAB', label: name });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteSubTest = (id, name) => {
+    setDeleteTarget({ id, type: 'SUB', label: name });
+    setShowDeleteModal(true);
+  };
 
   const fetchProjects = async () => {
     try {
@@ -279,9 +442,9 @@ const AdminMasters = () => {
     setIsLoading(true);
     const targetProject = projectId !== null ? projectId : selectedProject;
     try {
-      const isStandard = ["employee", "family", "health"].includes(
-        exploringProtocolId,
-      );
+        const isStandard = ["employee_master"].includes(
+          exploringProtocolId,
+        );
       const endpoint = isStandard
         ? "patients/employee-masters/"
         : "patients/registry-data/";
@@ -394,7 +557,7 @@ const AdminMasters = () => {
       familyFormData.relationship === "OTHER"
         ? familyFormData.custom_relationship
         : familyFormData.relationship;
-    const isStandard = ["employee", "family", "health"].includes(
+    const isStandard = ["employee_master"].includes(
       exploringProtocolId,
     );
 
@@ -715,7 +878,7 @@ const AdminMasters = () => {
       let allFailed = [];
 
       try {
-        const isStandard = ["employee", "family", "health"].includes(
+        const isStandard = ["employee_master"].includes(
           exploringProtocolId,
         );
         // For Project 1, the dynamic registries 'employee_master' and 'family_member' should also hit the specialized personnel endpoint
@@ -954,28 +1117,30 @@ const AdminMasters = () => {
                 >
                   Back to Project List
                 </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setIsEditingMaster(false);
-                    setMasterFormData({
-                      project: selectedProject || "",
-                      card_no: "",
-                      name: "",
-                      dob: "",
-                      gender: "MALE",
-                      mobile_no: "",
-                      aadhar_no: "",
-                      address: "",
-                      designation: "",
-                      proof_image: null,
-                      additional_fields: {},
-                    });
-                    setShowMasterModal(true);
-                  }}
-                >
-                  <Plus size={20} /> New Registry Entry
-                </button>
+                {projects.find((p) => String(p.id) === String(selectedProject))?.category_mappings?.some((m) => m.category === "EMPLOYEE") && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setIsEditingMaster(false);
+                      setMasterFormData({
+                        project: user?.project || selectedProject || "",
+                        card_no: "",
+                        name: "",
+                        dob: "",
+                        gender: "MALE",
+                        mobile_no: "",
+                        aadhar_no: "",
+                        address: "",
+                        designation: "",
+                        proof_image: null,
+                        additional_fields: {},
+                      });
+                      setShowMasterModal(true);
+                    }}
+                  >
+                    <Plus size={20} /> New Registry Entry
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -991,7 +1156,9 @@ const AdminMasters = () => {
             }}
           >
             {projects && projects.length > 0 ? (
-              projects.map((p) => (
+              projects
+                .filter((p) => !user?.project || String(p.id) === String(user.project))
+                .map((p) => (
                 <div
                   key={p.id}
                   onClick={() => {
@@ -1006,10 +1173,10 @@ const AdminMasters = () => {
                     textAlign: "center",
                     cursor: "pointer",
                     transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                    border: "1px solid #f1f5f9",
-                    background: "white",
-                    boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
-                    borderRadius: "24px",
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                    borderRadius: "28px",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-6px)";
@@ -1025,7 +1192,7 @@ const AdminMasters = () => {
                   <div
                     style={{
                       padding: "1.25rem",
-                      background: "#f5f3ff",
+                      background: "var(--background)",
                       borderRadius: "20px",
                       width: "fit-content",
                       margin: "0 auto 1.25rem auto",
@@ -1038,7 +1205,7 @@ const AdminMasters = () => {
                       fontSize: "1.125rem",
                       fontWeight: 900,
                       marginBottom: "0.75rem",
-                      color: "#1e293b",
+                      color: "var(--text-main)",
                     }}
                   >
                     {p.name}
@@ -1055,7 +1222,7 @@ const AdminMasters = () => {
                         fontSize: "0.75rem",
                         color: "var(--primary)",
                         fontWeight: 800,
-                        background: "#eff6ff",
+                        background: "var(--background)",
                         padding: "0.4rem 1rem",
                         borderRadius: "12px",
                         display: "flex",
@@ -1105,206 +1272,193 @@ const AdminMasters = () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "1.25rem",
-                marginBottom: "1.5rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "0.5rem",
+                marginBottom: "1rem",
               }}
             >
+              {/* Station Total Card */}
               <div
-                className="card"
+                className="card fade-in"
                 style={{
-                  padding: "1.25rem",
-                  borderLeft: "4px solid #6366f1",
-                  borderRadius: "16px",
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(99, 102, 241, 0.15)",
+                  border: "none",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: "0.625rem",
-                    fontWeight: 900,
-                    color: "#94a3b8",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Environment
-                </p>
-                <h3
-                  style={{
-                    fontSize: "1.125rem",
-                    fontWeight: 900,
-                    marginTop: "4px",
-                  }}
-                >
-                  {projects.find(
-                    (p) => String(p.id) === String(selectedProject),
-                  )?.name || "Workspace"}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Users size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {projects.length}
                 </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Station Total</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
               </div>
+
+              {/* OPD Today Card */}
               <div
-                className="card"
+                className="card fade-in"
                 style={{
-                  padding: "1.25rem",
-                  borderLeft: "4px solid #10b981",
-                  borderRadius: "16px",
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(16, 185, 129, 0.15)",
+                  border: "none",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: "0.625rem",
-                    fontWeight: 900,
-                    color: "#94a3b8",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Staff Records
-                </p>
-                <h3
-                  style={{
-                    fontSize: "1.125rem",
-                    fontWeight: 900,
-                    marginTop: "4px",
-                  }}
-                >
-                  {totalCount}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Activity size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {totalCount.toString().padStart(2, '0')}
                 </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>OPD Today</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
               </div>
+
+              {/* Emergency Card */}
               <div
-                className="card"
+                className="card fade-in"
                 style={{
-                  padding: "1.25rem",
-                  borderLeft: "4px solid #f59e0b",
-                  borderRadius: "16px",
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(239, 68, 68, 0.15)",
+                  border: "none",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: "0.625rem",
-                    fontWeight: 900,
-                    color: "#94a3b8",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Dependents
-                </p>
-                <h3
-                  style={{
-                    fontSize: "1.125rem",
-                    fontWeight: 900,
-                    marginTop: "4px",
-                  }}
-                >
-                  {totalFamilyCount}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Clock size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {(totalFamilyCount || 0).toString().padStart(2, '0')}
                 </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Emergency</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
               </div>
+
+              {/* Dependents Card */}
               <div
-                className="card"
+                className="card fade-in"
                 style={{
-                  padding: "1.25rem",
-                  borderLeft: "4px solid #ec4899",
-                  borderRadius: "16px",
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(245, 158, 11, 0.15)",
+                  border: "none",
                 }}
               >
-                <p
-                  style={{
-                    fontSize: "0.625rem",
-                    fontWeight: 900,
-                    color: "#94a3b8",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Custom Schema
-                </p>
-                <h3
-                  style={{
-                    fontSize: "1.125rem",
-                    fontWeight: 900,
-                    marginTop: "4px",
-                  }}
-                >
-                  {activeProjectFields.length} Fields
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <UserPlus size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                   {totalFamilyCount}
                 </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Dependents</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
               </div>
             </div>
 
             <div
               style={{
                 display: "flex",
-                gap: "0.75rem",
+                gap: "0.5rem",
                 marginBottom: "1.5rem",
-                background: "#f8fafc",
-                padding: "0.75rem",
-                borderRadius: "24px",
-                border: "1px solid #f1f5f9",
+                background: "var(--surface)",
+                padding: "0.5rem",
+                borderRadius: "20px",
+                border: "1px solid var(--border)",
+                width: "fit-content",
               }}
             >
               <button
-                className="btn btn-secondary"
+                className="btn"
                 style={{
-                  flex: 1,
-                  background:
-                    activeBoard === "STATS" ? "var(--primary)" : "white",
-                  color: activeBoard === "STATS" ? "white" : "#475569",
+                  background: activeBoard === "PROTOCOLS" ? "var(--background)" : "transparent",
+                  color: activeBoard === "PROTOCOLS" ? "var(--primary)" : "var(--text-muted)",
+                  boxShadow: activeBoard === "PROTOCOLS" ? "var(--shadow-sm)" : "none",
                   fontSize: "0.75rem",
-                  height: "44px",
-                  borderRadius: "16px",
-                }}
-                onClick={() => setActiveBoard("STATS")}
-              >
-                <Activity size={16} /> Overview Stats
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{
-                  flex: 1,
-                  background:
-                    activeBoard === "PROTOCOLS" ? "var(--primary)" : "white",
-                  color: activeBoard === "PROTOCOLS" ? "white" : "#475569",
-                  fontSize: "0.75rem",
-                  height: "44px",
-                  borderRadius: "16px",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
+                  transition: "all 0.2s",
                 }}
                 onClick={() => setActiveBoard("PROTOCOLS")}
               >
                 <Layers size={16} /> Data Hub
               </button>
+
               <button
-                className="btn btn-secondary"
+                className="btn"
                 style={{
-                  flex: 1,
-                  background:
-                    activeBoard === "REGISTRY" ? "var(--primary)" : "white",
-                  color: activeBoard === "REGISTRY" ? "white" : "#475569",
+                  background: activeBoard === "DIAGNOSTICS" ? "var(--background)" : "transparent",
+                  color: activeBoard === "DIAGNOSTICS" ? "var(--primary)" : "var(--text-muted)",
+                  boxShadow: activeBoard === "DIAGNOSTICS" ? "var(--shadow-sm)" : "none",
                   fontSize: "0.75rem",
-                  height: "44px",
-                  borderRadius: "16px",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
+                  transition: "all 0.2s",
                 }}
                 onClick={() => {
-                  setActiveBoard("REGISTRY");
-                  fetchEmployeeMasters(1);
+                  setActiveBoard("DIAGNOSTICS");
+                  fetchLabTests();
                 }}
               >
-                <Users size={16} /> Browse Registry
+                <Activity size={16} /> Lab Masters
               </button>
+
+              <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
+
               <button
-                className="btn btn-secondary"
+                className="btn"
                 style={{
-                  flex: 1,
-                  background: "white",
+                  background: "transparent",
+                  color: "#64748b",
                   fontSize: "0.75rem",
-                  height: "44px",
-                  borderRadius: "16px",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
                 }}
                 onClick={handleExport}
               >
                 <Download size={16} /> Export CSV
               </button>
+
               <button
                 className="btn btn-primary"
                 style={{
-                  flex: 1,
                   fontSize: "0.75rem",
-                  height: "44px",
-                  borderRadius: "16px",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
                   background: "#1e293b",
                 }}
                 onClick={() => {
@@ -1323,62 +1477,170 @@ const AdminMasters = () => {
             </div>
 
             {activeBoard === "STATS" ? (
-              <div
-                className="fade-in"
-                style={{
-                  padding: "4rem 2rem",
-                  textAlign: "center",
-                  background: "white",
-                  borderRadius: "32px",
-                  border: "1.5px dashed #f1f5f9",
-                }}
-              >
-                <div
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    background: "#f5f3ff",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 1.5rem auto",
-                  }}
-                >
-                  <Database size={40} color="var(--primary)" />
-                </div>
-                <h2
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: 900,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Workspace Repository Ready
-                </h2>
-                <p
-                  style={{
-                    color: "#64748b",
-                    fontWeight: 600,
-                    marginBottom: "2.5rem",
-                  }}
-                >
-                  Select 'Browse Registry' to view and manage {totalCount}{" "}
-                  patient records and {totalFamilyCount} dependents.
-                </p>
-                <button
-                  className="btn btn-primary"
-                  style={{
-                    margin: "0 auto",
-                    padding: "1rem 3rem",
-                    borderRadius: "16px",
-                  }}
-                  onClick={() => {
-                    setActiveBoard("PROTOCOLS");
-                  }}
-                >
-                  Open Protocol Hub
-                </button>
+              <div className="fade-in">
+                {dashboardStats ? (
+                  <>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr 1fr",
+                        gap: "1.25rem",
+                        marginBottom: "1.5rem",
+                      }}
+                    >
+                      <div
+                        className="card"
+                        style={{
+                          padding: "1.5rem",
+                          borderRadius: "24px",
+                          background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                          color: "white",
+                        }}
+                      >
+                        <p style={{ fontSize: "0.75rem", fontWeight: 800, opacity: 0.8 }}>TOTAL INVENTORY VALUE</p>
+                        <h2 style={{ fontSize: "2rem", fontWeight: 900, marginTop: "0.5rem" }}>
+                          ₹{dashboardStats.inventory_value.toLocaleString()}
+                        </h2>
+                        <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+                           <span style={{ fontSize: "0.75rem", background: "rgba(255,255,255,0.2)", padding: "4px 8px", borderRadius: "6px" }}>
+                              {dashboardStats.total_registered} Patients
+                           </span>
+                        </div>
+                      </div>
+                      
+                      <div
+                        className="card"
+                        style={{
+                          padding: "1.5rem",
+                          borderRadius: "24px",
+                          background: "var(--surface)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>STOCK HEALTH</p>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", height: "100%", paddingBottom: "1.5rem" }}>
+                           <div>
+                              <h4 style={{ fontSize: "1.5rem", fontWeight: 900, color: "#f59e0b" }}>{dashboardStats.stock_health.low}</h4>
+                              <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>LOW STOCK ITEMS</p>
+                           </div>
+                           <div style={{ borderLeft: "1px solid var(--border)", height: "40px" }} />
+                           <div>
+                              <h4 style={{ fontSize: "1.5rem", fontWeight: 900, color: "#ef4444" }}>{dashboardStats.stock_health.out}</h4>
+                              <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>OUT OF STOCK</p>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="card"
+                        style={{
+                          padding: "1.5rem",
+                          borderRadius: "24px",
+                          background: "var(--surface)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>CLINICAL CONVERSION</p>
+                        <h2 style={{ fontSize: "2rem", fontWeight: 900, color: "#10b981", marginTop: "0.5rem" }}>
+                          {dashboardStats.conversion_rate}%
+                        </h2>
+                        <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)", marginTop: "4px" }}>
+                           Visits successfully completed today
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.25rem" }}>
+                       <div className="card" style={{ padding: "1.5rem", borderRadius: "24px" }}>
+                          <h4 style={{ fontSize: "0.875rem", fontWeight: 900, marginBottom: "1.5rem" }}>MEDICATION CONSUMPTION TRENDS</h4>
+                          <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", height: "200px", padding: "1rem 0" }}>
+                             {dashboardStats.trends.map((t, i) => (
+                                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                                   <div style={{ 
+                                      width: "100%", 
+                                      background: "#eff6ff", 
+                                      borderRadius: "8px", 
+                                      height: `${Math.min(100, (t.units / (Math.max(...dashboardStats.trends.map(x=>x.units), 1))) * 100)}%`,
+                                      border: "1px solid #dbeafe",
+                                      minHeight: "4px"
+                                   }} />
+                                   <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "#94a3b8" }}>{t.date.split('-').slice(1).join('/')}</span>
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+                       
+                       <div className="card" style={{ padding: "1.5rem", borderRadius: "24px" }}>
+                          <h4 style={{ fontSize: "0.875rem", fontWeight: 900, marginBottom: "1.5rem" }}>TOP DISPENSED</h4>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                             {dashboardStats.top_medications.slice(0, 5).map((m, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "0.75rem", borderRadius: "12px" }}>
+                                   <span style={{ fontSize: "0.75rem", fontWeight: 800 }}>{m.name}</span>
+                                   <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "var(--primary)" }}>{m.total} Units</span>
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      padding: "4rem 2rem",
+                      textAlign: "center",
+                      background: "white",
+                      borderRadius: "32px",
+                      border: "1.5px dashed #f1f5f9",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        background: "#f5f3ff",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 1.5rem auto",
+                      }}
+                    >
+                      <Database size={40} color="var(--primary)" />
+                    </div>
+                    <h2
+                      style={{
+                        fontSize: "1.5rem",
+                        fontWeight: 900,
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      Workspace Repository Ready
+                    </h2>
+                    <p
+                      style={{
+                        color: "#64748b",
+                        fontWeight: 600,
+                        marginBottom: "2.5rem",
+                      }}
+                    >
+                      Select 'Browse Registry' to view and manage {totalCount}{" "}
+                      patient records and {totalFamilyCount} dependents.
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      style={{
+                        margin: "0 auto",
+                        padding: "1rem 3rem",
+                        borderRadius: "16px",
+                      }}
+                      onClick={() => {
+                        setActiveBoard("PROTOCOLS");
+                      }}
+                    >
+                      Open Protocol Hub
+                    </button>
+                  </div>
+                )}
               </div>
             ) : activeBoard === "PROTOCOLS" ? (
               <div className="fade-in">
@@ -1388,15 +1650,16 @@ const AdminMasters = () => {
                     padding: 0,
                     borderRadius: "24px",
                     overflow: "hidden",
-                    border: "1px solid #f1f5f9",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
                   }}
                 >
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr
                         style={{
-                          background: "#f8fafc",
-                          borderBottom: "1px solid #f1f5f9",
+                          background: "var(--background)",
+                          borderBottom: "1px solid var(--border)",
                         }}
                       >
                         <th
@@ -1444,7 +1707,7 @@ const AdminMasters = () => {
                       {getCurrentProtocols().map((proto) => (
                         <tr
                           key={proto.id}
-                          style={{ borderBottom: "1px solid #f8fafc" }}
+                          style={{ borderBottom: "1px solid var(--border)" }}
                         >
                           <td style={{ padding: "1.5rem 2rem" }}>
                             <div
@@ -1475,21 +1738,35 @@ const AdminMasters = () => {
                                   style={{
                                     fontSize: "1rem",
                                     fontWeight: 800,
-                                    color: "#1e293b",
+                                    color: "var(--text-main)",
                                     marginBottom: "2px",
                                   }}
                                 >
-                                  {proto.name}
+                                {proto.name}
                                 </h4>
-                                <p
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: 600,
-                                    color: "#64748b",
-                                  }}
-                                >
-                                  {proto.description}
-                                </p>
+                                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                  <p
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      fontWeight: 600,
+                                      color: "var(--text-muted)",
+                                    }}
+                                  >
+                                    {proto.description}
+                                  </p>
+                                  {(proto.icon === Pill || proto.slug.includes('pharmacy')) && (
+                                     <span style={{ 
+                                       fontSize: "0.625rem", 
+                                       background: "#fef3c7", 
+                                       color: "#92400e", 
+                                       padding: "2px 6px", 
+                                       borderRadius: "4px", 
+                                       fontWeight: 900 
+                                     }}>
+                                       AUTO-DEDUCTIVE
+                                     </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1640,32 +1917,181 @@ const AdminMasters = () => {
                     </tbody>
                   </table>
                 </div>
-                <div
-                  style={{
-                    marginTop: "2.5rem",
-                    display: "flex",
-                    justifyContent: "center",
-                  }}
-                >
-                  <button
-                    onClick={() => {
-                      setViewMode("PROJECTS");
-                      setSelectedProject("");
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      color: "#64748b",
-                      fontSize: "0.875rem",
-                      fontWeight: 700,
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <RotateCcw size={16} /> Reset Project Selection
-                  </button>
+              </div>
+            ) : activeBoard === "DIAGNOSTICS" ? (
+              <div className="fade-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Laboratory Diagnostic Masters</h3>
+                        <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Configure project-specific lab tests and component definitions</p>
+                    </div>
+                    <button 
+                        className="btn btn-primary" 
+                        onClick={() => setShowLabTestModal(true)}
+                        style={{ background: 'var(--primary)', borderRadius: '12px', padding: '0.75rem 1.5rem' }}
+                    >
+                        <Plus size={18} /> New Lab Test
+                    </button>
+                </div>
+                
+                <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <div className="table-responsive">
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                              <tr style={{ background: 'var(--background)', borderBottom: '1px solid #f1f5f9' }}>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Test Name / Code</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dept / Components</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                               {labTests.map(test => (
+                                 <React.Fragment key={test.id}>
+                                   <tr style={{ borderBottom: '1px solid #f8fafc', background: test.is_active ? 'transparent' : '#fcfcfc' }}>
+                                       <td style={{ padding: '1.5rem 2rem' }}>
+                                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ padding: '8px', background: '#f1f5f9', borderRadius: '10px' }}>
+                                                 <FlaskConical size={20} color="var(--primary)" />
+                                              </div>
+                                              <div>
+                                                <div style={{ fontWeight: 800, color: test.is_active ? '#1e293b' : '#94a3b8', fontSize: '1rem' }}>{test.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Code: {test.code || 'N/A'}</div>
+                                              </div>
+                                           </div>
+                                       </td>
+                                       <td style={{ padding: '1.5rem 2rem' }}>
+                                           <span style={{ fontSize: '0.625rem', fontWeight: 900, background: test.is_active ? '#e0e7ff' : '#f1f5f9', color: test.is_active ? '#4338ca' : '#94a3b8', padding: '0.4rem 0.75rem', borderRadius: '8px', textTransform: 'uppercase' }}>
+                                               {test.test_type_details?.name || 'N/A'}
+                                           </span>
+                                       </td>
+                                       <td style={{ padding: '1.5rem 2rem' }}>
+                                           <div style={{ fontSize: '0.875rem', fontWeight: 700, color: test.is_active ? '#475569' : '#cbd5e1' }}>{test.department_details?.name || 'N/A'}</div>
+                                           <button 
+                                              onClick={() => setExpandedLabTests({ ...expandedLabTests, [test.id]: !expandedLabTests[test.id] })}
+                                              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, marginTop: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                           >
+                                               {test.sub_tests?.length || 0} Dynamic Components
+                                               {expandedLabTests[test.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                           </button>
+                                       </td>
+                                       <td style={{ padding: '1.5rem 2rem', textAlign: 'right' }}>
+                                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                               <button 
+                                                   title="Add Component"
+                                                   className="btn btn-secondary" 
+                                                   style={{ width: '38px', height: '38px', padding: 0, borderRadius: '10px' }}
+                                                   onClick={() => {
+                                                       setCurrentLabTest(test);
+                                                       setShowSubTestModal(true);
+                                                   }}
+                                               >
+                                                   <Plus size={16} />
+                                               </button>
+                                               <button 
+                                                   title="Edit Test Master"
+                                                   className="btn btn-secondary" 
+                                                   style={{ width: '38px', height: '38px', padding: 0, borderRadius: '10px', background: '#eff6ff', color: '#2563eb', borderColor: '#dbeafe' }}
+                                                   onClick={() => {
+                                                       setCurrentLabTest(test);
+                                                       setLabTestForm({
+                                                          name: test.name,
+                                                          code: test.code,
+                                                          test_type: test.test_type,
+                                                          department: test.department,
+                                                          description: test.description,
+                                                          is_active: test.is_active
+                                                       });
+                                                       setIsEditingLabTest(true);
+                                                       setShowLabTestModal(true);
+                                                   }}
+                                               >
+                                                   <Edit2 size={16} />
+                                               </button>
+                                               <button 
+                                                   title={test.is_active ? "Deactivate" : "Activate"}
+                                                   className="btn btn-secondary" 
+                                                   style={{ width: '38px', height: '38px', padding: 0, borderRadius: '10px', background: test.is_active ? '#fff7ed' : '#ecfdf5', color: test.is_active ? '#ea580c' : '#059669' }}
+                                                   onClick={() => handleToggleLabStatus(test)}
+                                               >
+                                                   {test.is_active ? <Power size={16} /> : <Power size={16} />}
+                                               </button>
+                                               <button 
+                                                   title="Delete"
+                                                   className="btn btn-secondary" 
+                                                   style={{ width: '38px', height: '38px', padding: 0, borderRadius: '10px', background: '#fef2f2', color: '#dc2626' }}
+                                                   onClick={() => handleDeleteLabTest(test.id, test.name)}
+                                               >
+                                                   <Trash2 size={16} />
+                                               </button>
+                                           </div>
+                                       </td>
+                                   </tr>
+                                   {expandedLabTests[test.id] && (
+                                      <tr>
+                                        <td colSpan="4" style={{ padding: '0 2rem 1.5rem 4rem' }}>
+                                            <div style={{ background: 'var(--background)', borderRadius: '16px', padding: '1.25rem', border: '1px solid var(--border)' }}>
+                                               <div style={{ fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Component Definitions</div>
+                                               {test.sub_tests && test.sub_tests.length > 0 ? (
+                                                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                                     {test.sub_tests.map(sub => (
+                                                        <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'var(--surface)', borderRadius: '12px', border: '1px solid #edf2f7', opacity: sub.is_active ? 1 : 0.6 }}>
+                                                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sub.is_active ? '#10b981' : '#cbd5e1' }}></div>
+                                                              <div>
+                                                                 <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.875rem' }}>{sub.name} <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>[{sub.code}]</span></div>
+                                                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{sub.value_type} • {sub.units || 'No units'} • {sub.biological_range || 'No range'}</div>
+                                                              </div>
+                                                           </div>
+                                                           <div style={{ display: 'flex', gap: '6px' }}>
+                                                              <button onClick={() => {
+                                                                 setCurrentLabTest(test);
+                                                                 setCurrentSubTest(sub);
+                                                                 setSubTestForm({
+                                                                    name: sub.name,
+                                                                    code: sub.code,
+                                                                    value_type: sub.value_type,
+                                                                    input_data_type: sub.input_data_type,
+                                                                    min_chars: sub.min_chars,
+                                                                    max_chars: sub.max_chars,
+                                                                    units: sub.units,
+                                                                    biological_range: sub.biological_range,
+                                                                    description: sub.description,
+                                                                    dropdown_options: Array.isArray(sub.dropdown_options) ? sub.dropdown_options.join(', ') : sub.dropdown_options,
+                                                                    is_active: sub.is_active
+                                                                 });
+                                                                 setIsEditingSubTest(true);
+                                                                 setShowSubTestModal(true);
+                                                              }} style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '4px 8px', color: '#475569', cursor: 'pointer' }}><Edit2 size={12} /></button>
+                                                              <button onClick={() => handleToggleSubTestStatus(sub)} style={{ background: sub.is_active ? '#fff7ed' : '#ecfdf5', border: 'none', borderRadius: '6px', padding: '4px 8px', color: sub.is_active ? '#ea580c' : '#059669', cursor: 'pointer' }}><Power size={12} /></button>
+                                                              <button onClick={() => handleDeleteSubTest(sub.id, sub.name)} style={{ background: '#fef2f2', border: 'none', borderRadius: '6px', padding: '4px 8px', color: '#dc2626', cursor: 'pointer' }}><Trash2 size={12} /></button>
+                                                           </div>
+                                                        </div>
+                                                     ))}
+                                                  </div>
+                                               ) : (
+                                                  <div style={{ fontSize: '0.875rem', color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>No components defined for this test.</div>
+                                               )}
+                                            </div>
+                                        </td>
+                                      </tr>
+                                   )}
+                                </React.Fragment>
+                               ))}
+                              {labTests.length === 0 && !isLoading && (
+                                  <tr>
+                                      <td colSpan="4" style={{ padding: '5rem 2rem', textAlign: 'center' }}>
+                                          <div style={{ color: '#94a3b8', marginBottom: '1rem' }}>
+                                              <Activity size={48} style={{ opacity: 0.2, margin: '0 auto' }} />
+                                          </div>
+                                          <p style={{ color: '#94a3b8', fontWeight: 600 }}>No Lab Masters configured.</p>
+                                          <p style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>Add a new test to start building your diagnostic registry.</p>
+                                      </td>
+                                  </tr>
+                              )}
+                          </tbody>
+                      </table>
+                    </div>
                 </div>
               </div>
             ) : (
@@ -1781,6 +2207,30 @@ const AdminMasters = () => {
                       </button>
                       <button
                         className="btn btn-primary"
+                        onClick={() => {
+                          setBulkProject(selectedProject);
+                          setExploringProtocolId(exploringProtocolId);
+                          setBulkType("HEALTH");
+                          setBulkStep("UPLOAD");
+                          setShowBulkModal(true);
+                        }}
+                        style={{
+                          height: "52px",
+                          padding: "0 1.5rem",
+                          borderRadius: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          background: "#1e293b",
+                          border: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: 800
+                        }}
+                      >
+                        <Upload size={18} /> Upload Data
+                      </button>
+                      <button
+                        className="btn btn-primary"
                         style={{
                           height: "52px",
                           padding: "0 2.5rem",
@@ -1816,13 +2266,24 @@ const AdminMasters = () => {
                             borderBottom: "1px solid #f1f5f9",
                           }}
                         >
-                          {["employee", "family", "health"].includes(
+                          {["employee_master"].includes(
                             exploringProtocolId,
                           ) ? (
                             <>
                               <th
                                 style={{
                                   padding: "1.25rem 1.5rem",
+                                  fontSize: "0.625rem",
+                                  fontWeight: 900,
+                                  color: "#94a3b8",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                S.No
+                              </th>
+                              <th
+                                style={{
                                   fontSize: "0.625rem",
                                   fontWeight: 900,
                                   color: "#94a3b8",
@@ -1841,7 +2302,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Personnel Identity
+                                Name
                               </th>
                               <th
                                 style={{
@@ -1852,7 +2313,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Workstream
+                                Age / Gender
                               </th>
                               <th
                                 style={{
@@ -1863,7 +2324,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Demographics
+                                Aadhar No
                               </th>
                               <th
                                 style={{
@@ -1874,7 +2335,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Aadhar ID
+                                Mobile No
                               </th>
                               <th
                                 style={{
@@ -1885,7 +2346,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Contact
+                                Address
                               </th>
                               <th
                                 style={{
@@ -1896,7 +2357,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Primary Address
+                                Designation
                               </th>
                               {activeProjectFields.map((field) => (
                                 <th
@@ -1995,12 +2456,10 @@ const AdminMasters = () => {
                               new Date(m.dob).getFullYear()
                               : "N/A";
                             const isRegistry = ![
-                              "employee",
-                              "family",
-                              "health",
+                              "employee_master",
                             ].includes(exploringProtocolId);
                             const pageSize = isRegistry ? 100 : 10;
-                            const sno = (page - 1) * pageSize + idx + 1; // Calculate Serial Number based on pagination
+                            const sno = (page - 1) * pageSize + idx + 1;
                             const activeProtocol = getCurrentProtocols().find(
                               (p) => p.id === exploringProtocolId,
                             );
@@ -2015,6 +2474,15 @@ const AdminMasters = () => {
                                         style={{
                                           padding: "1.5rem 1.5rem",
                                           fontWeight: 900,
+                                          color: "#64748b",
+                                          fontSize: "0.875rem",
+                                        }}
+                                      >
+                                        {sno}
+                                      </td>
+                                      <td
+                                        style={{
+                                          fontWeight: 900,
                                           color: "var(--primary)",
                                           fontSize: "1rem",
                                         }}
@@ -2028,15 +2496,6 @@ const AdminMasters = () => {
                                         }}
                                       >
                                         {m.name}
-                                      </td>
-                                      <td
-                                        style={{
-                                          fontSize: "0.75rem",
-                                          fontWeight: 700,
-                                          color: "#64748b",
-                                        }}
-                                      >
-                                        {m.project_name || "-"}
                                       </td>
                                       <td style={{ fontWeight: 600 }}>
                                         {age} / {m.gender?.[0]}
@@ -2054,6 +2513,15 @@ const AdminMasters = () => {
                                         }}
                                       >
                                         {m.address?.substring(0, 20)}...
+                                      </td>
+                                      <td
+                                        style={{
+                                          fontSize: "0.75rem",
+                                          fontWeight: 700,
+                                          color: "#64748b",
+                                        }}
+                                      >
+                                        {m.designation || "-"}
                                       </td>
                                     </>
                                   ) : (
@@ -2097,9 +2565,7 @@ const AdminMasters = () => {
                                       ))}
                                     </>
                                   )}
-                                  {(exploringProtocolId === "employee" ||
-                                    exploringProtocolId === "family" ||
-                                    exploringProtocolId === "health") &&
+                                  {exploringProtocolId === "employee_master" &&
                                     activeProjectFields.map((field) => (
                                       <td
                                         key={field.id}
@@ -2127,7 +2593,7 @@ const AdminMasters = () => {
                                         gap: "0.5rem",
                                       }}
                                     >
-                                      {(exploringProtocolId === "employee" ||
+                                      {(exploringProtocolId === "employee_master" ||
                                         activeProtocol?.type_category ===
                                         "PERSONNEL_PRIMARY") && (
                                           <button
@@ -2140,10 +2606,10 @@ const AdminMasters = () => {
                                             }}
                                             title="Add Family Member"
                                             onClick={() => {
-                                              if (
-                                                exploringProtocolId ===
-                                                "employee"
-                                              ) {
+                                                if (
+                                                  exploringProtocolId ===
+                                                  "employee_master"
+                                                ) {
                                                 const nextSuffix =
                                                   (m.family_members?.length ||
                                                     0) + 1;
@@ -2600,9 +3066,7 @@ const AdminMasters = () => {
           </>
         )}
 
-        {/* MODALS REMAIN THE SAME... */}
-
-        {showMasterModal && (
+        {showMasterModal && createPortal(
           <div
             style={{
               position: "fixed",
@@ -2610,13 +3074,13 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(15, 23, 42, 0.7)",
-              backdropFilter: "blur(8px)",
+              background: "rgba(255, 255, 255, 0.85)",
+              backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
               alignItems: "flex-start",
-              zIndex: 10000,
-              padding: "100px 1rem 60px 1rem",
+              zIndex: 100000,
+              padding: "40px 1rem 60px 1rem",
               overflowY: "auto",
             }}
           >
@@ -2626,27 +3090,33 @@ const AdminMasters = () => {
                 width: "100%",
                 maxWidth: "600px",
                 padding: 0,
-                borderRadius: "24px",
+                borderRadius: "32px",
                 background: "white",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+                border: "1px solid var(--border)",
               }}
             >
               <div
                 style={{
                   padding: "1.5rem 2rem",
-                  borderBottom: "1px solid #f1f5f9",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  background: "#f8fafc",
-                  borderTopLeftRadius: "24px",
-                  borderTopRightRadius: "24px",
                 }}
               >
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800 }}>
-                  {isEditingMaster
-                    ? "Edit Master Record"
-                    : "Register in Masters"}
-                </h2>
+                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                  <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                    <ShieldCheck size={24} color="white" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                      {isEditingMaster
+                        ? "Edit Master Record"
+                        : "Register in Masters"}
+                    </h2>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Clinical Registry & Personnel Onboarding</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => {
                     setShowMasterModal(false);
@@ -2654,17 +3124,17 @@ const AdminMasters = () => {
                   }}
                   style={{
                     border: "none",
-                    background: "#e2e8f0",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
+                    background: "#f1f5f9",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "12px",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <X size={18} color="#64748b" />
+                  <X size={20} color="#64748b" />
                 </button>
               </div>
               <form onSubmit={handleMasterSubmit} style={{ padding: "2rem" }}>
@@ -2677,32 +3147,77 @@ const AdminMasters = () => {
                 >
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
                     <label>Assign Project *</label>
-                    <select
-                      required
-                      value={masterFormData.project}
-                      onChange={(e) =>
-                        setMasterFormData({
-                          ...masterFormData,
-                          project: e.target.value,
-                        })
-                      }
-                      className="form-control"
-                    >
-                      <option value="">-- Select Project --</option>
-                      {projects &&
-                        Array.isArray(projects) &&
-                        projects
-                          .filter((p) =>
-                            p.category_mappings?.some(
-                              (m) => m.category === "EMPLOYEE",
-                            ),
-                          )
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                    </select>
+                    {(user?.project || selectedProject || masterFormData.project) ? (
+                      <div style={{ 
+                        background: '#f8fafc', 
+                        padding: '1rem 1.25rem', 
+                        borderRadius: '16px', 
+                        border: '1.5px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        color: '#1e293b',
+                        fontWeight: 800,
+                        boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
+                      }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          background: 'white',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}>
+                          <ShieldCheck size={20} color="#6366f1" />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                           <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identified Workspace</span>
+                           <span style={{ fontSize: '0.9375rem' }}>
+                               {projects.find(p => String(p.id) === String(user?.project || selectedProject || masterFormData.project))?.name || "Target Project Workspace"}
+                           </span>
+                        </div>
+                        <span style={{ 
+                          fontSize: '0.625rem', 
+                          background: '#e0e7ff', 
+                          color: '#4338ca', 
+                          padding: '4px 8px', 
+                          borderRadius: '6px', 
+                          marginLeft: 'auto',
+                          fontWeight: 900,
+                          letterSpacing: '0.05em'
+                        }}>LOCKED</span>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={masterFormData.project}
+                        onChange={(e) =>
+                          setMasterFormData({
+                            ...masterFormData,
+                            project: e.target.value,
+                          })
+                        }
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                      >
+                        <option value="">-- Select Project --</option>
+                        {projects &&
+                          Array.isArray(projects) &&
+                          projects
+                            .filter((p) =>
+                              p.category_mappings?.some(
+                                (m) => m.category === "EMPLOYEE",
+                              ),
+                            )
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                      </select>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>Card No *</label>
@@ -2884,11 +3399,9 @@ const AdminMasters = () => {
                     display: "flex",
                     justifyContent: "flex-end",
                     gap: "1rem",
-                    marginTop: "2.5rem",
+                    marginTop: "1.5rem",
                     padding: "1.5rem 2rem",
-                    background: "#f8fafc",
-                    borderBottomLeftRadius: "24px",
-                    borderBottomRightRadius: "24px",
+                    background: "white",
                   }}
                 >
                   <button
@@ -2918,10 +3431,11 @@ const AdminMasters = () => {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {showFamilyModal && (
+        {showFamilyModal && createPortal(
           <div
             style={{
               position: "fixed",
@@ -2929,12 +3443,12 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(15, 23, 42, 0.7)",
-              backdropFilter: "blur(8px)",
+              background: "rgba(255, 255, 255, 0.85)",
+              backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
               alignItems: "flex-start",
-              zIndex: 10000,
+              zIndex: 100000,
               padding: "100px 1rem 60px 1rem",
               overflowY: "auto",
             }}
@@ -2945,25 +3459,31 @@ const AdminMasters = () => {
                 width: "100%",
                 maxWidth: "600px",
                 padding: 0,
-                borderRadius: "24px",
+                borderRadius: "32px",
                 background: "white",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+                border: "1px solid var(--border)",
               }}
             >
               <div
                 style={{
                   padding: "1.5rem 2rem",
-                  borderBottom: "1px solid #f1f5f9",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  background: "#f8fafc",
-                  borderTopLeftRadius: "24px",
-                  borderTopRightRadius: "24px",
                 }}
               >
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800 }}>
-                  {isEditingFamily ? "Edit Family Member" : "Add Family Member"}
-                </h2>
+                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                  <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                    <Users size={24} color="white" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                      {isEditingFamily ? "Edit Family Member" : "Add Family Member"}
+                    </h2>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Personal Dependants & Relations</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => {
                     setShowFamilyModal(false);
@@ -2971,17 +3491,17 @@ const AdminMasters = () => {
                   }}
                   style={{
                     border: "none",
-                    background: "#e2e8f0",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
+                    background: "#f1f5f9",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "12px",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <X size={18} color="#64748b" />
+                  <X size={20} color="#64748b" />
                 </button>
               </div>
               <form onSubmit={handleFamilySubmit} style={{ padding: "2rem" }}>
@@ -3110,10 +3630,11 @@ const AdminMasters = () => {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {showRegistryEditModal && (
+        {showRegistryEditModal && createPortal(
           <div
             style={{
               position: "fixed",
@@ -3121,13 +3642,13 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(15, 23, 42, 0.7)",
-              backdropFilter: "blur(8px)",
+              background: "rgba(255, 255, 255, 0.85)",
+              backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
               alignItems: "flex-start",
-              zIndex: 10000,
-              padding: "100px 1rem 60px 1rem",
+              zIndex: 100000,
+              padding: "40px 1rem 60px 1rem",
               overflowY: "auto",
             }}
           >
@@ -3137,40 +3658,46 @@ const AdminMasters = () => {
                 width: "100%",
                 maxWidth: "600px",
                 padding: 0,
-                borderRadius: "24px",
+                borderRadius: "32px",
                 background: "white",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+                border: "1px solid var(--border)",
               }}
             >
               <div
                 style={{
                   padding: "1.5rem 2rem",
-                  borderBottom: "1px solid #f1f5f9",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  background: "#f8fafc",
-                  borderTopLeftRadius: "24px",
-                  borderTopRightRadius: "24px",
                 }}
               >
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800 }}>
-                  Edit Registry Item: {registryEditData.name}
-                </h2>
+                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                  <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                    <Pencil size={24} color="white" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                      Edit Registry Item
+                    </h2>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Updating Global Database Entry</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowRegistryEditModal(false)}
                   style={{
                     border: "none",
-                    background: "#e2e8f0",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
+                    background: "#f1f5f9",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "12px",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <X size={18} color="#64748b" />
+                  <X size={20} color="#64748b" />
                 </button>
               </div>
               <form
@@ -3185,16 +3712,7 @@ const AdminMasters = () => {
                   }}
                 >
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
-                    <label
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "#94a3b8",
-                        fontWeight: 900,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Unique Code / ID
-                    </label>
+                    <label>Unique Code / ID</label>
                     <input
                       disabled
                       value={registryEditData.ucode}
@@ -3203,16 +3721,7 @@ const AdminMasters = () => {
                     />
                   </div>
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
-                    <label
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "#94a3b8",
-                        fontWeight: 900,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Item Name / Primary Label
-                    </label>
+                    <label>Item Name / Primary Label</label>
                     <input
                       required
                       value={registryEditData.name}
@@ -3228,16 +3737,7 @@ const AdminMasters = () => {
 
                   {/* Standard Registry Columns */}
                   <div className="form-group">
-                    <label
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "#94a3b8",
-                        fontWeight: 900,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Category / Group
-                    </label>
+                    <label>Category / Group</label>
                     <input
                       value={registryEditData.category}
                       onChange={(e) =>
@@ -3250,16 +3750,7 @@ const AdminMasters = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "#94a3b8",
-                        fontWeight: 900,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Internal Quantity
-                    </label>
+                    <label>Internal Quantity</label>
                     <input
                       type="number"
                       value={registryEditData.quantity}
@@ -3278,16 +3769,7 @@ const AdminMasters = () => {
                     .find((p) => p.id === exploringProtocolId)
                     ?.fields?.map((f) => (
                       <div className="form-group" key={f.slug}>
-                        <label
-                          style={{
-                            fontSize: "0.625rem",
-                            color: "#94a3b8",
-                            fontWeight: 900,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {f.label}
-                        </label>
+                        <label>{f.label}</label>
                         <input
                           value={
                             registryEditData.additional_fields?.[f.slug] || ""
@@ -3307,16 +3789,7 @@ const AdminMasters = () => {
                     ))}
 
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
-                    <label
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "#94a3b8",
-                        fontWeight: 900,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Detailed Description
-                    </label>
+                    <label>Detailed Description</label>
                     <textarea
                       rows="3"
                       value={registryEditData.description}
@@ -3346,25 +3819,18 @@ const AdminMasters = () => {
                   >
                     Discard
                   </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    style={{
-                      padding: "0.75rem 2rem",
-                      background:
-                        "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                    }}
-                  >
-                    Authorize Update
+                  <button type="submit" className="btn btn-primary">
+                    Update Entry
                   </button>
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
-      {showBulkModal && (
+      {showBulkModal && createPortal(
         <div
           style={{
             position: "fixed",
@@ -3372,7 +3838,7 @@ const AdminMasters = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(15, 23, 42, 0.7)",
+            background: "rgba(255, 255, 255, 0.85)",
             backdropFilter: "blur(12px)",
             display: "flex",
             justifyContent: "center",
@@ -3388,51 +3854,54 @@ const AdminMasters = () => {
               width: "100%",
               maxWidth: bulkStep === "UPLOAD" ? "800px" : "900px",
               padding: 0,
-              borderRadius: "28px",
+              borderRadius: "32px",
               background: "white",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.2)",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.15)",
+              border: '1px solid var(--border)'
             }}
           >
             <div
               style={{
                 padding: "1.5rem 2rem",
-                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                background: "#f8fafc",
-                borderTopLeftRadius: "28px",
-                borderTopRightRadius: "28px",
               }}
             >
-              <div>
-                <h2
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: 900,
-                    color: "#1e293b",
-                  }}
-                >
-                  {bulkStep === "PROJECT" && "Select Target Project"}
-                  {bulkStep === "TYPE" &&
-                    `Upload Type: ${projects.find((p) => String(p.id) === String(bulkProject))?.name || "Workspace"}`}
-                  {bulkStep === "UPLOAD" && "Prepare Your Data"}
-                </h2>
-                <p
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#64748b",
-                    fontWeight: 600,
-                    marginTop: "2px",
-                  }}
-                >
-                  {bulkStep === "PROJECT" &&
-                    "Choose the project you want to populate with bulk data"}
-                  {bulkStep === "TYPE" &&
-                    "Select the specific bulk operation for this project"}
-                  {bulkStep === "UPLOAD" &&
-                    "Upload your standardized CSV file below"}
-                </p>
+              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                  <Download size={24} color="white" />
+                </div>
+                <div>
+                  <h2
+                    style={{
+                      fontSize: "1.25rem",
+                      fontWeight: 900,
+                      color: "var(--text-main)",
+                      letterSpacing: '-0.02em'
+                    }}
+                  >
+                    {bulkStep === "PROJECT" && "Select Target Project"}
+                    {bulkStep === "TYPE" &&
+                      `Upload Type: ${projects.find((p) => String(p.id) === String(bulkProject))?.name || "Workspace"}`}
+                    {bulkStep === "UPLOAD" && "Prepare Your Data"}
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#64748b",
+                      fontWeight: 600,
+                      marginTop: "2px",
+                    }}
+                  >
+                    {bulkStep === "PROJECT" &&
+                      "Choose the project you want to populate with bulk data"}
+                    {bulkStep === "TYPE" &&
+                      "Select the specific bulk operation for this project"}
+                    {bulkStep === "UPLOAD" &&
+                      "Upload your standardized CSV file below"}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -3441,7 +3910,7 @@ const AdminMasters = () => {
                 }}
                 style={{
                   border: "none",
-                  background: "#e2e8f0",
+                  background: "#f1f5f9",
                   width: "36px",
                   height: "36px",
                   borderRadius: "12px",
@@ -4024,7 +4493,7 @@ const AdminMasters = () => {
         </div>
       )}
 
-      {showSchemaModal && (
+      {showSchemaModal && createPortal(
         <div
           style={{
             position: "fixed",
@@ -4032,7 +4501,7 @@ const AdminMasters = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(15, 23, 42, 0.4)",
+            background: "rgba(255, 255, 255, 0.85)",
             backdropFilter: "blur(12px)",
             display: "flex",
             justifyContent: "center",
@@ -4361,7 +4830,7 @@ const AdminMasters = () => {
         </div>
       )}
 
-      {confirmModal.isOpen && (
+      {confirmModal.isOpen && createPortal(
         <div
           style={{
             position: "fixed",
@@ -4369,7 +4838,7 @@ const AdminMasters = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(15, 23, 42, 0.4)",
+            background: "rgba(255, 255, 255, 0.85)",
             backdropFilter: "blur(4px)",
             display: "flex",
             justifyContent: "center",
@@ -4423,7 +4892,7 @@ const AdminMasters = () => {
         </div>
       )}
 
-      {showNewProtocolModal && (
+      {showNewProtocolModal && createPortal(
         <div
           style={{
             position: "fixed",
@@ -4431,7 +4900,7 @@ const AdminMasters = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(15, 23, 42, 0.4)",
+            background: "rgba(255, 255, 255, 0.85)",
             backdropFilter: "blur(10px)",
             display: "flex",
             justifyContent: "center",
@@ -5021,19 +5490,277 @@ const AdminMasters = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+      {showLabTestModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                 <div style={{ padding: '0.6rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '12px' }}>
+                    <Activity size={20} color="white" />
+                 </div>
+                 <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>{isEditingLabTest ? 'Edit Lab Test' : 'Lab Test Master'}</h2>
+              </div>
+              <button onClick={() => { setShowLabTestModal(false); resetLabForm(); }} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} color="#64748b" />
+              </button>
+            </div>
+            <form onSubmit={handleLabTestSubmit}>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label>Test Name (Required)</label>
+                  <input type="text" className="form-control" required value={labTestForm.name} onChange={e => setLabTestForm({ ...labTestForm, name: e.target.value })} />
+                </div>
+                <div>
+                  <label>Test Code (Required)</label>
+                  <input type="text" className="form-control" required value={labTestForm.code} onChange={e => setLabTestForm({ ...labTestForm, code: e.target.value })} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label>Test Type (Required)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select required className="form-control" value={labTestForm.test_type} onChange={e => setLabTestForm({ ...labTestForm, test_type: e.target.value })}>
+                        <option value="">Select Type</option>
+                        {labTestTypes.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => setShowTestTypeModal(true)} style={{ width: '44px', height: '52px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                  </div>
+                   <div>
+                    <label>Department (Required)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select required className="form-control" value={labTestForm.department} onChange={e => setLabTestForm({ ...labTestForm, department: e.target.value })}>
+                        <option value="">Select Dept</option>
+                        {labDepartments.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => setShowDeptModal(true)} style={{ width: '44px', height: '52px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label>Description (Required)</label>
+                  <textarea className="form-control" style={{ height: '80px', padding: '10px' }} value={labTestForm.description} onChange={e => setLabTestForm({ ...labTestForm, description: e.target.value })} />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                   <input type="checkbox" id="lab-active" checked={labTestForm.is_active} onChange={e => setLabTestForm({ ...labTestForm, is_active: e.target.checked })} />
+                   <label htmlFor="lab-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569', marginBottom: 0 }}>Active Registry Entry</label>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: isEditingLabTest ? '#2563eb' : 'var(--primary)' }}>{isEditingLabTest ? 'Update Test Master' : 'Save Test Master'}</button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showDeptModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>New Department</h2>
+              <button onClick={() => setShowDeptModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} color="#64748b" />
+              </button>
+            </div>
+            <form onSubmit={handleDeptSubmit}>
+               <div style={{ display: 'grid', gap: '1.5rem' }}>
+                 <div>
+                    <label>Department Name</label>
+                    <input type="text" className="form-control" required value={deptForm.name} onChange={e => setDeptForm({ ...deptForm, name: e.target.value })} />
+                 </div>
+                 <div>
+                    <label>Purpose / Desc</label>
+                    <textarea className="form-control" style={{ height: '60px' }} value={deptForm.description} onChange={e => setDeptForm({ ...deptForm, description: e.target.value })} />
+                 </div>
+               </div>
+               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px' }}>Initialize Dept</button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showTestTypeModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>New Test Type</h2>
+              <button onClick={() => setShowTestTypeModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 <X size={18} color="#64748b" />
+              </button>
+            </div>
+            <form onSubmit={handleTestTypeSubmit}>
+               <div style={{ display: 'grid', gap: '1.5rem' }}>
+                 <div>
+                    <label>Type Name (e.g. Single)</label>
+                    <input type="text" className="form-control" required value={testTypeForm.name} onChange={e => setTestTypeForm({ ...testTypeForm, name: e.target.value })} />
+                 </div>
+                 <div>
+                    <label>Description</label>
+                    <textarea className="form-control" style={{ height: '60px' }} value={testTypeForm.description} onChange={e => setTestTypeForm({ ...testTypeForm, description: e.target.value })} />
+                 </div>
+               </div>
+               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px' }}>Initialize Type</button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showSubTestModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111000 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "600px" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 900 }}>{isEditingSubTest ? 'Edit Component' : 'Sub Test Definition'}</h2>
+                <div style={{ fontSize: '0.875rem', color: '#64748b' }}>For: {currentLabTest?.name}</div>
+              </div>
+              <X onClick={() => { setShowSubTestModal(false); resetSubTestForm(); }} cursor="pointer" />
+            </div>
+            <form onSubmit={handleSubTestSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Sub Test Name (Required)</label>
+                  <input type="text" className="form-control" required placeholder="Enter" value={subTestForm.name} onChange={e => setSubTestForm({ ...subTestForm, name: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Sub Test Code (Required)</label>
+                  <input type="text" className="form-control" required placeholder="Enter" value={subTestForm.code} onChange={e => setSubTestForm({ ...subTestForm, code: e.target.value })} />
+                </div>
+                
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Value Type (Required)</label>
+                  <select className="form-control" value={subTestForm.value_type} onChange={e => setSubTestForm({ ...subTestForm, value_type: e.target.value })}>
+                    <option value="INPUT">Input</option>
+                    <option value="DROPDOWN">Dropdown</option>
+                    <option value="DESCRIPTIVE">Descriptive</option>
+                  </select>
+                </div>
+
+                {subTestForm.value_type === "INPUT" && (
+                   <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Input Data Type (Required)</label>
+                      <select className="form-control" value={subTestForm.input_data_type} onChange={e => setSubTestForm({ ...subTestForm, input_data_type: e.target.value })}>
+                        <option value="text">text</option>
+                        <option value="number">number</option>
+                      </select>
+                   </div>
+                )}
+
+                {subTestForm.value_type === "INPUT" && subTestForm.input_data_type === "text" && (
+                  <>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Min Chars Length (Required)</label>
+                      <input type="number" className="form-control" placeholder="Enter" value={subTestForm.min_chars} onChange={e => setSubTestForm({ ...subTestForm, min_chars: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Max chars Length</label>
+                      <input type="number" className="form-control" placeholder="Enter" value={subTestForm.max_chars} onChange={e => setSubTestForm({ ...subTestForm, max_chars: e.target.value })} />
+                    </div>
+                  </>
+                )}
+
+                {subTestForm.value_type === "DROPDOWN" && (
+                  <div style={{ gridColumn: 'span 1' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Dropdown Values (comma-separated)</label>
+                    <input type="text" className="form-control" placeholder="e.g. Positive, Negative" value={subTestForm.dropdown_options} onChange={e => setSubTestForm({ ...subTestForm, dropdown_options: e.target.value })} />
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Units (Required)</label>
+                  <input type="text" className="form-control" placeholder="e.g. mg/dL" value={subTestForm.units} onChange={e => setSubTestForm({ ...subTestForm, units: e.target.value })} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Biological Range (Required)</label>
+                  <input type="text" className="form-control" placeholder="e.g. 70 - 110" value={subTestForm.biological_range} onChange={e => setSubTestForm({ ...subTestForm, biological_range: e.target.value })} />
+                </div>
+                
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Description</label>
+                  <input type="text" className="form-control" placeholder="Optional description" value={subTestForm.description} onChange={e => setSubTestForm({ ...subTestForm, description: e.target.value })} />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                   <input type="checkbox" id="sub-active" checked={subTestForm.is_active} onChange={e => setSubTestForm({ ...subTestForm, is_active: e.target.checked })} />
+                   <label htmlFor="sub-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Active Component</label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => { setShowSubTestModal(false); resetSubTestForm(); }} className="btn btn-secondary" style={{ width: '120px', height: '48px', borderRadius: '12px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ width: '120px', height: '48px', borderRadius: '12px', background: isEditingSubTest ? '#2563eb' : '#5d3191' }}>{isEditingSubTest ? 'Update' : 'Confirm'}</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showDeleteModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111500 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", textAlign: 'center' }}>
+            <div style={{ width: '80px', height: '80px', background: '#fef2f2', color: '#dc2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
+               <Trash2 size={40} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.5rem' }}>Are you sure?</h2>
+            <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '2rem' }}>
+               You are about to delete <strong>{deleteTarget.label}</strong>. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+               <button onClick={() => setShowDeleteModal(false)} className="btn btn-secondary" style={{ flex: 1, height: '48px', borderRadius: '14px' }}>Cancel</button>
+               <button onClick={handleConfirmDelete} className="btn btn-primary" style={{ flex: 1, height: '48px', borderRadius: '14px', background: '#dc2626' }}>Delete Record</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .form-control { height: 44px; border-radius: 12px; border: 1.5px solid #e2e8f0; padding: 0 1rem; width: 100%; transition: all 0.2s; }
-        .form-control:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
-        .btn { border-radius: 12px; font-weight: 700; padding: 0.75rem 1.5rem; transition: all 0.2s; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; border: none; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
-        .btn-secondary { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
-        .btn-secondary:hover { background: #f1f5f9; border-color: #cbd5e1; }
-        .card { background: white; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); }
+        .form-control { 
+            background: #f8fafc !important; 
+            height: 52px !important; 
+            border-radius: 16px !important; 
+            border: 1.5px solid #e2e8f0 !important; 
+            padding: 0 1.25rem !important; 
+            width: 100% !important; 
+            transition: all 0.2s !important; 
+            font-size: 0.9375rem !important;
+            font-weight: 600 !important;
+            color: #1e293b !important;
+        }
+        .form-control:focus { 
+            background: white !important;
+            border-color: #6366f1 !important; 
+            outline: none !important; 
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important; 
+        }
+        label {
+            font-size: 0.75rem !important;
+            font-weight: 800 !important;
+            color: #64748b !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            margin-bottom: 0.5rem !important;
+            display: block !important;
+        }
+        .btn { border-radius: 14px; font-weight: 800; padding: 0.75rem 1.75rem; transition: all 0.2s; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; justify-content: center; border: none; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(79, 70, 229, 0.3); }
+        .btn-secondary { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .card { background: white; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); }
       `}</style>
     </>
   );

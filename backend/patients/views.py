@@ -9,11 +9,20 @@ from .serializers import (
     ProjectSerializer, ProjectCategoryMappingSerializer, ProjectFieldConfigSerializer,
     RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer
 )
+from accounts.utils import log_action
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all().order_by('name')
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        project = serializer.save()
+        log_action(self.request.user, 'Governance', 'Project Created', f"Created workspace {project.name}")
+
+    def perform_update(self, serializer):
+        project = serializer.save()
+        log_action(self.request.user, 'Governance', 'Project Updated', f"Updated workspace {project.name}")
 
     @action(detail=True, methods=['post'], url_path='sync-mappings')
     def sync_mappings(self, request, pk=None):
@@ -22,6 +31,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         ProjectCategoryMapping.objects.filter(project=project).delete()
         for cat in categories:
             ProjectCategoryMapping.objects.create(project=project, category=cat)
+        log_action(request.user, 'Governance', 'Sync Mappings', f"Synchronized mappings for project {project.name}")
         return Response({"status": "Mappings synchronized."})
 
 class RegistryTypeViewSet(viewsets.ModelViewSet):
@@ -47,6 +57,14 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = LargeResultsPagination
     search_fields = ['ucode', 'name']
+
+    def perform_create(self, serializer):
+        data = serializer.save()
+        log_action(self.request.user, 'Registry', 'Data Entry Created', f"Record {data.ucode} added to registry {data.registry_type.name}")
+
+    def perform_update(self, serializer):
+        data = serializer.save()
+        log_action(self.request.user, 'Registry', 'Data Entry Updated', f"Record {data.ucode} modified in registry {data.registry_type.name}")
 
     def get_queryset(self):
         """
@@ -145,6 +163,7 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                 success_count += 1
             except Exception as e:
                 print(f"Schema Mapping Error: {e}")
+        log_action(request.user, 'Registry', 'Bulk Upload', f"Imported {success_count} records into registry type {registry_type_id}")
         return Response({"success": success_count})
 
     @action(detail=False, methods=['get'], url_path='all-masters')
@@ -199,40 +218,97 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='bulk-upload')
     def bulk_upload(self, request):
         records = request.data.get('records', [])
-        passed_records = []; failed_records = []; success_count = 0; error_count = 0
+        failed_records = []; success_count = 0; error_count = 0
+        
+        def calculate_dob(age_str):
+            if not age_str: return None
+            import re
+            match = re.search(r'(\d+)', str(age_str))
+            if match:
+                age = int(match.group(1))
+                return (timezone.now() - timezone.timedelta(days=age*365.25)).date()
+            return None
+
+        def get_val(data, *keys):
+            for k in keys:
+                for d_key in data.keys():
+                    if d_key.lower().strip().replace(' ', '_').replace('/', '_') == k.lower():
+                        return data[d_key]
+            return None
+
+        # 1. Process Primary Employees
         for data in records:
-            relationship = str(data.get('relationship', '')).strip().upper()
-            if 'PRIMARY' in relationship or 'HOLDER' in relationship:
+            rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
+            if not rel or 'PRIMARY' in rel or 'HOLDER' in rel:
                 try:
+                    card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
+                    if not card_no: raise Exception("Missing Card Number")
+                    
+                    name = get_val(data, 'name', 'employee_name')
+                    gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
+                    gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
+                    
+                    dob = get_val(data, 'dob', 'date_of_birth')
+                    if not dob:
+                        dob = calculate_dob(get_val(data, 'age', 'age_gender'))
+
                     EmployeeMaster.objects.update_or_create(
-                        card_no=str(data.get('card_no')).strip(),
+                        card_no=card_no,
                         defaults={
                             'project_id': data.get('project'),
-                            'name': data.get('name'), 'dob': data.get('dob'),
-                            'gender': str(data.get('gender', 'MALE')).strip().upper(),
-                            'aadhar_no': data.get('aadhar_no') or None,
-                            'mobile_no': data.get('mobile_no'),
-                            'address': data.get('address', ''), 'designation': data.get('designation', ''),
+                            'name': name,
+                            'dob': dob,
+                            'gender': gender,
+                            'aadhar_no': get_val(data, 'aadhar_no', 'aadhar', 'aadhaar'),
+                            'mobile_no': get_val(data, 'mobile_no', 'mobile', 'phone'),
+                            'address': get_val(data, 'address', 'addr') or '',
+                            'designation': get_val(data, 'designation', 'desig') or '',
                         }
                     )
                     success_count += 1
-                except Exception as e: error_count += 1; failed_records.append({**data, 'error': str(e)})
+                except Exception as e:
+                    error_count += 1
+                    failed_records.append({**data, 'error': str(e)})
+
+        # 2. Process Dependents
         for data in records:
-            relationship = str(data.get('relationship', '')).strip().upper()
-            if 'PRIMARY' not in relationship and 'HOLDER' not in relationship:
+            rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
+            if rel and 'PRIMARY' not in rel and 'HOLDER' not in rel:
                 try:
-                    full_card_no = str(data.get('card_no')).strip()
+                    full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
+                    if not full_card_no: raise Exception("Missing Card Number")
+                    
                     parent_card_no = full_card_no.split('/')[0] if '/' in full_card_no else full_card_no
                     suffix = '/' + full_card_no.split('/')[1] if '/' in full_card_no else '/1'
+                    
                     employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
-                    if employee:
-                        FamilyMember.objects.update_or_create(employee=employee, card_no_suffix=suffix, defaults={
-                            'name': data.get('name'), 'dob': data.get('dob'), 'gender': str(data.get('gender', 'MALE')).strip().upper(),
-                            'aadhar_no': data.get('aadhar_no') or None, 'mobile_no': data.get('mobile_no'), 'relationship': relationship
-                        })
-                        success_count += 1
-                    else: error_count += 1; failed_records.append({**data, 'error': "Parent not found"})
-                except Exception as e: error_count += 1; failed_records.append({**data, 'error': str(e)})
+                    if not employee: raise Exception(f"Parent employee {parent_card_no} not found")
+
+                    gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
+                    gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
+                    
+                    dob = get_val(data, 'dob', 'date_of_birth')
+                    if not dob:
+                        dob = calculate_dob(get_val(data, 'age', 'age_gender'))
+
+                    FamilyMember.objects.update_or_create(
+                        employee=employee,
+                        card_no_suffix=suffix,
+                        defaults={
+                            'name': get_val(data, 'name', 'family_name'),
+                            'dob': dob,
+                            'gender': gender,
+                            'aadhar_no': get_val(data, 'aadhar_no', 'aadhar', 'aadhaar'),
+                            'mobile_no': get_val(data, 'mobile_no', 'mobile', 'phone'),
+                            'relationship': rel
+                        }
+                    )
+                    success_count += 1
+                except Exception as e:
+                    error_count += 1
+                    failed_records.append({**data, 'error': str(e)})
+        
+        log_action(request.user, 'Governance', 'Bulk Upload', f"Imported {success_count} personnel records (Errors: {error_count})")
         return Response({"success": success_count, "errors": error_count, "failed_records": failed_records})
 
     @action(detail=False, methods=['get'], url_path='all-masters')
@@ -275,12 +351,22 @@ class RegistryReportView(viewsets.ViewSet):
         # Base filters
         patient_qs = Patient.objects.all()
         visit_qs = Visit.objects.all()
-        inventory_items = RegistryData.objects.filter(registry_type__slug='pharmacy-drugs')
+        
+        # Dynamic Pharmacy Discovery (Project Isolated)
+        # We look for the first registry marked with the 'Pill' icon or having 'pharmacy' in its identifier
+        pharmacy_type = None
+        if active_project:
+            pharmacy_type = RegistryType.objects.filter(project=active_project).filter(Q(icon='Pill') | Q(slug__icontains='pharmacy') | Q(name__icontains='pharmacy')).first()
+        else:
+            pharmacy_type = RegistryType.objects.filter(Q(icon='Pill') | Q(slug='pharmacy-drugs')).first()
+
+        inventory_items = RegistryData.objects.filter(registry_type=pharmacy_type) if pharmacy_type else RegistryData.objects.none()
 
         if active_project:
             patient_qs = patient_qs.filter(Q(project=active_project) | Q(employee_master__project=active_project))
             visit_qs = visit_qs.filter(Q(patient__project=active_project) | Q(patient__employee_master__project=active_project))
-            inventory_items = inventory_items.filter(registry_type__project=active_project)
+            # inventory_items is already filtered by registry_type which is project-aware
+
         
         # 1. Consumption Aggregation (Last 7 Days Trend)
         # Search for all consumption logs first

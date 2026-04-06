@@ -163,7 +163,7 @@ const Users = () => {
                                                 {u.username[0].toUpperCase()}
                                             </div>
                                             <div>
-                                                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#1e293b' }}>{u.first_name} {u.last_name || '(No Name)'}</p>
+                                                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{u.first_name} {u.last_name || '(No Name)'}</p>
                                                 <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Joined {new Date(u.date_joined).toLocaleDateString('en-GB')}</p>
                                             </div>
                                         </div>
@@ -190,7 +190,7 @@ const Users = () => {
                                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '280px' }}>
                                                 {u.user_roles_details?.length > 0 ? (
                                                     u.user_roles_details.map(ur => (
-                                                        <span key={ur.id} className="badge" style={{ background: '#f1f5f9', color: '#1e293b', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem' }}>
+                                                        <span key={ur.id} className="badge" style={{ background: 'var(--background)', color: 'var(--text-main)', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem', border: '1px solid var(--border)' }}>
                                                             {ur.name}
                                                         </span>
                                                     ))
@@ -203,8 +203,8 @@ const Users = () => {
                                         )}
                                     </td>
                                     <td>
-                                        <div style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{u.email}</div>
-                                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{u.phone || 'No phone'}</div>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-main)' }}>{u.email}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.phone || 'No phone'}</div>
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -246,8 +246,8 @@ const Users = () => {
                 
                 {/* Pagination */}
                 {totalCount > 10 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
                                 className="btn btn-secondary" disabled={page === 1} onClick={() => fetchUsers(page - 1)}
@@ -285,12 +285,12 @@ const Users = () => {
                         maxWidth: '520px', 
                         padding: 0, 
                         borderRadius: '24px', 
-                        background: 'white', 
-                        border: 'none', 
+                        background: 'var(--surface)', 
+                        border: '1px solid var(--border)', 
                         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                         position: 'relative'
                     }}>
-                        <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <div style={{ background: 'var(--primary)', padding: '0.625rem', borderRadius: '10px' }}>
                                     <UserPlus size={20} color="white" />
@@ -300,7 +300,7 @@ const Users = () => {
                                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Configure credentials and access roles</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer' }}>
+                            <button onClick={() => setShowModal(false)} style={{ border: 'none', background: 'var(--background)', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-main)' }}>
                                 <X size={16} />
                             </button>
                         </div>
@@ -339,8 +339,8 @@ const Users = () => {
                                 </div>
                             )}
                             {editingUser && (
-                                <div style={{ background: '#fefce8', padding: '0.75rem', borderRadius: '10px', marginBottom: '2rem', border: '1px solid #fef08a' }}>
-                                    <p style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 600 }}>Editing user permissions. Account ID cannot be changed.</p>
+                                <div style={{ background: 'var(--background)', padding: '0.75rem', borderRadius: '10px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Editing user permissions. Account ID cannot be changed.</p>
                                 </div>
                             )}
 
@@ -370,9 +370,9 @@ const Users = () => {
                         }}>
                             <AlertTriangle size={32} />
                         </div>
-                        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>Revoke Access?</h2>
-                        <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '2rem' }}>
-                            Are you sure you want to remove <strong>{confirmDelete.username}</strong>? This will disable their login credentials immediately.
+                        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem', color: 'var(--text-main)' }}>Revoke Access?</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
+                             Are you sure you want to remove <strong>{confirmDelete.username}</strong>? This will disable their login credentials immediately.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(null)}>Keep User</button>

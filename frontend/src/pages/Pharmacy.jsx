@@ -115,7 +115,7 @@ const Pharmacy = () => {
       <div style={{ display: 'grid', gridTemplateColumns: selectedPresc ? '1fr 1fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         {/* Prescription List */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Active Prescriptions ({totalCount})</h3>
              <Pill size={18} color="#94a3b8" />
           </div>
@@ -164,7 +164,7 @@ const Pharmacy = () => {
           
           {/* Pagination */}
           {totalCount > 10 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page}</span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
@@ -186,10 +186,10 @@ const Pharmacy = () => {
 
         {/* Issuance Form */}
         {selectedPresc && (
-          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ padding: '0.75rem', background: '#4c1d95', borderRadius: '12px' }}>
+                  <div style={{ padding: '0.75rem', background: 'var(--primary)', borderRadius: '12px' }}>
                      <Package size={24} color="white" />
                   </div>
                   <div>
@@ -197,28 +197,28 @@ const Pharmacy = () => {
                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Receipt for <strong>{selectedPresc.patient_name}</strong></p>
                   </div>
                </div>
-               <button onClick={() => setSelectedPresc(null)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer' }}>
+               <button onClick={() => setSelectedPresc(null)} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer' }}>
                   <X size={16} />
                </button>
             </div>
 
-            <div style={{ background: '#f5f3ff', border: '1px solid #c084fc', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
-               <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#6b21a8', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Prescription List</p>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
+               <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Prescription List</p>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                    {selectedPresc.items.map(item => (
-                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'white', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
+                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                            <div>
-                               <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#4c1d95' }}>{item.medication_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#7c3aed', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                               <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
+                               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                                    {item.dosage} | {item.frequency} | {item.duration} days
-                                   <span style={{ background: '#4c1d95', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>Dose: {getDoseCount(item.frequency, item.duration)}</span>
+                                   <span style={{ background: 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>Dose: {getDoseCount(item.frequency, item.duration)}</span>
                                    <span style={{ 
                                        marginLeft: 'auto',
                                        color: (typeof getInventoryStock(item.medication_name) === 'string' && getInventoryStock(item.medication_name).includes('Sync')) ? '#64748b' : 
                                               (parseInt(getInventoryStock(item.medication_name)) >= getDoseCount(item.frequency, item.duration) ? '#10b981' : '#ef4444'), 
                                        fontWeight: 800,
                                        fontSize: '0.6875rem',
-                                       background: 'white',
+                                       background: 'var(--surface)',
                                        padding: '2px 8px',
                                        borderRadius: '6px',
                                        border: '1px solid #e9d5ff'

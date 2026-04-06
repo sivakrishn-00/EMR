@@ -215,7 +215,7 @@ const Patients = () => {
           const active = currentIndex === step.id;
           
           // Color Logic: Doctor/Action Needed is Blue/Red, Completed is Green
-          const dotColor = done ? '#10b981' : active ? '#ef4444' : '#e2e8f0'; 
+          const dotColor = done ? '#10b981' : active ? 'var(--primary)' : 'var(--border)'; 
           
           return (
             <React.Fragment key={step.id}>
@@ -234,7 +234,7 @@ const Patients = () => {
                 <span style={{ fontSize: '7px', fontWeight: 800, marginTop: '1px', color: active ? '#ef4444' : '#94a3b8', textTransform: 'uppercase' }}>{step.label}</span>
               </div>
               {idx < steps.length - 1 && (
-                <div style={{ width: '8px', height: '2px', background: done ? '#10b981' : '#e2e8f0', marginBottom: '10px' }}></div>
+                <div style={{ width: '8px', height: '2px', background: done ? '#10b981' : 'var(--border)', marginBottom: '10px' }}></div>
               )}
             </React.Fragment>
           );
@@ -249,8 +249,9 @@ const Patients = () => {
     const phone = String(p.phone || '');
     const idProof = String(p.id_proof_number || '');
     const cardNo = String(p.card_no || '');
+    const patientID = String(p.patient_id || '').toLowerCase();
 
-    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow);
+    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
   });
 
   return (
@@ -271,7 +272,7 @@ const Patients = () => {
       </header>
 
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid #e2e8f0', marginBottom: '2rem', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
         <button 
             onClick={() => setViewMode('ACTIVE')}
             style={{ 
@@ -318,19 +319,26 @@ const Patients = () => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-         <div className="card" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid var(--primary)' }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Registered</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.25rem' }}>{stats.total_registered}</p>
-         </div>
-         <div className="card" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid var(--secondary)' }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>OPD Today</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.25rem' }}>{String(stats.opd_today).padStart(2, '0')}</p>
-         </div>
-         <div className="card" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid var(--accent)' }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Emergency</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.25rem' }}>{String(stats.emergency_today).padStart(2, '0')}</p>
-         </div>
+      {/* Premium Hub Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem', marginBottom: '3rem' }}>
+          <DashboardMetric 
+              label="Station Total" 
+              value={stats.total_registered} 
+              icon={<User size={24} />} 
+              gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
+          />
+          <DashboardMetric 
+              label="OPD Today" 
+              value={String(stats.opd_today).padStart(2, '0')} 
+              icon={<Activity size={24} />} 
+              gradient="linear-gradient(135deg, #059669 0%, #10b981 100%)"
+          />
+          <DashboardMetric 
+              label="Emergency" 
+              value={String(stats.emergency_today).padStart(2, '0')} 
+              icon={<Clock size={24} />} 
+              gradient="linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)"
+          />
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
@@ -339,8 +347,8 @@ const Patients = () => {
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
-              placeholder="Search by Name, Mobile, or UHID..." 
-              style={{ paddingLeft: '2.75rem', height: '44px', background: '#f8fafc', border: '1px solid #e2e8f0' }}
+              placeholder="Search by ID (BHSPL0001), Name, or Mobile..." 
+              style={{ paddingLeft: '2.75rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -348,7 +356,7 @@ const Patients = () => {
           {user?.role === 'ADMIN' && (
               <select 
                   className="form-control" 
-                  style={{ width: '250px', height: '44px', background: 'white' }}
+                  style={{ width: '250px', height: '44px', background: 'var(--surface)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                   value={projectFilter}
                   onChange={(e) => setProjectFilter(e.target.value)}
               >
@@ -388,41 +396,41 @@ const Patients = () => {
                     <td style={{ padding: '1.25rem 1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ 
-                          width: '40px', height: '40px', background: '#e0e7ff', color: '#4338ca', 
+                          width: '40px', height: '40px', background: 'var(--background)', color: 'var(--text-main)', 
                           borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontWeight: 700, fontSize: '0.875rem'
                         }}>
                           {(p.first_name?.[0] || 'P')}{(p.last_name?.[0] || '')}
                         </div>
                         <div>
-                          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#1e293b' }}>
+                          <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-main)' }}>
                             {p.first_name || 'Anonymous'} {p.last_name || ''}
                             {p.is_employee_linked && <span style={{ marginLeft: '8px', fontSize: '0.625rem', background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>EMP LINKED</span>}
                           </p>
-                          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {p.is_employee_linked ? `Card No: ${p.card_no}` : `UHID: #${1000 + (p.id || 0)}`}
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            ID: <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{p.patient_id}</span> {p.is_employee_linked && ` | Card: ${p.card_no}`}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', background: '#f0f9ff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e0f2fe' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--background)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                             {p.project_name || 'GENERAL'}
                         </span>
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.gender}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{age} Years</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{age} Years</span>
                       </div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-                          <Phone size={12} color="#94a3b8" /> {p.phone ? p.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}
+                          <Phone size={12} color="var(--text-muted)" /> {p.phone ? p.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#64748b' }}>
-                          <MapPin size={12} color="#94a3b8" /> {p.address?.substring(0, 20)}...
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          <MapPin size={12} color="var(--text-muted)" /> {p.address?.substring(0, 20)}...
                         </div>
                       </div>
                     </td>
@@ -444,22 +452,22 @@ const Patients = () => {
                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>
                                     APPT: {p.upcoming_appointment.time}
                                 </span>
-                                <span style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: 700 }}>{p.upcoming_appointment.date}</span>
-                                <span style={{ fontSize: '0.625rem', color: '#94a3b8' }}>{p.upcoming_appointment.reason}</span>
+                                <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 700 }}>{p.upcoming_appointment.date}</span>
+                                <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>{p.upcoming_appointment.reason}</span>
                                 <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.05)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>
                                     Awaiting Arrival
                                 </div>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                     {p.visits && p.visits.length > 0 ? "Returned Patient" : "Registered Only"}
                                 </span>
                                 {p.upcoming_appointment && (
                                      <span style={{ fontSize: '0.625rem', color: 'var(--primary)', fontWeight: 700 }}>Next Appt: {p.upcoming_appointment.date}</span>
                                 )}
                                 {p.last_visit_details && (
-                                    <span style={{ fontSize: '0.625rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                         <Clock size={10} /> Last Saw: {p.last_visit_details.last_date}
                                     </span>
                                 )}
@@ -473,9 +481,9 @@ const Patients = () => {
                     <td style={{ textAlign: 'right', paddingRight: '1.5rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
                         {p.current_visit ? (
-                            <div style={{ background: '#f8fafc', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Clock size={12} color="#94a3b8" />
-                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>In Clinic</span>
+                            <div style={{ background: 'var(--background)', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Clock size={12} color="var(--text-muted)" />
+                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>In Clinic</span>
                             </div>
                         ) : viewMode === 'SCHEDULED' ? (
                             <button 
@@ -516,7 +524,7 @@ const Patients = () => {
                             </button>
                         )}
                         <button className="btn btn-secondary" style={{ padding: '0.4rem', border: 'none', background: 'transparent' }}>
-                          <MoreVertical size={18} color="#94a3b8" />
+                          <MoreVertical size={18} color="var(--text-muted)" />
                         </button>
                       </div>
                     </td>
@@ -526,8 +534,8 @@ const Patients = () => {
               {!isLoading && filteredPatients.length === 0 && (
                 <tr>
                   <td colSpan="7" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-                    <Info size={40} color="#e2e8f0" style={{ marginBottom: '1rem' }} />
-                    <p style={{ color: '#64748b', fontWeight: 500 }}>No records found matching your search.</p>
+                    <Info size={40} color="var(--border)" style={{ marginBottom: '1rem' }} />
+                    <p style={{ color: 'var(--text-muted)', fontWeight: 500 }}>No records found matching your search.</p>
                   </td>
                 </tr>
               )}
@@ -536,8 +544,8 @@ const Patients = () => {
         </div>
         
         {/* Pagination Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                 Showing <span style={{ color: 'var(--primary)' }}>{filteredPatients.length}</span> of {totalCount} patients
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -557,7 +565,7 @@ const Patients = () => {
                             style={{ 
                                 width: '32px', height: '32px', borderRadius: '8px', border: 'none',
                                 background: page === i + 1 ? 'var(--primary)' : 'transparent',
-                                color: page === i + 1 ? 'white' : '#64748b',
+                                color: page === i + 1 ? 'white' : 'var(--text-muted)',
                                 fontWeight: 700, cursor: 'pointer', transition: '0.3s'
                             }}
                         >
@@ -597,14 +605,14 @@ const Patients = () => {
             padding: 0, 
             borderRadius: '24px', 
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
-            background: 'white',
+            background: 'var(--surface)',
             position: 'relative'
           }}>
             {/* Modal Header */}
             <div style={{ 
-              padding: '1.5rem 2rem', borderBottom: '1px solid #f1f5f9', 
+              padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)', 
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              background: '#f8fafc', borderTopLeftRadius: '24px', borderTopRightRadius: '24px'
+              background: 'var(--background)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: 'var(--primary)', padding: '0.75rem', borderRadius: '12px' }}>
@@ -617,9 +625,9 @@ const Patients = () => {
               </div>
               <button 
                 onClick={() => setShowModal(false)}
-                style={{ border: 'none', background: '#e2e8f0', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ border: 'none', background: 'var(--border)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <X size={18} color="#64748b" />
+                <X size={18} color="var(--text-muted)" />
               </button>
             </div>
 
@@ -631,15 +639,15 @@ const Patients = () => {
                 <div style={{ gridColumn: 'span 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
-                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', background: 'var(--background)', padding: '4px', borderRadius: '10px' }}>
                         {(!user?.project || (projects.find(p => p.id === user.project)?.category_mappings?.some(m => m.category === 'GENERAL'))) && (
                         <button 
                             type="button"
                             onClick={() => setFormData({...formData, is_employee_linked: false})}
                             style={{ 
                                 padding: '6px 16px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 700,
-                                background: !formData.is_employee_linked ? 'white' : 'transparent',
-                                color: !formData.is_employee_linked ? 'var(--primary)' : '#64748b',
+                                background: !formData.is_employee_linked ? 'var(--surface)' : 'transparent',
+                                color: !formData.is_employee_linked ? 'var(--primary)' : 'var(--text-muted)',
                                 boxShadow: !formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                 cursor: 'pointer'
                             }}
@@ -651,8 +659,8 @@ const Patients = () => {
                              onClick={() => setFormData({...formData, is_employee_linked: true})}
                              style={{ 
                                  padding: '6px 16px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 700,
-                                 background: formData.is_employee_linked ? 'white' : 'transparent',
-                                 color: formData.is_employee_linked ? 'var(--primary)' : '#64748b',
+                                 background: formData.is_employee_linked ? 'var(--surface)' : 'transparent',
+                                 color: formData.is_employee_linked ? 'var(--primary)' : 'var(--text-muted)',
                                  boxShadow: formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                  cursor: 'pointer'
                              }}
@@ -662,14 +670,14 @@ const Patients = () => {
                   </div>
                   <div className="form-group">
                     <label><Activity size={14} /> Reason for Visit / Chief Complaint <span style={{ color: '#ef4444' }}>*</span></label>
-                    <input required value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Fever and body pain, Regular followup..." style={{ background: '#fffbeb', borderColor: (formAttempted && !formData.reason) ? '#ef4444' : '#fef3c7' }} />
+                    <input required value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Fever and body pain, Regular followup..." style={{ background: 'var(--background)', borderColor: (formAttempted && !formData.reason) ? '#ef4444' : 'var(--border)' }} />
                     {formAttempted && !formData.reason && <p style={{ color: '#ef4444', fontSize: '10px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
                   </div>
                 </div>
 
                 {formData.is_employee_linked && (
-                    <div style={{ gridColumn: 'span 2', background: '#f0f9ff', padding: '1.5rem', borderRadius: '16px', border: '1px solid #bae6fd' }}>
-                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', marginBottom: '1rem' }}>Link Employee Record</p>
+                    <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Link Employee Record</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                             <div className="form-group" style={{ position: 'relative' }}>
                                 <label>Search Employee (Name/Card No)</label>
@@ -693,7 +701,7 @@ const Patients = () => {
                                             />
                                             <div style={{
                                                 position: 'absolute', top: '100%', left: 0, right: 0, 
-                                                background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px',
+                                                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
                                                 maxHeight: '300px', overflowY: 'auto', zIndex: 1000,
                                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', marginTop: '4px'
                                             }}>
@@ -701,7 +709,7 @@ const Patients = () => {
                                                     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
                                                     emp.card_no.includes(employeeSearchTerm)
                                                 ).length === 0 ? (
-                                                    <div style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.875rem' }}>No matching employees found</div>
+                                                    <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No matching employees found</div>
                                                 ) : (
                                                     employeeMasters.filter(emp => 
                                                         emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
@@ -729,14 +737,14 @@ const Patients = () => {
                                                                 });
                                                             }}
                                                             style={{
-                                                                padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                                                                padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border)',
                                                                 fontSize: '0.875rem'
                                                             }}
-                                                            onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                            onMouseOver={(e) => e.currentTarget.style.background = 'var(--background)'}
                                                             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                                                         >
                                                             <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{emp.card_no}</div>
-                                                            <div style={{ color: '#475569' }}>{emp.name}</div>
+                                                            <div style={{ color: 'var(--text-main)' }}>{emp.name}</div>
                                                         </div>
                                                     ))
                                                 )}
@@ -785,7 +793,7 @@ const Patients = () => {
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label>Registration Project <span style={{ color: '#ef4444' }}>*</span></label>
                     {user?.project ? (
-                        <div style={{ padding: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#64748b', fontWeight: 600 }}>
+                        <div style={{ padding: '0.75rem', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
                             {projects.find(p => p.id === user.project)?.name || 'Mapped Project'}
                         </div>
                     ) : (
@@ -793,7 +801,7 @@ const Patients = () => {
                         required 
                         value={formData.project} 
                         onChange={e => setFormData({...formData, project: e.target.value})} 
-                        style={{ background: '#f0f9ff', borderColor: '#bae6fd' }}
+                        style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
                         >
                         <option value="">-- Select Project --</option>
                         {projects && Array.isArray(projects) && projects.filter(p => p.category_mappings?.some(m => m.category === 'GENERAL')).map(p => (
@@ -810,24 +818,24 @@ const Patients = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
                       <label><User size={14} /> First Name <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="e.g. John" style={{ border: (formAttempted && !formData.first_name) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                      <input required value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="e.g. John" style={{ border: (formAttempted && !formData.first_name) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
                       {formAttempted && !formData.first_name && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                     <div className="form-group">
                       <label>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="e.g. Doe" style={{ border: (formAttempted && !formData.last_name) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                      <input required value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="e.g. Doe" style={{ border: (formAttempted && !formData.last_name) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
                       {formAttempted && !formData.last_name && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <div style={{ background: '#eff6ff', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dbeafe' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '1rem' }}>Identity Verification (Primary ID)</p>
+                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Identity Verification (Primary ID)</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label><Fingerprint size={14} /> ID Proof Type *</label>
-                            <select value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})} style={{ background: 'white' }}>
+                            <select value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})} style={{ background: 'var(--surface)' }}>
                                 <option value="AADHAAR">Aadhaar Card</option>
                                 <option value="VOTER_ID">Voter ID</option>
                                 <option value="DRIVING_LICENCE">Driving Licence</option>
@@ -836,7 +844,7 @@ const Patients = () => {
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label>ID proof Number (Primary Key) <span style={{ color: '#ef4444' }}>*</span></label>
-                            <input required value={formData.id_proof_number} onChange={e => setFormData({...formData, id_proof_number: e.target.value})} placeholder="Enter Aadhaar/ID number" style={{ background: 'white', border: (formAttempted && !formData.id_proof_number) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                            <input required value={formData.id_proof_number} onChange={e => setFormData({...formData, id_proof_number: e.target.value})} placeholder="Enter Aadhaar/ID number" style={{ background: 'var(--surface)', border: (formAttempted && !formData.id_proof_number) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
                             {formAttempted && !formData.id_proof_number && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
                         </div>
                     </div>
@@ -845,13 +853,13 @@ const Patients = () => {
 
                 <div className="form-group">
                   <label><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input type="date" required value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} style={{ border: (formAttempted && !formData.dob) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                  <input type="date" required value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} style={{ border: (formAttempted && !formData.dob) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
                   {formAttempted && !formData.dob && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                 </div>
 
                 <div className="form-group">
                   <label>Gender <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} style={{ border: (formAttempted && !formData.gender) ? '1px solid #ef4444' : '1px solid #e2e8f0' }}>
+                  <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} style={{ border: (formAttempted && !formData.gender) ? '1px solid #ef4444' : '1px solid var(--border)' }}>
                     <option value="">-- Select --</option>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
@@ -866,7 +874,7 @@ const Patients = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
                       <label><Phone size={14} /> Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required type="tel" maxLength={10} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g,'')})} placeholder="10-digit number" style={{ border: (formAttempted && (!formData.phone || formData.phone.length !== 10)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                      <input required type="tel" maxLength={10} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g,'')})} placeholder="10-digit number" style={{ border: (formAttempted && (!formData.phone || formData.phone.length !== 10)) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
                       {formAttempted && (!formData.phone || formData.phone.length !== 10) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Invalid / Required (10 Digits)</p>}
                     </div>
                     <div className="form-group">
@@ -895,7 +903,7 @@ const Patients = () => {
               {/* Modal Footer */}
               <div style={{ 
                 display: 'flex', justifyContent: 'flex-end', gap: '1rem', 
-                marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9' 
+                marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' 
               }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} style={{ padding: '0.75rem 2rem' }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2.5rem' }}>Complete Registration</button>
@@ -909,9 +917,9 @@ const Patients = () => {
         .form-control {
           width: 100%;
           padding: 0.625rem 0.875rem;
-          background-color: #f8fafc;
-          border: 1px solid #e2e8f0;
-          color: #1e293b;
+          background-color: var(--background);
+          border: 1px solid var(--border);
+          color: var(--text-main);
           font-weight: 500;
           transition: 0.3s;
           outline: none;
@@ -940,5 +948,37 @@ const Patients = () => {
     </div>
   );
 };
+
+// Premium Hub-Style Metric Components 🎯
+const DashboardMetric = ({ label, value, icon, gradient }) => (
+    <div style={{ 
+        background: gradient || 'var(--surface)', 
+        borderRadius: '16px', 
+        padding: '0.75rem 1.125rem', 
+        color: 'white',
+        boxShadow: '0 6px 12px -3px rgba(0,0,0,0.1)',
+        position: 'relative',
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.08)',
+        transition: 'transform 0.3s ease',
+        cursor: 'default'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+        <div style={{ position: 'relative', zIndex: 2 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <div style={{ background: 'rgba(255,255,255,0.15)', padding: '0.4rem', borderRadius: '10px' }}>
+                    {React.cloneElement(icon, { size: 14, strokeWidth: 3 })}
+                </div>
+                <div style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.8, background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '10px' }}>Live</div>
+            </div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.01em' }}>{value}</div>
+            <div style={{ fontSize: '0.6875rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.01em' }}>{label}</div>
+        </div>
+        {/* Abstract Background Shapes */}
+        <div style={{ position: 'absolute', right: '-10%', bottom: '-15%', width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', zIndex: 1 }}></div>
+    </div>
+);
 
 export default Patients;

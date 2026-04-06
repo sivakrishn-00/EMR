@@ -15,7 +15,8 @@ import {
   ClipboardList,
   Database,
   ShieldCheck,
-  BarChart3
+  BarChart3,
+  HardDrive
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -40,6 +41,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
 
   const adminItems = [
     { name: 'Admin Masters', icon: Database, path: '/admin-masters' },
+    { name: 'Project Linking', icon: HardDrive, path: '/lab-machines' },
     { name: 'Project Management', icon: Settings, path: '/projects' },
     { name: 'Role Management', icon: ShieldCheck, path: '/roles' },
     { name: 'User Management', icon: UserCheck, path: '/users' },

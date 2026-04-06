@@ -3,7 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Prescription, DispensingRecord
 from .serializers import PrescriptionSerializer, DispensingRecordSerializer
-from accounts.models import AuditLog, Notification
+from accounts.models import Notification
+from accounts.utils import log_action
 
 def notify_team(project, roles, title, message):
     from accounts.models import User
@@ -65,11 +66,11 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             visit.is_active = False
             visit.save()
             
-            AuditLog.objects.create(
-                user=request.user, 
-                module='Pharmacy', 
-                action='Medication Dispensed', 
-                details=f"Dispensed medicines for prescription {prescription.id}"
+            log_action(
+                request.user, 
+                'Pharmacy', 
+                'Medication Dispensed', 
+                f"Dispensed medicines for prescription {prescription.id}"
             )
             
             # Notify doctor

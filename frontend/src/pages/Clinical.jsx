@@ -13,7 +13,8 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -26,7 +27,7 @@ const Clinical = () => {
     diagnosis: '', 
     plan: '',
     next_step: 'PENDING_PHARMACY',
-    lab_test_name: '',
+    lab_investigations: [],
     medications: []
   });
   const [page, setPage] = useState(1);
@@ -35,16 +36,62 @@ const Clinical = () => {
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
   const [totalInventoryCount, setTotalInventoryCount] = useState(0);
+  
+  const [labMasters, setLabMasters] = useState([]);
+  const [registryTypes, setRegistryTypes] = useState([]);
+  const [searchLab, setSearchLab] = useState("");
+  const [showLabSearch, setShowLabSearch] = useState(false);
 
   useEffect(() => {
     fetchVisitsToSee();
-    fetchPharmacyInventory();
+    fetchRegistryTypes();
   }, []);
 
-  const fetchPharmacyInventory = async () => {
+  const fetchRegistryTypes = async () => {
     try {
-      // Filter strictly for pharmacy-drugs protocol
-      const res = await api.get('patients/registry-data/?registry_type=pharmacy-drugs&page_size=1000');
+      const res = await api.get('patients/registry-data/all-masters/');
+      setRegistryTypes(res.data || []);
+    } catch (e) {
+      console.error("Failed to load clinical protocols");
+    }
+  };
+
+  useEffect(() => {
+    if (selectedVisit) {
+      const pid = selectedVisit.patient_details?.project_id || selectedVisit.patient_details?.project || "";
+      if (pid) {
+          fetchProjectLabMasters(pid);
+          fetchPharmacyInventory(pid);
+      }
+    }
+  }, [selectedVisit]);
+
+  const fetchProjectLabMasters = async (projectId) => {
+    try {
+      const res = await api.get(`laboratory/lab-tests/?project_id=${projectId}&active_only=true`);
+      setLabMasters(res.data.results || res.data);
+    } catch (err) {
+      console.error("Lab link offline:", err);
+    }
+  };
+
+  const fetchPharmacyInventory = async (projectId = "") => {
+    try {
+      // Find the correct pharmacy registry for this specific project
+      let slug = 'pharmacy-drugs';
+      if (projectId) {
+         // Resolve protocol by icon (Pill) or common naming patterns if 'pharmacy-drugs' name was customized
+         const matchedType = registryTypes.find(rt => 
+           String(rt.project) === String(projectId) && 
+           (rt.icon === 'Pill' || rt.slug.toLowerCase().includes('pharmacy') || rt.name.toLowerCase().includes('pharmacy'))
+         );
+         if (matchedType) slug = matchedType.slug;
+      }
+
+      // Filter strictly for pharmacy-drugs protocol and isolate by project if specified
+      let url = `patients/registry-data/?registry_type=${slug}&page_size=1000`;
+      if (projectId) url += `&project=${projectId}`;
+      const res = await api.get(url);
       const data = res.data.results || res.data;
       setPharmacyInventory(Array.isArray(data) ? data : []);
       setTotalInventoryCount(res.data.count || (Array.isArray(data) ? data.length : 0));
@@ -114,9 +161,10 @@ const Clinical = () => {
         diagnosis: '', 
         plan: '',
         next_step: 'PENDING_PHARMACY',
-        lab_test_name: '',
+        lab_investigations: [],
         medications: []
       });
+      setSearchLab("");
       setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
       fetchVisitsToSee();
     } catch (err) {
@@ -134,10 +182,10 @@ const Clinical = () => {
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting Patients - Only show if NO patient is selected */}
         {!selectedVisit && (
-          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Consultation Queue ({totalCount})</h3>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Consultation Queue ({totalCount})</h3>
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Patients waiting for examination</p>
                </div>
                <button onClick={() => fetchVisitsToSee()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -148,7 +196,7 @@ const Clinical = () => {
             <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                  <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                      <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Name</th>
                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</th>
                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vitals Status</th>
@@ -157,15 +205,15 @@ const Clinical = () => {
                 </thead>
                 <tbody>
                   {visitsReady.map(v => (
-                    <tr key={v.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'all 0.2s ease' }}>
+                    <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <div style={{ width: '42px', height: '42px', background: '#eff6ff', color: '#2563eb', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem', boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.1)' }}>
                                {v.patient_details?.first_name[0].toLowerCase()}
                             </div>
                             <div>
-                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#1e293b' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>UHID: #{1000 + v.id}</p>
+                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
                             </div>
                          </div>
                       </td>
@@ -181,7 +229,7 @@ const Clinical = () => {
                                 chief_complaint: v.consultation?.chief_complaint || v.reason || '',
                                 diagnosis: v.consultation?.diagnosis || '',
                                 plan: v.consultation?.plan || '',
-                                lab_test_name: '',
+                                lab_investigations: [], // Start fresh for new investigations
                                 medications: v.prescriptions?.map(p => ({
                                     name: p.medication_name,
                                     dosage: p.dosage,
@@ -227,7 +275,7 @@ const Clinical = () => {
           
           {/* Pagination */}
           {totalCount > 10 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
@@ -258,8 +306,8 @@ const Clinical = () => {
                        <Stethoscope size={24} color="white" />
                     </div>
                     <div>
-                      <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                      <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> UHID: #{1000 + selectedVisit.id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
+                      <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
+                      <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
@@ -268,18 +316,18 @@ const Clinical = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: '#f8fafc', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9', display: 'flex', gap: '3rem' }}>
+              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem' }}>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
                  </div>
                  <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Status</p>
@@ -291,7 +339,7 @@ const Clinical = () => {
              <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                    {/* Vitals Summary */}
-                   <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                   <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                        <div style={{ gridColumn: 'span 2', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                            <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Vitals</p>
                            <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 700 }}>Weight: {selectedVisit.vitals?.weight_kg}kg | Height: {selectedVisit.vitals?.height_cm}cm</span>
@@ -315,7 +363,7 @@ const Clinical = () => {
                    </div>
 
                    {/* Personal History */}
-                   <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Personal History</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                            <HistoryBadge label="Smoke" value={selectedVisit.vitals?.smoking} />
@@ -328,7 +376,7 @@ const Clinical = () => {
                    </div>
 
                    {/* Family History */}
-                   <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Family History</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                            <HistoryBadge label="DM" value={selectedVisit.vitals?.family_dm} />
@@ -369,31 +417,71 @@ const Clinical = () => {
 
                 {/* Lab Results IF EXISTS */}
                 {selectedVisit.lab_requests?.some(lr => lr.status === 'COMPLETED') && (
-                    <div style={{ background: '#fff7ed', padding: '1.25rem', borderRadius: '16px', border: '1px solid #ffedd5', marginTop: '1rem' }}>
-                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#9a3412', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', marginTop: '1rem' }}>
+                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <FlaskConical size={12} /> Laboratory Results
                         </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {selectedVisit.lab_requests.filter(lr => lr.status === 'COMPLETED').map(lr => (
-                                <div key={lr.id} style={{ padding: '0.75rem', background: 'white', border: '1px solid #fed7aa', borderRadius: '12px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                        <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#9a3412' }}>{lr.test_name}</p>
-                                        <span style={{ fontSize: '0.625rem', background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>VERIFIED</span>
+                                <div key={lr.id} style={{ padding: '1rem', background: 'var(--surface)', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+                                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a' }}>{lr.test_name}</p>
+                                        <span style={{ fontSize: '0.625rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>VERIFIED</span>
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                                        <div>
-                                            <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Value</p>
-                                            <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>{lr.result?.value}</p>
+                                    
+                                    {lr.test_master_details?.sub_tests?.length > 0 ? (
+                                        <div style={{ padding: 0 }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                                <thead>
+                                                    <tr style={{ background: '#f1f5f9' }}>
+                                                        <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Parameter</th>
+                                                        <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Result</th>
+                                                        <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ref. Range</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {lr.test_master_details.sub_tests.map(st => {
+                                                        const val = lr.result?.values?.[st.name];
+                                                        let isAbnormal = false;
+                                                        if (st.biological_range && val) {
+                                                            const match = st.biological_range.match(/([\d.]+)\s*-\s*([\d.]+)/);
+                                                            if (match) {
+                                                                const numVal = parseFloat(val);
+                                                                if (!isNaN(numVal) && (numVal < parseFloat(match[1]) || numVal > parseFloat(match[2]))) {
+                                                                    isAbnormal = true;
+                                                                }
+                                                            }
+                                                        }
+                                                        return (
+                                                            <tr key={st.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                                <td style={{ padding: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>{st.name}</td>
+                                                                <td style={{ padding: '0.5rem', fontSize: '0.8125rem', fontWeight: isAbnormal ? 900 : 700, color: isAbnormal ? '#dc2626' : '#10b981' }}>
+                                                                    {val || '--'} {st.units && <span style={{ fontSize: '0.625rem', fontWeight: 600, color: '#94a3b8' }}>{st.units}</span>}
+                                                                </td>
+                                                                <td style={{ padding: '0.5rem', fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>{st.biological_range || '-'}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <div>
-                                            <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Ref. Range</p>
-                                            <p style={{ fontSize: '0.75rem', fontWeight: 600 }}>{lr.result?.reference_range || '--'}</p>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                            <div>
+                                                <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Value</p>
+                                                <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>{lr.result?.value}</p>
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Ref. Range</p>
+                                                <p style={{ fontSize: '0.75rem', fontWeight: 600 }}>{lr.result?.reference_range || '--'}</p>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
+
                                     {lr.result?.interpretation && (
-                                        <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #fed7aa' }}>
-                                            <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Interpretation</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#431407', lineHeight: 1.4 }}>{lr.result.interpretation}</p>
+                                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
+                                            <p style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', fontWeight: 800 }}>Interpretation / Analyst Remarks</p>
+                                            <p style={{ fontSize: '0.75rem', color: '#334155', lineHeight: 1.4, fontWeight: 500 }}>{lr.result.interpretation}</p>
                                         </div>
                                     )}
                                 </div>
@@ -427,127 +515,131 @@ const Clinical = () => {
                </div>
 
                {/* Medication Section */}
-               <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '16px', border: '1px solid #f1f5f9', marginBottom: '1.5rem' }}>
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      color: "#4338ca",
-                      marginBottom: "1rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span
-                      style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+               {consultData.next_step !== 'PENDING_LAB' && (
+                 <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '1.5rem' }} className="fade-in">
+                    <p
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: 800,
+                        color: "#4338ca",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        justifyContent: "space-between",
+                      }}
                     >
-                      <Pill size={14} /> Prescribe Medications
-                    </span>
-                    <span style={{ fontSize: "0.625rem", color: "#64748b", background: "white", padding: "2px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-                      Inventory: {totalInventoryCount} Drugs Available
-                    </span>
-                  </p>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <div style={{ position: 'relative' }}>
-                      <input 
-                        list="drug-inventory"
-                        placeholder="Drug Name" 
-                        value={newMed.name} 
-                        onChange={e => {
-                          const val = e.target.value;
-                          setNewMed({...newMed, name: val});
-                        }} 
-                        style={{ background: 'white', height: '36px', fontSize: '0.75rem', width: '100%' }} 
-                      />
-                      <datalist id="drug-inventory">
-                        {pharmacyInventory.map(d => (
-                          <option key={d.id} value={d.name}>{d.name} (Stock: {d.quantity})</option>
-                        ))}
-                      </datalist>
-                      {newMed.name && (
-                        <div style={{ 
-                          fontSize: '0.625rem', 
-                          marginTop: '6px', 
-                          fontWeight: 800, 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          {(() => {
-                            const drug = pharmacyInventory.find(d => d.name === newMed.name);
-                            const qty = drug?.quantity || 0;
-                            if (qty === 0) return (
-                              <span style={{ background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', border: '1px solid #fecaca' }}>OUT OF STOCK</span>
-                            );
-                            if (qty < 10) return (
-                              <span style={{ background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: '4px', border: '1px solid #fef3c7' }}>LOW STOCK: {qty} UNITS</span>
-                            );
-                            return (
-                              <span style={{ background: '#f0fdf4', color: '#166534', padding: '2px 8px', borderRadius: '4px', border: '1px solid #dcfce7' }}>AVAILABLE: {qty} UNITS</span>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                     <input placeholder="Dosage" value={newMed.dosage} onChange={e => setNewMed({...newMed, dosage: e.target.value})} style={{ background: 'white', height: '36px', fontSize: '0.75rem' }} />
-                     <select 
-                        value={newMed.frequency} 
-                        onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
-                        style={{ background: 'white', height: '36px', fontSize: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0 0.5rem' }}
-                     >
-                        <option value="1-0-1">1-0-1 (Morn-Night)</option>
-                        <option value="1-1-1">1-1-1 (Morn-Noon-Night)</option>
-                        <option value="1-0-0">1-0-0 (Morn Only)</option>
-                        <option value="0-1-0">0-1-0 (Noon Only)</option>
-                        <option value="0-0-1">0-0-1 (Night Only)</option>
-                        <option value="1-1-0">1-1-0 (Morn-Noon)</option>
-                        <option value="0-1-1">0-1-1 (Noon-Night)</option>
-                        <option value="1-1-1-1">1-1-1-1 (Four times)</option>
-                        <option value="OD">OD (Once Daily)</option>
-                        <option value="BD">BD (Twice Daily)</option>
-                        <option value="TDS">TDS (Thrice Daily)</option>
-                        <option value="QID">QID (Four times Daily)</option>
-                        <option value="SOS">SOS (As Needed / Emergency)</option>
-                        <option value="HS">HS (At Bedtime)</option>
-                        <option value="STAT">STAT (Immediately)</option>
-                        <option value="Weekly">Weekly</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Before Food">Before Food</option>
-                        <option value="After Food">After Food</option>
-                     </select>
-                     <input placeholder="Days" value={newMed.duration} onChange={e => setNewMed({...newMed, duration: e.target.value})} style={{ background: 'white', height: '36px', fontSize: '0.75rem' }} />
-                     <button type="button" onClick={() => {
-                        if (newMed.name) {
-                            setConsultData({...consultData, medications: [...consultData.medications, newMed]});
-                            setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
-                        }
-                     }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
-                  </div>
-
-                  {consultData.medications.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          {consultData.medications.map((m, idx) => (
-                              <div key={idx} style={{ background: 'white', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                  <div style={{ fontSize: '0.75rem' }}>
-                                      <span style={{ fontWeight: 800 }}>{m.name}</span>
-                                      <span style={{ color: '#64748b', marginLeft: '0.4rem' }}>({m.dosage} - {m.frequency} for {m.duration} days)</span>
-                                      <span style={{ color: '#10b981', fontWeight: 800, marginLeft: '0.5rem' }}>Total: {getDoseCount(m.frequency, m.duration)}</span>
-                                  </div>
-                                  <button type="button" onClick={() => {
-                                      const updated = [...consultData.medications];
-                                      updated.splice(idx, 1);
-                                      setConsultData({...consultData, medications: updated});
-                                  }} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: 0 }}>
-                                      <X size={12} />
-                                  </button>
-                              </div>
+                      <span
+                        style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                      >
+                        <Pill size={14} /> Prescribe Medications
+                      </span>
+                      <span style={{ fontSize: "0.625rem", color: "#64748b", background: "white", padding: "2px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                        Inventory: {totalInventoryCount} Drugs Available
+                      </span>
+                    </p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <div style={{ position: 'relative' }}>
+                        <input 
+                          list="drug-inventory"
+                          placeholder="Drug Name" 
+                          value={newMed.name} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setNewMed({...newMed, name: val});
+                          }} 
+                          style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', marginBottom: '4px' }} 
+                        />
+                        <datalist id="drug-inventory">
+                          {pharmacyInventory.map(d => (
+                            <option key={d.id} value={d.name}>{d.name} (Stock: {d.quantity})</option>
                           ))}
+                        </datalist>
+                        
+                        {/* Dynamic Stock Indicator */}
+                        {newMed.name && (() => {
+                            const drug = pharmacyInventory.find(d => d.name.toLowerCase() === newMed.name.toLowerCase());
+                            if (!drug) return null;
+                            const alreadyAdded = consultData.medications
+                                .filter(m => m.name.toLowerCase() === newMed.name.toLowerCase())
+                                .reduce((sum, m) => sum + getDoseCount(m.frequency, m.duration), 0);
+                            const remaining = drug.quantity - alreadyAdded;
+                            const color = remaining > 10 ? '#166534' : remaining > 0 ? '#b45309' : '#ef4444';
+                            const bg = remaining > 10 ? '#dcfce7' : remaining > 0 ? '#fef3c7' : '#fee2e2';
+                            return (
+                                <div style={{ fontSize: '9px', fontWeight: 900, color: color, background: bg, padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                    REMAINING STOCK: {remaining} UNITS
+                                </div>
+                            );
+                        })()}
                       </div>
-                  )}
-               </div>
+                       <input placeholder="Dosage" value={newMed.dosage} onChange={e => setNewMed({...newMed, dosage: e.target.value})} style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem' }} />
+                       <select 
+                          value={newMed.frequency} 
+                          onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
+                          style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem' }}
+                       >
+                          <option value="1-0-1">1-0-1</option>
+                          <option value="1-1-1">1-1-1</option>
+                          <option value="OD">OD</option>
+                          <option value="BD">BD</option>
+                          <option value="TDS">TDS</option>
+                       </select>
+                       <input placeholder="Days" type="number" value={newMed.duration} onChange={e => setNewMed({...newMed, duration: e.target.value})} style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem' }} />
+                       <button type="button" onClick={() => {
+                          if (!newMed.name || !newMed.duration) {
+                              toast.error("Please provide both Drug Name and Number of Days");
+                              return;
+                          }
+                          setConsultData({...consultData, medications: [...consultData.medications, newMed]});
+                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
+                       }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
+                    </div>
+
+                    {/* Prescribed Medications List - 'Falling' here */}
+                    {consultData.medications.length > 0 && (
+                        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {consultData.medications.map((m, idx) => (
+                                <div key={idx} className="fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', padding: '10px 15px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <div style={{ width: '30px', height: '30px', background: '#f5f3ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Pill size={14} color="#6366f1" />
+                                        </div>
+                                        <div>
+                                            <p style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{m.name}</p>
+                                            <p style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>{m.dosage} • {m.frequency} • {m.duration} Days ({getDoseCount(m.frequency, m.duration)} units)</p>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button 
+                                            type="button" 
+                                            title="Edit Medication"
+                                            onClick={() => {
+                                                setNewMed({ ...m });
+                                                const updated = consultData.medications.filter((_, i) => i !== idx);
+                                                setConsultData({...consultData, medications: updated});
+                                            }}
+                                            style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
+                                        >
+                                            <Pencil size={14} />
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const updated = consultData.medications.filter((_, i) => i !== idx);
+                                                setConsultData({...consultData, medications: updated});
+                                            }}
+                                            style={{ border: 'none', background: '#fef2f2', color: '#ef4444', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                  </div>
+               )}
 
                <div style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
                   <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -588,14 +680,102 @@ const Clinical = () => {
 
                   {consultData.next_step === 'PENDING_LAB' && (
                     <div className="fade-in" style={{ marginTop: '1rem' }}>
-                        <label style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '0.25rem', display: 'block' }}>INVESTIGATION REQUIRED *</label>
-                        <input 
-                            required 
-                            placeholder="e.g. CBC, Serum Creatinine, X-Ray Chest..." 
-                            value={consultData.lab_test_name} 
-                            onChange={e => setConsultData({...consultData, lab_test_name: e.target.value})}
-                            style={{ background: 'white', height: '40px' }}
-                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <label style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribe Investigations (Project Masters)</label>
+                            <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8' }}>{labMasters.length} Tests Available</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+                           <div style={{ flex: 1, position: 'relative' }}>
+                               <input 
+                                   placeholder="Search Investigation from Master Registry..." 
+                                   value={searchLab} 
+                                   onFocus={() => setShowLabSearch(true)}
+                                   onBlur={() => {
+                                       // Delay closing to allow onMouseDown on the registry items to fire first
+                                       setTimeout(() => setShowLabSearch(false), 250);
+                                   }}
+                                   onChange={e => setSearchLab(e.target.value)}
+                                   style={{ background: 'var(--surface)', height: '44px', fontSize: '0.875rem', borderRadius: '14px', border: '1px solid var(--border)', transition: 'all 0.2s', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}
+                                   onKeyUp={e => {
+                                       if(e.key === 'Escape') setShowLabSearch(false);
+                                   }}
+                               />
+                               {showLabSearch && (
+                                  <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto', background: 'white', border: '1px solid #e0e7ff', borderRadius: '16px', zIndex: 1000, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', padding: '6px' }}>
+                                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
+                                     {labMasters.filter(l => {
+                                         const query = searchLab.toLowerCase();
+                                         const alreadyAdded = consultData.lab_investigations.some(i => i.id === l.id);
+                                         const alreadyRequested = (selectedVisit?.lab_requests || []).some(r => r.test_master === l.id);
+                                         return l.name.toLowerCase().includes(query) && !alreadyAdded && !alreadyRequested;
+                                     }).map(l => (
+                                        <div key={l.id} 
+                                             onMouseDown={(e) => {
+                                                // 🎯 onMouseDown fires before onBlur, ensuring the selection is captured
+                                                e.preventDefault(); 
+                                                setConsultData({
+                                                    ...consultData, 
+                                                    lab_investigations: [...consultData.lab_investigations, { id: l.id, name: l.name, code: l.code }]
+                                                });
+                                                setSearchLab("");
+                                                setShowLabSearch(false);
+                                             }}
+                                             className="search-item"
+                                             style={{ padding: '12px 15px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', transition: 'all 0.2s' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                             <div style={{ fontWeight: 800, fontSize: '0.8125rem' }}>{l.name}</div>
+                                             <div style={{ fontSize: '0.625rem', padding: '2px 8px', background: '#f1f5f9', borderRadius: '6px', fontWeight: 700, color: '#64748b' }}>{l.code}</div>
+                                          </div>
+                                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>{l.test_type_name} • {l.department_name}</div>
+                                        </div>
+                                     ))}
+                                     {labMasters.filter(l => {
+                                         const q = searchLab.toLowerCase();
+                                         const added = consultData.lab_investigations.some(i => i.id === l.id);
+                                         const done = (selectedVisit?.lab_requests || []).some(r => r.test_master === l.id);
+                                         return l.name.toLowerCase().includes(q) && !added && !done;
+                                     }).length === 0 && (
+                                        <div style={{ padding: '20px', textAlign: 'center' }}>
+                                           <p style={{ color: '#94a3b8', fontSize: '0.8125rem', fontWeight: 600 }}>No unticked investigations matching search</p>
+                                        </div>
+                                     )}
+                                  </div>
+                               )}
+                            </div>
+                         </div>
+
+                        {/* Investigations 'Falling' List */}
+                        {(consultData.lab_investigations.length > 0 || (selectedVisit?.lab_requests || []).length > 0) && (
+                            <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {/* Historical / Existing Requests (Locked) */}
+                                {(selectedVisit?.lab_requests || []).map((req, idx) => (
+                                    <div key={`hist-${idx}`} style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
+                                        <CheckCircle size={12} color="#10b981" />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{req.test_name}</span>
+                                        <span style={{ fontSize: '0.55rem', padding: '1px 5px', background: '#e2e8f0', borderRadius: '4px', fontWeight: 900 }}>FIXED</span>
+                                    </div>
+                                ))}
+
+                                {/* New Additions */}
+                                {consultData.lab_investigations.map((inv, idx) => (
+                                    <div key={`new-${idx}`} className="fade-in" style={{ background: '#eff6ff', padding: '6px 12px', borderRadius: '10px', border: '1px solid #3b82f6', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.1)' }}>
+                                        <FlaskConical size={12} color="#2563eb" />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>{inv.name}</span>
+                                        <button 
+                                            type="button" 
+                                            onMouseDown={(e) => {
+                                                e.preventDefault(); 
+                                                const updated = consultData.lab_investigations.filter((_, i) => i !== idx);
+                                                setConsultData({...consultData, lab_investigations: updated});
+                                            }}
+                                            style={{ border: 'none', background: 'transparent', padding: 0, color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                   )}
                </div>
@@ -631,7 +811,7 @@ const HistoryBadge = ({ label, value, color, variant }) => {
     }
 
     return (
-        <div style={{ padding: '3px 8px', background: 'white', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div style={{ padding: '3px 8px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)', display: 'flex', gap: '4px', alignItems: 'center' }}>
             <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{label}:</span>
             <span style={{ fontSize: '0.625rem', fontWeight: 800, color: isPositive ? (color || '#ef4444') : '#10b981' }}>{displayValue}</span>
         </div>
@@ -641,7 +821,7 @@ const HistoryBadge = ({ label, value, color, variant }) => {
 const ExamItem = ({ label, value }) => {
     const isAbnormal = value === 'FND';
     return (
-        <div style={{ padding: '0.5rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+        <div style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
             <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '2px' }}>{label}</p>
             <p style={{ fontSize: '0.75rem', fontWeight: 800, color: isAbnormal ? '#dc2626' : '#059669' }}>{value || '--'}</p>
         </div>
