@@ -59,12 +59,7 @@ const AdminMasters = () => {
 
     const activeCategories = (proj.category_mappings || []).map(m => m.category);
 
-    const customSet = (proj.registry_types || []).filter((rt) => {
-        // Only show system registries if their corresponding category is mapped to the project
-        if (rt.type_category === 'PERSONNEL_PRIMARY') return activeCategories.includes('EMPLOYEE');
-        if (rt.type_category === 'PERSONNEL_DEPENDENT') return activeCategories.includes('FAMILY');
-        return true; // Always show user-created custom registries
-    }).map((rt) => ({
+    const customSet = (proj.registry_types || []).map((rt) => ({
       id: rt.slug,
       dbId: rt.id,
       slug: rt.slug,
@@ -1899,7 +1894,7 @@ const AdminMasters = () => {
                                 onClick={() => {
                                   setExploringProtocolId(proto.id);
                                   setActiveBoard("REGISTRY");
-                                  if (proto.id === "employee") {
+                                  if (proto.id === "employee_master") {
                                     setSearchQuery("");
                                   }
                                   fetchEmployeeMasters(1, null, proto.id);
@@ -1924,9 +1919,9 @@ const AdminMasters = () => {
                                   setBulkProject(selectedProject);
                                   setExploringProtocolId(proto.id);
                                   setBulkType(
-                                    proto.id === "employee"
+                                    proto.id === "employee_master"
                                       ? "MASTER"
-                                      : proto.id === "family"
+                                      : proto.id === "family_member"
                                         ? "FAMILY"
                                         : "HEALTH",
                                   );
