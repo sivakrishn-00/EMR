@@ -32,33 +32,44 @@ class ProjectViewSet(viewsets.ModelViewSet):
         for cat in categories:
             ProjectCategoryMapping.objects.create(project=project, category=cat)
             
-            # Auto-provision system registries based on mapping
-            if cat == 'EMPLOYEE':
-                RegistryType.objects.get_or_create(
-                    project=project,
-                    type_category='PERSONNEL_PRIMARY',
-                    defaults={
-                        'name': 'Unified Master Registry',
-                        'slug': 'employee_master',
-                        'description': 'Direct staff and family dependency uploads (Unified Protocol)',
-                        'coverage': 'ENTIRE ECOSYSTEM',
-                        'icon': 'Users',
-                        'color': '#6366f1'
-                    }
-                )
-            elif cat == 'FAMILY':
-                RegistryType.objects.get_or_create(
-                    project=project,
-                    type_category='PERSONNEL_DEPENDENT',
-                    defaults={
-                        'name': 'Dependent Registry',
-                        'slug': 'family_member',
-                        'description': 'Family and dependent mapping repository',
-                        'coverage': 'FAMILY UNIT',
-                        'icon': 'UserPlus',
-                        'color': '#10b981'
-                    }
-                )
+        # 2. Provision standard system registries based on selected categories
+        if 'EMPLOYEE' in categories:
+            # Smart Sync: Look for existing slug or category to avoid IntegrityErrors
+            rt, created = RegistryType.objects.get_or_create(
+                project=project,
+                slug='employee_master',
+                defaults={
+                    'name': 'Unified Master Registry',
+                    'type_category': 'PERSONNEL_PRIMARY',
+                    'description': 'Direct staff and family dependency uploads (Unified Protocol)',
+                    'coverage': 'ENTIRE ECOSYSTEM',
+                    'icon': 'Users',
+                    'color': '#6366f1'
+                }
+            )
+            if not created:
+                rt.type_category = 'PERSONNEL_PRIMARY'
+                rt.name = 'Unified Master Registry'
+                rt.description = 'Direct staff and family dependency uploads (Unified Protocol)'
+                rt.save()
+
+        if 'FAMILY' in categories:
+            rt, created = RegistryType.objects.get_or_create(
+                project=project,
+                slug='family_member',
+                defaults={
+                    'name': 'Dependent Registry',
+                    'type_category': 'PERSONNEL_DEPENDENT',
+                    'description': 'Linked family records for employees',
+                    'coverage': 'DEPENDENT BASE',
+                    'icon': 'UserPlus',
+                    'color': '#ec4899'
+                }
+            )
+            if not created:
+                rt.type_category = 'PERSONNEL_DEPENDENT'
+                rt.name = 'Dependent Registry'
+                rt.save()
 
         log_action(request.user, 'Governance', 'Sync Mappings', f"Synchronized mappings and provisioned default registries for project {project.name}")
         return Response({"status": "Mappings synchronized and registries provisioned."})
