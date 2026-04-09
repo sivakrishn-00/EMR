@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../services/api';
-import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Users = () => {
@@ -267,12 +268,12 @@ const Users = () => {
             </div>
 
             {/* Registration/Edit Modal */}
-            {showModal && (
+            {showModal && createPortal(
                 <div style={{ 
                     position: 'fixed', 
                     top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(15, 23, 42, 0.7)', 
-                    backdropFilter: 'blur(8px)', 
+                    background: 'rgba(255, 255, 255, 0.85)', 
+                    backdropFilter: 'blur(12px)', 
                     display: 'flex', 
                     justifyContent: 'center', 
                     alignItems: 'flex-start', 
@@ -282,104 +283,195 @@ const Users = () => {
                 }}>
                     <div className="card fade-in" style={{ 
                         width: '100%', 
-                        maxWidth: '520px', 
+                        maxWidth: '560px', 
                         padding: 0, 
-                        borderRadius: '24px', 
-                        background: 'var(--surface)', 
+                        borderRadius: '32px', 
+                        background: 'white', 
                         border: '1px solid var(--border)', 
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
                         position: 'relative'
                     }}>
-                        <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <div style={{ background: 'var(--primary)', padding: '0.625rem', borderRadius: '10px' }}>
-                                    <UserPlus size={20} color="white" />
+                        {/* Header Section */}
+                        <div style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                                <div style={{ 
+                                    padding: '0.75rem', 
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                                    borderRadius: '16px', 
+                                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' 
+                                }}>
+                                    <UserPlus size={24} color="white" />
                                 </div>
                                 <div>
-                                    <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>{editingUser ? 'Update Staff Member' : 'Add Staff Member'}</h2>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Configure credentials and access roles</p>
+                                    <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                                        {editingUser ? 'Update Staff Profile' : 'Add Staff Member'}
+                                    </h2>
+                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>
+                                        Configure credentials and access roles
+                                    </p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} style={{ border: 'none', background: 'var(--background)', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-main)' }}>
-                                <X size={16} />
+                            <button 
+                                onClick={() => setShowModal(false)} 
+                                style={{ 
+                                    border: 'none', 
+                                    background: '#f1f5f9', 
+                                    width: '36px', 
+                                    height: '36px', 
+                                    borderRadius: '12px', 
+                                    cursor: 'pointer', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center' 
+                                }}
+                            >
+                                <X size={20} color="#64748b" />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                                 <div className="form-group">
-                                    <label>First Name</label>
-                                    <input required value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="e.g. David" />
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>First Name</label>
+                                    <input 
+                                        required 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.first_name} 
+                                        onChange={e => setFormData({...formData, first_name: e.target.value})} 
+                                        placeholder="e.g. David" 
+                                    />
                                 </div>
                                 <div className="form-group">
-                                    <label>Last Name</label>
-                                    <input required value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="e.g. Miller" />
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Last Name</label>
+                                    <input 
+                                        required 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.last_name} 
+                                        onChange={e => setFormData({...formData, last_name: e.target.value})} 
+                                        placeholder="e.g. Miller" 
+                                    />
                                 </div>
-                            </div>
-                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                                <label>Username (Login ID)</label>
-                                <input required value={formData.username} disabled={!!editingUser} onChange={e => setFormData({...formData, username: e.target.value})} placeholder="e.g. dmiller2024" />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                                <label>Email Address</label>
-                                <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="dmiller@clinic.com" />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                                <label>Assigned Project Facility</label>
-                                <select required value={formData.project} onChange={e => setFormData({...formData, project: e.target.value})}>
-                                    <option value="">-- Select Project Facility --</option>
-                                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
+
+                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Username (Login ID)</label>
+                                    <input 
+                                        required 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.username} 
+                                        disabled={!!editingUser} 
+                                        onChange={e => setFormData({...formData, username: e.target.value})} 
+                                        placeholder="e.g. dmiller2024" 
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Email Address</label>
+                                    <input 
+                                        type="email" 
+                                        required 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.email} 
+                                        onChange={e => setFormData({...formData, email: e.target.value})} 
+                                        placeholder="dmiller@clinic.com" 
+                                    />
+                                </div>
+
+                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Assigned Project Facility</label>
+                                    <select 
+                                        required 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.project} 
+                                        onChange={e => setFormData({...formData, project: e.target.value})}
+                                    >
+                                        <option value="">-- Select Project Facility --</option>
+                                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                </div>
+
+                                {!editingUser ? (
+                                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                        <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Temporary Password</label>
+                                        <input 
+                                            type="password" 
+                                            required 
+                                            className="form-control"
+                                            style={{ height: '52px', borderRadius: '16px' }}
+                                            onChange={e => setFormData({...formData, password: e.target.value})} 
+                                            placeholder="••••••••" 
+                                        />
+                                    </div>
+                                ) : (
+                                    <div style={{ gridColumn: 'span 2', background: '#f8fafc', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                        <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                            Editing user permissions. Security identifiers are locked.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
-                            {!editingUser && (
-                                <div className="form-group" style={{ marginBottom: '2rem' }}>
-                                    <label>Temporary Password</label>
-                                    <input type="password" required onChange={e => setFormData({...formData, password: e.target.value})} placeholder="••••••••" />
-                                </div>
-                            )}
-                            {editingUser && (
-                                <div style={{ background: 'var(--background)', padding: '0.75rem', borderRadius: '10px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Editing user permissions. Account ID cannot be changed.</p>
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} style={{ padding: '0.75rem 1.5rem' }}>Close</button>
-                                <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setShowModal(false)} 
+                                    style={{ padding: '0.75rem 2rem', borderRadius: '16px', fontWeight: 800 }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="btn btn-primary" 
+                                    style={{ 
+                                        padding: '0.75rem 2.5rem', 
+                                        borderRadius: '16px', 
+                                        fontWeight: 800,
+                                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                        border: 'none',
+                                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                                    }}
+                                >
                                     {editingUser ? 'Save Updates' : 'Confirm Registration'}
                                 </button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Delete Confirmation */}
-            {confirmDelete && (
+            {confirmDelete && createPortal(
                 <div style={{ 
-                    position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', 
-                    backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    position: 'fixed', inset: 0, background: 'rgba(255, 255, 255, 0.4)', 
+                    backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
                     zIndex: 10000 
                 }}>
-                    <div className="card fade-in" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '2.5rem' }}>
+                    <div className="card fade-in" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '2.5rem', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
                         <div style={{ 
                              width: '64px', height: '64px', background: '#fee2e2', color: '#ef4444', 
                              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             margin: '0 auto 1.5rem'
+                             margin: '0 auto 1.5rem',
+                             boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
                         }}>
                             <AlertTriangle size={32} />
                         </div>
-                        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem', color: 'var(--text-main)' }}>Revoke Access?</h2>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.75rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Revoke Access?</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem', fontWeight: 600 }}>
                              Are you sure you want to remove <strong>{confirmDelete.username}</strong>? This will disable their login credentials immediately.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(null)}>Keep User</button>
-                            <button className="btn btn-primary" style={{ flex: 1, background: '#ef4444', borderColor: '#ef4444' }} onClick={handleDelete}>Delete User</button>
+                            <button className="btn btn-secondary" style={{ flex: 1, borderRadius: '16px', fontWeight: 800 }} onClick={() => setConfirmDelete(null)}>Keep User</button>
+                            <button className="btn btn-primary" style={{ flex: 1, background: '#ef4444', borderColor: '#ef4444', borderRadius: '16px', fontWeight: 800, border: 'none', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }} onClick={handleDelete}>Delete User</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

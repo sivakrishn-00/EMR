@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../services/api';
 import { 
   Plus, 
@@ -18,7 +19,8 @@ import {
   Check,
   Clock,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -586,48 +588,63 @@ const Patients = () => {
       </div>
 
       {/* Registration Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div style={{
           position: 'fixed', 
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.7)', 
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(255, 255, 255, 0.85)', 
+          backdropFilter: 'blur(12px)',
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'flex-start',
           zIndex: 10000, 
-          padding: '100px 1rem 60px 1rem',
+          padding: '80px 1rem 60px 1rem',
           overflowY: 'auto'
         }}>
           <div className="fade-in card" style={{ 
             width: '100%', 
-            maxWidth: '820px', 
+            maxWidth: '680px', 
             padding: 0, 
-            borderRadius: '24px', 
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
-            background: 'var(--surface)',
+            borderRadius: '32px', 
+            boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+            background: 'white',
+            border: '1px solid var(--border)',
             position: 'relative'
           }}>
             {/* Modal Header */}
             <div style={{ 
-              padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)', 
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              background: 'var(--background)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px'
+              padding: '1.5rem 2rem', 
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ background: 'var(--primary)', padding: '0.75rem', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div style={{ 
+                    padding: '0.75rem', 
+                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                    borderRadius: '16px', 
+                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' 
+                }}>
                   <UserPlus size={24} color="white" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Patient Registration</h2>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Fill in the details to create a new UHID</p>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Patient Registration</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Fill in the details to create a new UHID</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowModal(false)}
-                style={{ border: 'none', background: 'var(--border)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ 
+                    border: 'none', 
+                    background: '#f1f5f9', 
+                    width: '36px', 
+                    height: '36px', 
+                    borderRadius: '12px', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                }}
               >
-                <X size={18} color="var(--text-muted)" />
+                <X size={20} color="#64748b" />
               </button>
             </div>
 
@@ -639,17 +656,17 @@ const Patients = () => {
                 <div style={{ gridColumn: 'span 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
-                    <div style={{ display: 'flex', gap: '8px', background: 'var(--background)', padding: '4px', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
                         {(!user?.project || (projects.find(p => p.id === user.project)?.category_mappings?.some(m => m.category === 'GENERAL'))) && (
                         <button 
                             type="button"
                             onClick={() => setFormData({...formData, is_employee_linked: false})}
                             style={{ 
-                                padding: '6px 16px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 700,
-                                background: !formData.is_employee_linked ? 'var(--surface)' : 'transparent',
-                                color: !formData.is_employee_linked ? 'var(--primary)' : 'var(--text-muted)',
+                                padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
+                                background: !formData.is_employee_linked ? 'white' : 'transparent',
+                                color: !formData.is_employee_linked ? 'var(--primary)' : '#64748b',
                                 boxShadow: !formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                                cursor: 'pointer'
+                                cursor: 'pointer', transition: '0.3s'
                             }}
                         >General</button>
                         )}
@@ -658,33 +675,39 @@ const Patients = () => {
                              type="button"
                              onClick={() => setFormData({...formData, is_employee_linked: true})}
                              style={{ 
-                                 padding: '6px 16px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 700,
-                                 background: formData.is_employee_linked ? 'var(--surface)' : 'transparent',
-                                 color: formData.is_employee_linked ? 'var(--primary)' : 'var(--text-muted)',
+                                 padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
+                                 background: formData.is_employee_linked ? 'white' : 'transparent',
+                                 color: formData.is_employee_linked ? 'var(--primary)' : '#64748b',
                                  boxShadow: formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
-                                 cursor: 'pointer'
+                                 cursor: 'pointer', transition: '0.3s'
                              }}
                         >Employee/Family</button>
                         )}
                     </div>
                   </div>
                   <div className="form-group">
-                    <label><Activity size={14} /> Reason for Visit / Chief Complaint <span style={{ color: '#ef4444' }}>*</span></label>
-                    <input required value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Fever and body pain, Regular followup..." style={{ background: 'var(--background)', borderColor: (formAttempted && !formData.reason) ? '#ef4444' : 'var(--border)' }} />
+                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Activity size={14} /> Reason for Visit / Chief Complaint <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input 
+                        required 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px', background: '#f8fafc' }}
+                        value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Fever and body pain, Regular followup..." 
+                    />
                     {formAttempted && !formData.reason && <p style={{ color: '#ef4444', fontSize: '10px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
                   </div>
                 </div>
 
                 {formData.is_employee_linked && (
-                    <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                        <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Link Employee Record</p>
+                    <div style={{ gridColumn: 'span 2', background: '#f8fafc', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                        <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Link Employee Record</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                             <div className="form-group" style={{ position: 'relative' }}>
-                                <label>Search Employee (Name/Card No)</label>
+                                <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Search Employee (Name/Card No)</label>
                                 <div style={{ position: 'relative' }}>
                                     <input 
                                         type="text"
                                         className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px', background: 'white' }}
                                         placeholder="Type name or card number..."
                                         value={employeeSearchTerm}
                                         onChange={(e) => {
@@ -701,9 +724,9 @@ const Patients = () => {
                                             />
                                             <div style={{
                                                 position: 'absolute', top: '100%', left: 0, right: 0, 
-                                                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
+                                                background: 'white', border: '1px solid var(--border)', borderRadius: '16px',
                                                 maxHeight: '300px', overflowY: 'auto', zIndex: 1000,
-                                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', marginTop: '4px'
+                                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', marginTop: '8px'
                                             }}>
                                                 {employeeMasters.filter(emp => 
                                                     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
@@ -737,14 +760,14 @@ const Patients = () => {
                                                                 });
                                                             }}
                                                             style={{
-                                                                padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                                                                padding: '0.875rem 1.25rem', cursor: 'pointer', borderBottom: '1px solid var(--border)',
                                                                 fontSize: '0.875rem'
                                                             }}
-                                                            onMouseOver={(e) => e.currentTarget.style.background = 'var(--background)'}
+                                                            onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
                                                             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                                                         >
-                                                            <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{emp.card_no}</div>
-                                                            <div style={{ color: 'var(--text-main)' }}>{emp.name}</div>
+                                                            <div style={{ fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.01em' }}>{emp.card_no}</div>
+                                                            <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{emp.name}</div>
                                                         </div>
                                                     ))
                                                 )}
@@ -755,9 +778,10 @@ const Patients = () => {
                             </div>
                             {formData.employee_master && (
                                 <div className="form-group">
-                                    <label>Select Family Member</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Select Family Member</label>
                                     <select 
                                         className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px', background: 'white' }}
                                         onChange={(e) => {
                                             const emp = employeeMasters.find(em => em.id === formData.employee_master);
                                             const fam = emp.family_members.find(f => f.id === parseInt(e.target.value));
@@ -791,22 +815,35 @@ const Patients = () => {
 
                 {!formData.is_employee_linked && (
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label>Registration Project <span style={{ color: '#ef4444' }}>*</span></label>
+                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Registration Project <span style={{ color: '#ef4444' }}>*</span></label>
                     {user?.project ? (
-                        <div style={{ padding: '0.75rem', background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <div style={{ 
+                            padding: '1rem 1.25rem', 
+                            background: '#f8fafc', 
+                            border: '1.5px solid #e2e8f0', 
+                            borderRadius: '16px', 
+                            color: '#1e293b', 
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                        }}>
+                            <ShieldCheck size={18} color="#6366f1" />
                             {projects.find(p => p.id === user.project)?.name || 'Mapped Project'}
+                            <span style={{ fontSize: '0.625rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', marginLeft: 'auto', fontWeight: 900 }}>LOCKED</span>
                         </div>
                     ) : (
                         <select 
-                        required 
-                        value={formData.project} 
-                        onChange={e => setFormData({...formData, project: e.target.value})} 
-                        style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
+                            required 
+                            className="form-control"
+                            style={{ height: '52px', borderRadius: '16px', background: '#f8fafc' }}
+                            value={formData.project} 
+                            onChange={e => setFormData({...formData, project: e.target.value})} 
                         >
-                        <option value="">-- Select Project --</option>
-                        {projects && Array.isArray(projects) && projects.filter(p => p.category_mappings?.some(m => m.category === 'GENERAL')).map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
+                            <option value="">-- Select Project --</option>
+                            {projects && Array.isArray(projects) && projects.filter(p => p.category_mappings?.some(m => m.category === 'GENERAL')).map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
                         </select>
                     )}
                   </div>
@@ -814,28 +851,42 @@ const Patients = () => {
 
                 {/* Personal Information */}
                 <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Basic Details</p>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Basic Details</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
-                      <label><User size={14} /> First Name <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="e.g. John" style={{ border: (formAttempted && !formData.first_name) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
+                      <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><User size={14} /> First Name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input 
+                        required 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                        value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="e.g. John" 
+                      />
                       {formAttempted && !formData.first_name && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                     <div className="form-group">
-                      <label>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="e.g. Doe" style={{ border: (formAttempted && !formData.last_name) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
+                      <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input 
+                        required 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                        value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="e.g. Doe" 
+                      />
                       {formAttempted && !formData.last_name && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Identity Verification (Primary ID)</p>
+                  <div style={{ background: '#f1f5f9', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Identity Verification (Primary ID)</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label><Fingerprint size={14} /> ID Proof Type *</label>
-                            <select value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})} style={{ background: 'var(--surface)' }}>
+                            <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Fingerprint size={14} /> ID Proof Type *</label>
+                            <select 
+                                className="form-control"
+                                style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})}
+                            >
                                 <option value="AADHAAR">Aadhaar Card</option>
                                 <option value="VOTER_ID">Voter ID</option>
                                 <option value="DRIVING_LICENCE">Driving Licence</option>
@@ -843,8 +894,13 @@ const Patients = () => {
                             </select>
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label>ID proof Number (Primary Key) <span style={{ color: '#ef4444' }}>*</span></label>
-                            <input required value={formData.id_proof_number} onChange={e => setFormData({...formData, id_proof_number: e.target.value})} placeholder="Enter Aadhaar/ID number" style={{ background: 'var(--surface)', border: (formAttempted && !formData.id_proof_number) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
+                            <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>ID proof Number <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input 
+                                required 
+                                className="form-control"
+                                style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                value={formData.id_proof_number} onChange={e => setFormData({...formData, id_proof_number: e.target.value})} placeholder="Enter Aadhaar/ID number" 
+                            />
                             {formAttempted && !formData.id_proof_number && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
                         </div>
                     </div>
@@ -852,14 +908,24 @@ const Patients = () => {
                 </div>
 
                 <div className="form-group">
-                  <label><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input type="date" required value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} style={{ border: (formAttempted && !formData.dob) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input 
+                    type="date" required 
+                    className="form-control"
+                    style={{ height: '52px', borderRadius: '16px' }}
+                    value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} 
+                  />
                   {formAttempted && !formData.dob && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                 </div>
 
                 <div className="form-group">
-                  <label>Gender <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} style={{ border: (formAttempted && !formData.gender) ? '1px solid #ef4444' : '1px solid var(--border)' }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Gender <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select 
+                    required 
+                    className="form-control"
+                    style={{ height: '52px', borderRadius: '16px' }}
+                    value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}
+                  >
                     <option value="">-- Select --</option>
                     <option value="MALE">Male</option>
                     <option value="FEMALE">Female</option>
@@ -870,16 +936,25 @@ const Patients = () => {
 
                 {/* Contact Information */}
                 <div style={{ gridColumn: 'span 2' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Contact & Address</p>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Contact & Address</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
-                      <label><Phone size={14} /> Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input required type="tel" maxLength={10} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g,'')})} placeholder="10-digit number" style={{ border: (formAttempted && (!formData.phone || formData.phone.length !== 10)) ? '1px solid #ef4444' : '1px solid var(--border)' }} />
+                      <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Phone size={14} /> Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input 
+                        required type="tel" maxLength={10} 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g,'')})} placeholder="10-digit number" 
+                      />
                       {formAttempted && (!formData.phone || formData.phone.length !== 10) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Invalid / Required (10 Digits)</p>}
                     </div>
                     <div className="form-group">
-                      <label>Patient Type</label>
-                      <select value={formData.patient_type} onChange={e => setFormData({...formData, patient_type: e.target.value})}>
+                      <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Patient Type</label>
+                      <select 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                        value={formData.patient_type} onChange={e => setFormData({...formData, patient_type: e.target.value})}
+                      >
                         <option value="OPD">Outpatient (OPD)</option>
                         <option value="IPD">Inpatient (IPD)</option>
                         <option value="Emergency">Emergency</option>
@@ -890,27 +965,53 @@ const Patients = () => {
                 </div>
 
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label><MapPin size={14} /> Local Address *</label>
-                  <textarea rows="2" required value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="House No, Street, Landmark..."></textarea>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><MapPin size={14} /> Local Address *</label>
+                  <textarea 
+                    rows="2" required 
+                    className="form-control"
+                    style={{ height: '80px', borderRadius: '16px', padding: '1rem' }}
+                    value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="House No, Street, Landmark..."
+                  ></textarea>
                 </div>
                 
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label>ABHA ID (Optional)</label>
-                    <input value={formData.abha_id} onChange={e => setFormData({...formData, abha_id: e.target.value})} placeholder="14-digit ABHA Number" />
+                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>ABHA ID (Optional)</label>
+                    <input 
+                        className="form-control"
+                        style={{ height: '52px', borderRadius: '16px' }}
+                        value={formData.abha_id} onChange={e => setFormData({...formData, abha_id: e.target.value})} placeholder="14-digit ABHA Number" 
+                    />
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div style={{ 
                 display: 'flex', justifyContent: 'flex-end', gap: '1rem', 
-                marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' 
+                marginTop: '3.5rem'
               }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} style={{ padding: '0.75rem 2rem' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2.5rem' }}>Complete Registration</button>
+                <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowModal(false)} 
+                    style={{ padding: '0.75rem 2rem', borderRadius: '16px', fontWeight: 800 }}
+                >Cancel</button>
+                <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    style={{ 
+                        padding: '0.75rem 2.5rem', 
+                        borderRadius: '16px', 
+                        fontWeight: 800,
+                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        border: 'none',
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                    }}
+                >Complete Registration</button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style>{`
