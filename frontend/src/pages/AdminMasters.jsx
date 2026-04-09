@@ -53,13 +53,18 @@ const AdminMasters = () => {
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
 
-  const getCurrentProtocols = () => {
-    const proj = projects.find((p) => String(p.id) === String(selectedProject));
+  const getCurrentProtocols = (projectId = selectedProject) => {
+    const proj = projects.find((p) => String(p.id) === String(projectId));
     if (!proj) return [];
-    
-    // All protocols are now dynamic and fetched from the RegistryType model in the DB.
-    // Standard protocols like the 'Unified Master Registry' are auto-populated via backend signals.
-    const customSet = (proj.registry_types || []).map((rt) => ({
+
+    const activeCategories = (proj.category_mappings || []).map(m => m.category);
+
+    const customSet = (proj.registry_types || []).filter((rt) => {
+        // Only show system registries if their corresponding category is mapped to the project
+        if (rt.type_category === 'PERSONNEL_PRIMARY') return activeCategories.includes('EMPLOYEE');
+        if (rt.type_category === 'PERSONNEL_DEPENDENT') return activeCategories.includes('FAMILY');
+        return true; // Always show user-created custom registries
+    }).map((rt) => ({
       id: rt.slug,
       dbId: rt.id,
       slug: rt.slug,
@@ -74,8 +79,27 @@ const AdminMasters = () => {
             ? UserPlus
             : Users,
       color: rt.color,
-      isCustom: true,
-      fields: rt.fields || [],
+      isCustom: !["PERSONNEL_PRIMARY", "PERSONNEL_DEPENDENT"].includes(rt.type_category),
+      fields:
+        rt.fields && rt.fields.length > 0
+          ? rt.fields
+          : rt.slug === "employee_master"
+            ? [
+                { label: "Card No", slug: "card_no" },
+                { label: "Name", slug: "name" },
+                { label: "Gender", slug: "gender" },
+                { label: "Mobile", slug: "mobile_no" },
+                { label: "Aadhar", slug: "aadhar_no" },
+                { label: "Designation", slug: "designation" },
+              ]
+            : rt.slug === "family_member"
+              ? [
+                  { label: "Card No", slug: "card_no" },
+                  { label: "Name", slug: "name" },
+                  { label: "Gender", slug: "gender" },
+                  { label: "Relationship", slug: "relationship" },
+                ]
+              : [],
     }));
     return customSet;
   };
@@ -198,6 +222,7 @@ const AdminMasters = () => {
     completed: false,
   });
   const [bulkProject, setBulkProject] = useState("");
+  const [bulkMode, setBulkMode] = useState("OVERWRITE"); // OVERWRITE or INCREMENT
 
   const [bulkStep, setBulkStep] = useState("PROJECT"); // PROJECT, TYPE, UPLOAD
   const [bulkType, setBulkType] = useState(""); // MAPPING, FAMILY, COMPLETE
@@ -438,19 +463,20 @@ const AdminMasters = () => {
     }
   };
 
-  const fetchEmployeeMasters = async (pageNum = 1, projectId = null) => {
+  const fetchEmployeeMasters = async (pageNum = 1, projectId = null, protocolId = null) => {
     setIsLoading(true);
     const targetProject = projectId !== null ? projectId : selectedProject;
+    const targetProtocol = protocolId !== null ? protocolId : exploringProtocolId;
+    
     try {
         const isStandard = ["employee_master"].includes(
-          exploringProtocolId,
+          targetProtocol,
         );
       const endpoint = isStandard
         ? "patients/employee-masters/"
         : "patients/registry-data/";
 
-      // Map 'employee_master' or 'family_member' slugs to the registry endpoint if they aren't caught by isStandard
-      const params = `?page=${pageNum}&search=${searchQuery}&registry_type=${exploringProtocolId || ""}&project=${targetProject}`;
+      const params = `?page=${pageNum}&search=${searchQuery}&registry_type=${targetProtocol || ""}&project=${targetProject}`;
 
       const res = await api.get(`${endpoint}${params}`);
 
@@ -770,7 +796,6 @@ const AdminMasters = () => {
         registryEditData,
       );
       toast.success("Command Hub: Registry Updated!");
-      setShowRegistryEditModal(true);
       setShowRegistryEditModal(false);
       fetchEmployeeMasters(page);
     } catch (err) {
@@ -898,7 +923,7 @@ const AdminMasters = () => {
           const payload =
             isStandard || isProject1Personnel
               ? { records: batch }
-              : { registry_type: exploringProtocolId, records: batch };
+              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode };
           const res = await api.post(endpoint, payload);
 
           totalSuccess += res.data.success || 0;
@@ -1018,21 +1043,22 @@ const AdminMasters = () => {
     setNewProtocolData({ name: "", description: "", coverage: "", fields: [] });
   };
 
-  const handleDeleteProtocol = async (id) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to remove this custom registry? All mapping metadata for this type will be lost.",
-      )
-    )
-      return;
-
-    try {
-      await api.delete(`patients/registry-types/${id}/`);
-      toast.success("Registry Protocol Removed from Server.");
-      fetchProjects(); // Refresh UI
-    } catch (err) {
-      toast.error("Deletion Failed");
-    }
+  const handleDeleteProtocol = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Remove Registry Protocol",
+      message: "Are you sure you want to remove this custom registry? All clinical data and schema mapping for this type will be permanently lost.",
+      onConfirm: async () => {
+        try {
+          await api.delete(`patients/registry-types/${id}/`);
+          toast.success("Governance Hub: Registry Protocol Excised.");
+          fetchProjects(); // Refresh UI
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          toast.error("Process Blocked: Protocol Erasure Failed");
+        }
+      },
+    });
   };
 
   const stats = getStats();
@@ -1805,7 +1831,7 @@ const AdminMasters = () => {
                                   <button
                                     onClick={() => {
                                       setIsEditingProtocol(true);
-                                      setEditingProtocolId(proto.id);
+                                      setEditingProtocolId(proto.dbId);
                                       setNewProtocolData({
                                         name: proto.name,
                                         description: proto.description,
@@ -1831,7 +1857,7 @@ const AdminMasters = () => {
                                   </button>
                                   <button
                                     onClick={() =>
-                                      handleDeleteProtocol(proto.id)
+                                      handleDeleteProtocol(proto.dbId)
                                     }
                                     style={{
                                       border: "none",
@@ -1876,7 +1902,7 @@ const AdminMasters = () => {
                                   if (proto.id === "employee") {
                                     setSearchQuery("");
                                   }
-                                  fetchEmployeeMasters(1);
+                                  fetchEmployeeMasters(1, null, proto.id);
                                 }}
                               >
                                 Explore
@@ -2212,6 +2238,32 @@ const AdminMasters = () => {
                           setExploringProtocolId(exploringProtocolId);
                           setBulkType("HEALTH");
                           setBulkStep("UPLOAD");
+                          setBulkMode("INCREMENT");
+                          setShowBulkModal(true);
+                        }}
+                        style={{
+                          height: "52px",
+                          padding: "0 1.5rem",
+                          borderRadius: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          background: "#10b981",
+                          border: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: 800
+                        }}
+                      >
+                        <Plus size={18} /> Refill Stock
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setBulkProject(selectedProject);
+                          setExploringProtocolId(exploringProtocolId);
+                          setBulkType("HEALTH");
+                          setBulkStep("UPLOAD");
+                          setBulkMode("OVERWRITE");
                           setShowBulkModal(true);
                         }}
                         style={{
@@ -2236,6 +2288,9 @@ const AdminMasters = () => {
                           padding: "0 2.5rem",
                           borderRadius: "16px",
                           fontWeight: 800,
+                          background: "white",
+                          color: "#1e293b",
+                          border: "1.5px solid #f1f5f9"
                         }}
                         onClick={() => fetchEmployeeMasters(1)}
                       >
@@ -4022,7 +4077,7 @@ const AdminMasters = () => {
                     gap: "1.25rem",
                   }}
                 >
-                  {getCurrentProtocols().map((proto) => (
+                  {getCurrentProtocols(bulkProject).map((proto) => (
                     <div
                       key={proto.id}
                       onClick={() => {
@@ -4287,7 +4342,7 @@ const AdminMasters = () => {
                           }}
                         >
                           {(
-                            getCurrentProtocols().find(
+                            getCurrentProtocols(bulkProject).find(
                               (p) => p.id === exploringProtocolId,
                             )?.fields || []
                           ).map((f) => (
@@ -4320,6 +4375,86 @@ const AdminMasters = () => {
                           exact sequence for clinical integration.
                         </p>
                       </div>
+
+                      <div
+                        style={{
+                          marginTop: "1.5rem",
+                          padding: "1.25rem",
+                          background: "#fff",
+                          borderRadius: "18px",
+                          border: "1.5px solid #eef2ff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                        onClick={() => setBulkMode(bulkMode === "OVERWRITE" ? "INCREMENT" : "OVERWRITE")}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                           <div style={{ 
+                             width: "44px", 
+                             height: "44px", 
+                             borderRadius: "12px", 
+                             background: bulkMode === "INCREMENT" ? "rgba(16, 185, 129, 0.1)" : "rgba(99, 102, 241, 0.1)",
+                             display: "flex",
+                             alignItems: "center",
+                             justifyContent: "center",
+                             transition: "all 0.3s"
+                           }}>
+                              {bulkMode === "INCREMENT" ? <Plus size={22} color="#10b981" /> : <RotateCcw size={20} color="#6366f1" />}
+                           </div>
+                           <div>
+                              <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
+                                 {bulkMode === "INCREMENT" ? "Add to Existing Stock" : "Overwrite Current Data"}
+                              </p>
+                              <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, margin: 0 }}>
+                                 {bulkMode === "INCREMENT" ? "Increments quantity for existing medicine codes" : "Replaces all data fields for existing codes"}
+                              </p>
+                           </div>
+                        </div>
+                        <div style={{ 
+                          width: "52px", 
+                          height: "28px", 
+                          background: bulkMode === "INCREMENT" ? "#10b981" : "#cbd5e1",
+                          borderRadius: "20px",
+                          position: "relative",
+                          transition: "all 0.3s"
+                        }}>
+                           <div style={{ 
+                             width: "20px", 
+                             height: "20px", 
+                             background: "white", 
+                             borderRadius: "50%", 
+                             position: "absolute",
+                             top: "4px",
+                             left: bulkMode === "INCREMENT" ? "28px" : "4px",
+                             transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                             boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                           }} />
+                        </div>
+                      </div>
+
+                      {bulkMode === "INCREMENT" && (
+                        <div style={{
+                          marginTop: "1.25rem",
+                          padding: "1rem",
+                          background: "#fffbeb",
+                          borderRadius: "14px",
+                          border: "1px solid #fde68a",
+                          display: "flex",
+                          gap: "0.75rem",
+                          alignItems: "flex-start"
+                        }}>
+                          <AlertCircle size={18} color="#b45309" style={{ marginTop: "2px" }} />
+                          <div>
+                            <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "#92400e", margin: "0 0 2px 0" }}>Caution: Refill Mode Active</p>
+                            <p style={{ fontSize: "0.675rem", fontWeight: 600, color: "#b45309", margin: 0, opacity: 0.9 }}>
+                              This will add quantities to current stock. To avoid double-entry, ensure this file hasn't been uploaded before.
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       <div
                         style={{
@@ -4423,7 +4558,7 @@ const AdminMasters = () => {
                         }}
                       >
                         Successfully integrated {bulkStatus.success}{" "}
-                        {getCurrentProtocols().find(
+                        {getCurrentProtocols(bulkProject).find(
                           (p) => p.id === exploringProtocolId,
                         )?.name || "records"}
                         .
@@ -4490,7 +4625,8 @@ const AdminMasters = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showSchemaModal && createPortal(

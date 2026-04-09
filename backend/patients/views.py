@@ -31,8 +31,37 @@ class ProjectViewSet(viewsets.ModelViewSet):
         ProjectCategoryMapping.objects.filter(project=project).delete()
         for cat in categories:
             ProjectCategoryMapping.objects.create(project=project, category=cat)
-        log_action(request.user, 'Governance', 'Sync Mappings', f"Synchronized mappings for project {project.name}")
-        return Response({"status": "Mappings synchronized."})
+            
+            # Auto-provision system registries based on mapping
+            if cat == 'EMPLOYEE':
+                RegistryType.objects.get_or_create(
+                    project=project,
+                    type_category='PERSONNEL_PRIMARY',
+                    defaults={
+                        'name': 'Unified Master Registry',
+                        'slug': 'employee_master',
+                        'description': 'Direct staff and family dependency uploads (Unified Protocol)',
+                        'coverage': 'ENTIRE ECOSYSTEM',
+                        'icon': 'Users',
+                        'color': '#6366f1'
+                    }
+                )
+            elif cat == 'FAMILY':
+                RegistryType.objects.get_or_create(
+                    project=project,
+                    type_category='PERSONNEL_DEPENDENT',
+                    defaults={
+                        'name': 'Dependent Registry',
+                        'slug': 'family_member',
+                        'description': 'Family and dependent mapping repository',
+                        'coverage': 'FAMILY UNIT',
+                        'icon': 'UserPlus',
+                        'color': '#10b981'
+                    }
+                )
+
+        log_action(request.user, 'Governance', 'Sync Mappings', f"Synchronized mappings and provisioned default registries for project {project.name}")
+        return Response({"status": "Mappings synchronized and registries provisioned."})
 
 class RegistryTypeViewSet(viewsets.ModelViewSet):
     queryset = RegistryType.objects.all()
@@ -111,6 +140,8 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
     def bulk_upload(self, request):
         registry_type_id = request.data.get('registry_type')
         records = request.data.get('records', [])
+        mode = request.data.get('mode', 'OVERWRITE') # OVERWRITE or INCREMENT
+        
         if not registry_type_id or not records:
             return Response({"error": "Missing registry_type or records"}, status=400)
         
@@ -133,13 +164,13 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         success_count = 0
         for data in records:
             try:
-                # Resolve ucode/primary key - check multiple common variants
+                # Resolve ucode/primary key
                 ucode = data.get('ucode') or data.get('card_no') or data.get('item_code') or next(iter(data.values()))
                 name = data.get('name') or data.get('item_name') or data.get('label') or ""
                 
                 # Case-insensitive mapping of CSV headers to schema slugs
                 additional = {}
-                slug_map = {s.lower(): s for s in field_slugs} # Map lower -> exact slug
+                slug_map = {s.lower(): s for s in field_slugs} 
                 
                 for key, val in data.items():
                     clean_key = str(key).strip().lower()
@@ -148,22 +179,41 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                     elif key in field_slugs:
                         additional[key] = val
                 
-                RegistryData.objects.update_or_create(
+                qty_input = int(data.get('quantity') or data.get('qty') or 0)
+                cost_input = float(data.get('cost') or data.get('price') or 0.0)
+
+                obj, created = RegistryData.objects.get_or_create(
                     registry_type_id=active_type_id,
                     ucode=str(ucode).strip(),
                     defaults={
                         'name': str(name).strip(),
                         'category': data.get('category') or data.get('item_group', ''),
                         'description': str(data.get('description') or ''),
-                        'quantity': int(data.get('quantity') or data.get('qty') or 0),
-                        'cost': float(data.get('cost') or data.get('price') or 0.0),
+                        'quantity': qty_input,
+                        'cost': cost_input,
                         'additional_fields': additional
                     }
                 )
+
+                if not created:
+                    # Update fields
+                    obj.name = str(name).strip() or obj.name
+                    obj.category = data.get('category') or data.get('item_group', obj.category)
+                    obj.cost = cost_input or obj.cost
+                    obj.additional_fields.update(additional)
+                    
+                    if mode == 'INCREMENT' or mode == 'ADD':
+                        obj.quantity += qty_input
+                    else:
+                        obj.quantity = qty_input
+                    
+                    obj.save()
+
                 success_count += 1
             except Exception as e:
                 print(f"Schema Mapping Error: {e}")
-        log_action(request.user, 'Registry', 'Bulk Upload', f"Imported {success_count} records into registry type {registry_type_id}")
+        
+        log_action(request.user, 'Registry', 'Bulk Upload', f"Processed {success_count} records ({mode}) into registry type {registry_type_id}")
         return Response({"success": success_count})
 
     @action(detail=False, methods=['get'], url_path='all-masters')
