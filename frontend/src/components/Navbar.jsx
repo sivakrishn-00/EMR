@@ -20,7 +20,7 @@ import {
   Moon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { MEDIA_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Navbar = ({ onToggleSidebar, isCollapsed }) => {
@@ -42,6 +42,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null); // { type: 'PATIENT'|'MASTER', data: {} }
+  const [headerProjects, setHeaderProjects] = useState([]);
   const dropdownRef = useRef(null);
   const calendarRef = useRef(null);
   const notifyRef = useRef(null);
@@ -129,6 +130,24 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
       console.error("Notify fail");
     }
   };
+
+  const fetchHeaderProjects = async () => {
+    if (!user?.project) {
+        setHeaderProjects([]);
+        return;
+    }
+    try {
+      const res = await api.get(`patients/project-logos/?project=${user.project}`);
+      const pList = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setHeaderProjects(pList.slice(0, 6)); // Up to 6
+    } catch (err) {
+      setHeaderProjects([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchHeaderProjects();
+  }, [user]);
 
   const markRead = async () => {
     try {
@@ -340,7 +359,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
                 whiteSpace: 'nowrap',
                 lineHeight: 1
               }}>
-                Electronic Medical Records
+                {user?.branding?.project_name || 'Electronic Medical Records'}
               </span>
             </div>
           )}
@@ -348,6 +367,39 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
 
         {/* Right Section: Compacted Actions + Search Utility */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          
+          {/* Dynamic Header Logos (Up to 6 Round Logos) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {headerProjects.map((p) => {
+                const logoSrc = p.image || p.logo;
+                if (!logoSrc) return null;
+                return (
+                  <div 
+                    key={p.id} 
+                    className="logo-round-container"
+                    style={{ 
+                      width: '46px', 
+                      height: '46px', 
+                      borderRadius: '50%', 
+                      overflow: 'hidden', 
+                      border: '2.5px solid white',
+                      background: 'white',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title={p.name}
+                  >
+                    <img src={logoSrc.startsWith('http') ? logoSrc : `${MEDIA_URL}${logoSrc}`} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                );
+            })}
+          </div>
+
           {/* Theme Toggle Utility */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <button
@@ -771,6 +823,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
         .logout-btn { color: #ef4444 !important; }
         .logout-btn:hover { background: #fef2f2 !important; }
         .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1); }
+        .logo-round-container:hover { transform: scale(1.15) translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.15); z-index: 50; }
       `}</style>
     </>
   );

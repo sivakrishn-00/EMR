@@ -1,6 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import LabRequestViewSet, LabResultViewSet, LabTestMasterViewSet, LabSubTestViewSet, LabDepartmentViewSet, LabTestTypeViewSet, LabMachineViewSet, LabMachineDataViewSet
+from .views import (
+    LabRequestViewSet, LabResultViewSet, LabTestMasterViewSet, 
+    LabSubTestViewSet, LabDepartmentViewSet, LabTestTypeViewSet, 
+    LabMachineViewSet, LabMachineDataViewSet, LabProjectBridgeViewSet
+)
 
 router = DefaultRouter()
 router.register(r'requests', LabRequestViewSet, basename='labrequest')
@@ -12,6 +16,7 @@ router.register(r'departments', LabDepartmentViewSet, basename='labdepartment')
 router.register(r'test-types', LabTestTypeViewSet, basename='labtesttype')
 router.register(r'machines', LabMachineViewSet, basename='labmachine')
 router.register(r'machine-data', LabMachineDataViewSet, basename='labmachinedata')
+router.register(r'project-bridge', LabProjectBridgeViewSet, basename='labprojectbridge')
 
 
 urlpatterns = [

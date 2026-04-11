@@ -6,6 +6,10 @@ const API_BASE_URL = isDev
   ? 'http://localhost:8000/api/'           // Terminal 1: Dev Loop
   : `http://${window.location.hostname}:9002/api/`; // Terminal 2: Production Server (9002)
 
+export const MEDIA_URL = isDev
+  ? 'http://localhost:8000'
+  : `http://${window.location.hostname}:9002`;
+
 const api = axios.create({
   baseURL: API_BASE_URL,
 });

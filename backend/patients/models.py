@@ -10,6 +10,10 @@ GENDER_CHOICES = (
 class Project(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
+    logo = models.ImageField(upload_to='project_logos/', blank=True, null=True)
+    primary_color = models.CharField(max_length=20, default='#6366f1')
+    secondary_color = models.CharField(max_length=20, default='#a5b4fc')
+    accent_color = models.CharField(max_length=20, default='#f43f5e')
     use_registry_for_personnel = models.BooleanField(default=False, help_text="Prioritize polymorphic registry for Staff/Family")
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -312,3 +316,15 @@ def delete_family_from_registry(sender, instance, **kwargs):
     if instance.employee:
         full_card_no = f"{instance.employee.card_no}{instance.card_no_suffix}"
         RegistryData.objects.filter(registry_type__project=instance.employee.project, registry_type__type_category='PERSONNEL_DEPENDENT', ucode=full_card_no).delete()
+
+class ProjectLogo(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='header_logos')
+    image = models.ImageField(upload_to='project_header_logos/')
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.project.name} - Logo {self.id}"

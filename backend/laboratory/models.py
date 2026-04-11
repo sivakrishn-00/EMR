@@ -111,6 +111,28 @@ class LabResult(models.Model):
         return f"Result for {self.lab_request}"
 
 
+class LabProjectBridge(models.Model):
+    """
+    Project-Level Sync Governance.
+    Allows one key and one IP whitelist to manage multiple machines in a single Project.
+    """
+    project = models.OneToOneField('patients.Project', on_delete=models.CASCADE, related_name='lab_bridge')
+    sync_key = models.CharField(max_length=100, unique=True, db_index=True, blank=True)
+    allowed_ips = models.JSONField(default=list, blank=True, help_text="List of IPs allowed to sink data for this project")
+    alert_emails = models.TextField(blank=True, null=True, help_text="Comma-separated emails for project-wide alerts")
+    downtime_threshold = models.IntegerField(default=5, help_text="Global threshold for machines in this project")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.sync_key:
+            import secrets
+            self.sync_key = secrets.token_hex(16)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Bridge for {self.project.name}"
+
 # LabAnalyzer and AnalyzerLog removed. Integration is now handled via the Cloud Sync Bridge API.
 
 
@@ -130,16 +152,34 @@ class LabMachine(models.Model):
     # Store a unique hash/slug of the 4 fields for instant lookup
     composite_identity = models.CharField(max_length=255, unique=True, db_index=True)
     
+    sync_key = models.CharField(max_length=100, unique=True, db_index=True, null=True, blank=True, help_text="Unique API key for machine-to-cloud synchronization")
+    
     is_active = models.BooleanField(default=True)
     last_synced_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # ENTERPRISE SECURITY & TELEMETRY
+    allowed_ips = models.JSONField(default=list, blank=True, help_text="List of IPv4/IPv6 addresses authorized for this key")
+    telemetry_data = models.JSONField(default=dict, blank=True, help_text="Real-time performance metrics (count, latency, etc.)")
+    maintenance_mode = models.BooleanField(default=False, help_text="If true, server will send RESET command to attached agent")
+    alert_emails = models.TextField(blank=True, null=True, help_text="Comma-separated emails for downtime alerts")
+    downtime_threshold = models.IntegerField(default=5, help_text="Send alert if no pulse for X minutes")
 
     class Meta:
         verbose_name = "Lab Machine Station"
         unique_together = ('machine_id', 'machine_name', 'lab_id', 'location')
 
+    def save(self, *args, **kwargs):
+        if not self.composite_identity:
+            self.composite_identity = f"{self.machine_id}|{self.machine_name}|{self.lab_id}|{self.location}"
+        if not self.sync_key:
+            import secrets
+            self.sync_key = secrets.token_hex(16)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.machine_name} - {self.lab_id} ({self.project.name})"
+        proj_name = self.project.name if self.project else "UNASSIGNED"
+        return f"{self.machine_name} - {self.lab_id} ({proj_name})"
 
 class LabMachineData(models.Model):
     """
@@ -215,6 +255,7 @@ class LabSyncAudit(models.Model):
     
     # Tracking latency
     received_at = models.DateTimeField(auto_now_add=True)
+    processing_time_ms = models.FloatField(default=0.0)
     
     # Store any specific error messages or metadata
     status_msg = models.TextField(blank=True, null=True)

@@ -3,18 +3,49 @@ from django.utils import timezone
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField
+from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo
 from .serializers import (
     PatientSerializer, EmployeeMasterSerializer, FamilyMemberSerializer,
     ProjectSerializer, ProjectCategoryMappingSerializer, ProjectFieldConfigSerializer,
-    RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer
+    RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer, ProjectLogoSerializer
 )
 from accounts.utils import log_action
 
+class ProjectLogoViewSet(viewsets.ModelViewSet):
+    queryset = ProjectLogo.objects.all().order_by('order')
+    serializer_class = ProjectLogoSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ProjectLogo.objects.all().order_by('order')
+        
+        # Admin can filter
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            return queryset.filter(project_id=project_id)
+            
+        # Non-admin only see their own project logos
+        if user.is_authenticated:
+            is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+            if not is_admin and user.project:
+                return queryset.filter(project=user.project)
+        
+        return queryset
+
 class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = Project.objects.all().order_by('name')
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Project.objects.all().order_by('name')
+        user = self.request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        if not is_admin and user.project:
+            queryset = queryset.filter(id=user.project.id)
+            
+        return queryset
 
     def perform_create(self, serializer):
         project = serializer.save()
@@ -75,9 +106,25 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response({"status": "Mappings synchronized and registries provisioned."})
 
 class RegistryTypeViewSet(viewsets.ModelViewSet):
-    queryset = RegistryType.objects.all()
     serializer_class = RegistryTypeSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = RegistryType.objects.all()
+        user = self.request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        project_id = self.request.query_params.get('project')
+        
+        if not is_admin:
+            if user.project:
+                queryset = queryset.filter(project=user.project)
+            else:
+                queryset = queryset.none()
+        elif project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset
 
 class RegistryFieldViewSet(viewsets.ModelViewSet):
     queryset = RegistryField.objects.all()
@@ -128,7 +175,18 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
 
         # Project Isolation: Filter by associated project
         project_id = self.request.query_params.get('project')
-        if project_id and project_id != 'null' and project_id != 'undefined':
+        
+        user = self.request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        if not is_admin:
+            if user.project:
+                queryset = queryset.filter(registry_type__project=user.project)
+            else:
+                # If no project, they can only see what they created if possible, 
+                # but RegistryData is usually tied to projects.
+                queryset = queryset.none()
+        elif project_id:
             queryset = queryset.filter(registry_type__project_id=project_id)
 
         # Workspace Search: Filter by primary identifiers (ucode/name)
@@ -141,11 +199,25 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='all-masters')
     def all_masters(self, request):
-        """Provides a master list of all clinical registries for Navbar/Dashboard integration."""
+        """Provides a master list of all clinical registries filtered by project context."""
         from .models import RegistryType
         from .serializers import RegistryTypeSerializer
-        types = RegistryType.objects.all()
-        return Response(RegistryTypeSerializer(types, many=True).data)
+        
+        user = request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        project_id = request.query_params.get('project')
+        
+        queryset = RegistryType.objects.all()
+        
+        if not is_admin:
+            if user.project:
+                queryset = queryset.filter(project=user.project)
+            else:
+                queryset = queryset.none()
+        elif project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return Response(RegistryTypeSerializer(queryset, many=True).data)
 
     @action(detail=False, methods=['post'], url_path='bulk-upload')
     def bulk_upload(self, request):
@@ -227,13 +299,6 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         log_action(request.user, 'Registry', 'Bulk Upload', f"Processed {success_count} records ({mode}) into registry type {registry_type_id}")
         return Response({"success": success_count})
 
-    @action(detail=False, methods=['get'], url_path='all-masters')
-    def all_masters(self, request):
-        """Provides a master list of all clinical registries for Navbar/Dashboard integration."""
-        from .models import RegistryType
-        from .serializers import RegistryTypeSerializer
-        types = RegistryType.objects.all()
-        return Response(RegistryTypeSerializer(types, many=True).data)
 
 class ProjectCategoryMappingViewSet(viewsets.ModelViewSet):
     queryset = ProjectCategoryMapping.objects.all()
@@ -374,12 +439,29 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='all-masters')
     def all_masters(self, request):
-        """Returns all employee masters with their nested family members for unified search in Navbar."""
+        """Returns employee masters filtered by project for unified search in Navbar."""
         from .models import EmployeeMaster
         from .serializers import EmployeeMasterSerializer
-        # We prefetch family_members to avoid N+1 queries in the Navbar search
-        employees = EmployeeMaster.objects.all().prefetch_related('family_members')
-        return Response(EmployeeMasterSerializer(employees, many=True).data)
+        
+        user = request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        # Base queryset
+        queryset = EmployeeMaster.objects.all().prefetch_related('family_members')
+        
+        # Enforce Isolation
+        if not is_admin:
+            if user.project:
+                queryset = queryset.filter(project=user.project)
+            else:
+                queryset = queryset.none()
+        else:
+            # Admins can filter by project param
+            project_id = request.query_params.get('project')
+            if project_id:
+                queryset = queryset.filter(project_id=project_id)
+        
+        return Response(EmployeeMasterSerializer(queryset, many=True).data)
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     queryset = FamilyMember.objects.all()
@@ -531,9 +613,17 @@ class PatientViewSet(viewsets.ModelViewSet):
         queryset = Patient.objects.all().order_by('-created_at')
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        project_param = self.request.query_params.get('project')
+        
         if not is_admin:
-            if user.project: queryset = queryset.filter(Q(project=user.project) | Q(employee_master__project=user.project))
-            else: queryset = queryset.filter(registered_by=user)
+            if user.project: 
+                queryset = queryset.filter(Q(project=user.project) | Q(employee_master__project=user.project))
+            else: 
+                queryset = queryset.filter(registered_by=user)
+        elif project_param:
+            queryset = queryset.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+            
         return queryset
 
     @action(detail=False, methods=['get'])

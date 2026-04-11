@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     PatientViewSet, EmployeeMasterViewSet, FamilyMemberViewSet,
     ProjectViewSet, ProjectCategoryMappingViewSet, ProjectFieldConfigViewSet,
-    RegistryTypeViewSet, RegistryDataViewSet, RegistryFieldViewSet, RegistryReportView
+    RegistryTypeViewSet, RegistryDataViewSet, RegistryFieldViewSet, RegistryReportView, ProjectLogoViewSet
 )
 
 router = DefaultRouter()
@@ -16,6 +16,7 @@ router.register(r'registry-data', RegistryDataViewSet, basename='registry-data')
 router.register(r'project-category-mappings', ProjectCategoryMappingViewSet, basename='project-category-mapping')
 router.register(r'project-field-configs', ProjectFieldConfigViewSet, basename='project-field-config')
 router.register(r'registry-fields', RegistryFieldViewSet, basename='registry-field')
+router.register(r'project-logos', ProjectLogoViewSet, basename='project-logo')
 router.register(r'reports', RegistryReportView, basename='report')
 
 urlpatterns = [

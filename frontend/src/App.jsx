@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { MEDIA_URL } from './services/api';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
@@ -17,7 +18,7 @@ import ProjectManagement from './pages/ProjectManagement';
 import RoleManagement from './pages/RoleManagement';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
-import LabMachineRegistry from './pages/LabMachineRegistry'; // Project Linking Hub
+import BridgeHub from './pages/BridgeHub';
 import { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children, requiredModule }) => {
@@ -127,10 +128,39 @@ const MainLayout = ({ children }) => {
   );
 };
 
+const ThemedApp = ({ children }) => {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.branding) {
+      const { primary_color, secondary_color, accent_color } = user.branding;
+      const root = document.documentElement;
+      root.style.setProperty('--primary', primary_color);
+      root.style.setProperty('--secondary', secondary_color);
+      root.style.setProperty('--accent', accent_color);
+      
+      // Compute helper colors for gradients and lights
+      root.style.setProperty('--primary-dark', primary_color + 'dd'); 
+      root.style.setProperty('--primary-light', primary_color + '44');
+    } else {
+      // System defaults
+      const root = document.documentElement;
+      root.style.setProperty('--primary', '#6366f1');
+      root.style.setProperty('--secondary', '#10b981');
+      root.style.setProperty('--accent', '#f59e0b');
+      root.style.setProperty('--primary-dark', '#4f46e5');
+      root.style.setProperty('--primary-light', '#818cf8');
+    }
+  }, [user]);
+
+  return children;
+};
+
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <ThemedApp>
+        <BrowserRouter>
         <Toaster position="top-right" 
           toastOptions={{
             style: {
@@ -240,10 +270,10 @@ function App() {
           } />
 
 
-          <Route path="/lab-machines" element={
+          <Route path="/bridge-hub" element={
             <MainLayout>
-              <ProtectedRoute requiredModule="/lab-machines">
-                <LabMachineRegistry />
+              <ProtectedRoute requiredModule="/bridge-hub">
+                <BridgeHub />
               </ProtectedRoute>
             </MainLayout>
           } />
@@ -267,6 +297,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+      </ThemedApp>
     </AuthProvider>
   );
 }

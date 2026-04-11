@@ -1,8 +1,13 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachine, LabMachineData, LabSyncAudit
-from .serializers import LabRequestSerializer, LabResultSerializer, LabTestMasterSerializer, LabSubTestSerializer, LabDepartmentSerializer, LabTestTypeSerializer, LabMachineDataSerializer
+import time
+from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachine, LabMachineData, LabSyncAudit, LabProjectBridge
+from .serializers import (
+    LabRequestSerializer, LabResultSerializer, LabTestMasterSerializer, 
+    LabSubTestSerializer, LabDepartmentSerializer, LabTestTypeSerializer, 
+    LabMachineSerializer, LabMachineDataSerializer, LabProjectBridgeSerializer
+)
 
 from accounts.models import Notification
 from patients.models import Patient
@@ -10,6 +15,8 @@ from accounts.utils import log_action
 from django.core.cache import cache
 from django.utils import timezone
 import json
+import secrets
+import hashlib
 
 def notify_team(project, roles, title, message):
     from accounts.models import User
@@ -122,27 +129,76 @@ class LabRequestViewSet(viewsets.ModelViewSet):
         import hashlib, json
         from django_redis import get_redis_connection
         
-        batch_fingerprint = hashlib.sha256(json.dumps(results_batch[:5]).encode()).hexdigest()
-        redis_conn = get_redis_connection("default")
-        
-        if redis_conn.get(f"EMR_IDEMPOTENCY_{batch_fingerprint}"):
-            return Response({
-                "status": "Success",
-                "message": "Duplicate batch ignored (already processed)."
-            }, status=status.HTTP_200_OK)
+        batch_id = None
+        try:
+            batch_fingerprint = hashlib.sha256(json.dumps(results_batch[:5]).encode()).hexdigest()
+            redis_conn = get_redis_connection("default")
+            
+            if redis_conn.get(f"EMR_IDEMPOTENCY_{batch_fingerprint}"):
+                return Response({
+                    "status": "Success",
+                    "message": "Duplicate batch ignored (already processed)."
+                }, status=status.HTTP_200_OK)
 
-        # Set 2-hour window for idempotency
-        redis_conn.set(f"EMR_IDEMPOTENCY_{batch_fingerprint}", "1", ex=7200)
+            # Set 2-hour window for idempotency
+            redis_conn.set(f"EMR_IDEMPOTENCY_{batch_fingerprint}", "1", ex=7200)
+        except Exception as redis_err:
+            request.redis_failed = True
+            print(f"CRITICAL: Redis Connection Failed. Idempotency check bypassed. Error: {redis_err}")
 
         # 2. Priority Routing: Move heavy data to 'bulk' lane
         from .tasks import process_sync_batch
-        process_sync_batch.apply_async(args=[results_batch], queue='bulk')
+        
+        # Identity Context
+        machine = getattr(request, 'sync_machine', None)
+        project = getattr(request, 'sync_project', None)
+        project_id = project.id if project else None
+        
+        # TELEMETRY START
+        start_time = time.time()
+        
+        try:
+            process_sync_batch.apply_async(
+                args=[results_batch], 
+                kwargs={'forced_project_id': project_id, 'machine_pk': machine.id if machine else None},
+                queue='bulk'
+            )
+        except Exception as celery_err:
+            request.redis_failed = True
+            print(f"WARN: Celery/Redis Broker Unreachable. Executing Task Synchronously. Error: {celery_err}")
+            # SYNC FALLBACK: Process immediately if background queue is down
+            process_sync_batch(results_batch, forced_project_id=project_id, machine_pk=machine.id if machine else None)
+        
+        # Update Telemetry & Heartbeat
+        latency = (time.time() - start_time) * 1000
+        if machine:
+            telemetry = machine.telemetry_data or {}
+            telemetry['total_batches'] = telemetry.get('total_batches', 0) + 1
+            telemetry['total_records'] = telemetry.get('total_records', 0) + len(results_batch)
+            
+            # Simple moving average for latency visualization
+            old_avg = telemetry.get('avg_latency_ms', 0)
+            telemetry['avg_latency_ms'] = round((old_avg * 0.8) + (latency * 0.2), 2)
+            telemetry['last_ip'] = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))
+            
+            machine.telemetry_data = telemetry
+            machine.last_synced_at = timezone.now()
+            machine.save(update_fields=['telemetry_data', 'last_synced_at'])
 
-        return Response({
-            "status": "Accepted",
-            "batch_id": batch_fingerprint,
-            "message": "Platinum bulk lane assigned. Data mirroring in progress."
-        }, status=status.HTTP_202_ACCEPTED)
+        response_payload = {
+            "status": "Success", 
+            "message": f"Processed {len(results_batch)} records.",
+            "mode": "ASYNC" if not getattr(request, 'redis_failed', False) else "SYNC_FALLBACK",
+            "latency_ms": round(latency, 2)
+        }
+
+        # SELF-HEALING LOGIC: Server-side maintenance override
+        if machine and machine.maintenance_mode:
+            response_payload["cmd"] = "RESET"
+            machine.maintenance_mode = False
+            machine.save(update_fields=['maintenance_mode'])
+
+        return Response(response_payload, status=status.HTTP_202_ACCEPTED)
 
 
 
@@ -172,11 +228,15 @@ class LabMachineViewSet(viewsets.ModelViewSet):
     Used to link unique machine combinations to specific Projects.
     """
     queryset = LabMachine.objects.all()
-    serializer_class = None # Define if needed, using raw for now
+    serializer_class = LabMachineSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return LabMachine.objects.all().select_related('project')
+        queryset = LabMachine.objects.all().select_related('project')
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset
 
     @action(detail=False, methods=['get'], url_path='registry-list', permission_classes=[permissions.AllowAny])
     def registry_list(self, request):
@@ -198,6 +258,7 @@ class LabMachineViewSet(viewsets.ModelViewSet):
                 "project_id": m.project_id, # Added for frontend dropdown select
                 "project_name": m.project.name if m.project else "UNASSIGNED",
                 "composite_identity": m.composite_identity,
+                "sync_key": m.sync_key,
                 "last_pulse": m.last_synced_at.isoformat() if m.last_synced_at else None,
                 "is_online": (timezone.now() - m.last_synced_at).total_seconds() < 90 if m.last_synced_at else False
             })
@@ -205,7 +266,30 @@ class LabMachineViewSet(viewsets.ModelViewSet):
         print(f"DELIVERING {len(results)} MACHINES TO DROPDOWN")
         return Response(results, content_type='application/json')
 
-    @action(detail=False, methods=['post'], url_path='link_discovery', permission_classes=[permissions.AllowAny])
+    @action(detail=True, methods=['post'], url_path='generate-key')
+    def generate_key(self, request, pk=None):
+        """
+        SECURITY: Provision a unique cryptographically secure 32-char token for this lab station.
+        """
+        machine = self.get_object()
+        if not machine.sync_key:
+            machine.sync_key = secrets.token_hex(16) # 32 chars
+            machine.save()
+            return Response({"status": "Key Generated", "sync_key": machine.sync_key})
+        return Response({"status": "Key exists", "sync_key": machine.sync_key}, status=400)
+
+    @action(detail=True, methods=['post'], url_path='rotate-key')
+    def rotate_key(self, request, pk=None):
+        """
+        GOVERNANCE: Regenerate a key (Revokes the old one immediately).
+        """
+        machine = self.get_object()
+        new_key = secrets.token_hex(16)
+        machine.sync_key = new_key
+        machine.save()
+        return Response({"status": "Key Rotated Successfully", "sync_key": new_key})
+
+    @action(detail=False, methods=['post'], url_path='link_discovery')
     def link_discovery(self, request):
         """
         ACTION: Links a specific Machine Combination to a Project.
@@ -245,12 +329,22 @@ class LabMachineViewSet(viewsets.ModelViewSet):
                 lab_id=machine.lab_id,
                 location=machine.location
             ).update(project_id=target_project_id)
+
+            # 4. Sibling Discovery: Link all other detached machines at this exact location
+            # This helps auto-configure multiple machines (WBC, Biochemistry, etc.) at the same site.
+            siblings_linked = 0
+            if target_project_id:
+                siblings_linked = LabMachine.objects.filter(
+                    lab_id=machine.lab_id,
+                    location=machine.location,
+                    project__isnull=True
+                ).update(project_id=target_project_id)
             
             p_name = machine.project.name if machine.project else "UNASSIGNED"
             
             return Response({
                 "status": "Success",
-                "message": f"Associated with {p_name}. {updated_count} historic records updated."
+                "message": f"Associated with {p_name}. {updated_count} records updated. {siblings_linked} sibling machines linked."
             })
         except Exception as e:
             return Response({"error": str(e)}, status=500)
@@ -404,4 +498,29 @@ class LabMachineDataViewSet(viewsets.ReadOnlyModelViewSet):
         if patient_id:
             queryset = queryset.filter(patient_id=patient_id)
         return queryset
+
+class LabProjectBridgeViewSet(viewsets.ModelViewSet):
+    """
+    GOVERNANCE: Unified access for Project-Wide Sync Keys and Security Policies.
+    """
+    queryset = LabProjectBridge.objects.all()
+    serializer_class = LabProjectBridgeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='get-by-project')
+    def get_by_project(self, request):
+        project_id = request.query_params.get('project')
+        if not project_id:
+            return Response({"error": "Project ID required"}, status=400)
+        
+        bridge, created = LabProjectBridge.objects.get_or_create(project_id=project_id)
+        serializer = self.get_serializer(bridge)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='rotate-key')
+    def rotate_key(self, request, pk=None):
+        bridge = self.get_object()
+        bridge.sync_key = secrets.token_hex(16)
+        bridge.save()
+        return Response({"sync_key": bridge.sync_key})
 

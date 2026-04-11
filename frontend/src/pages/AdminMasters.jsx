@@ -32,13 +32,18 @@ import {
   Edit2,
   Power,
   Clock,
-  ShoppingCart
+  ShoppingCart,
+  Radio,
+  Key,
+  Shuffle
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
 const AdminMasters = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [employeeMasters, setEmployeeMasters] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -144,6 +149,20 @@ const AdminMasters = () => {
   const [isEditingLabTest, setIsEditingLabTest] = useState(false);
   const [isEditingSubTest, setIsEditingSubTest] = useState(false);
   const [expandedLabTests, setExpandedLabTests] = useState({});
+
+  // Lab Machine Registry State
+  const [labMachines, setLabMachines] = useState([]);
+  const [isLoadingMachines, setIsLoadingMachines] = useState(false);
+  const [showMachineModal, setShowMachineModal] = useState(false);
+  const [machineForm, setMachineForm] = useState({
+    machine_id: "",
+    machine_name: "",
+    lab_id: "",
+    location: "",
+    is_active: true
+  });
+  const [currentMachine, setCurrentMachine] = useState(null);
+  const [isEditingMachine, setIsEditingMachine] = useState(false);
 
   const [labTestForm, setLabTestForm] = useState({
     name: "",
@@ -267,6 +286,8 @@ const AdminMasters = () => {
       fetchLabTests();
       fetchLabDepartments();
       fetchLabTestTypes();
+    } else if (activeBoard === "MACHINES") {
+      fetchLabMachines();
     } else if (activeBoard === "STATS") {
       fetchDashboardStats();
     } else {
@@ -443,6 +464,74 @@ const AdminMasters = () => {
   const handleDeleteSubTest = (id, name) => {
     setDeleteTarget({ id, type: 'SUB', label: name });
     setShowDeleteModal(true);
+  };
+
+  const fetchLabMachines = async () => {
+    setIsLoadingMachines(true);
+    try {
+      const res = await api.get(`laboratory/machines/?project=${selectedProject || ""}`);
+      setLabMachines(res.data.results || res.data);
+    } catch (err) {
+      toast.error("Failed to fetch lab machines");
+    } finally {
+      setIsLoadingMachines(false);
+    }
+  };
+
+  const handleMachineSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (!selectedProject) return toast.error("Select project first");
+      
+      const data = { 
+        ...machineForm, 
+        project_id: selectedProject,
+        // For backwards compatibility or direct machine model fields
+        machine_name: machineForm.machine_name,
+        machine_id: machineForm.machine_id,
+        lab_id: machineForm.lab_id,
+        location: machineForm.location
+      };
+
+      if (isEditingMachine && currentMachine) {
+        await api.put(`laboratory/machines/${currentMachine.id}/`, { ...data, project: selectedProject });
+        toast.success("Machine Registry Updated");
+      } else {
+        // Use link_discovery for creation as it handles composite_identity and retroactive data mirroring
+        await api.post("laboratory/machines/link_discovery/", data);
+        toast.success("Machine Registered & Linked Successfully");
+      }
+      setShowMachineModal(false);
+      fetchLabMachines();
+    } catch (err) {
+      toast.error("Error managing machine registry");
+    }
+  };
+
+  const handleGenerateKey = async (machineId) => {
+    try {
+      const res = await api.post(`laboratory/machines/${machineId}/generate-key/`);
+      toast.success("New Sync Key Generated");
+      fetchLabMachines();
+    } catch (err) {
+      toast.error("Failed to generate key");
+    }
+  };
+
+  const handleRotateKey = async (machineId) => {
+    if (!window.confirm("Rotating the key will immediately disconnect the current sync agent. Proceed?")) return;
+    try {
+      const res = await api.post(`laboratory/machines/${machineId}/rotate-key/`);
+      toast.success("Sync Key Rotated Successfully");
+      fetchLabMachines();
+    } catch (err) {
+      toast.error("Failed to rotate key");
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard!");
   };
 
   const fetchProjects = async () => {
@@ -1456,6 +1545,27 @@ const AdminMasters = () => {
                 <Activity size={16} /> Lab Masters
               </button>
 
+              <button
+                className="btn"
+                style={{
+                  background: activeBoard === "MACHINES" ? "var(--background)" : "transparent",
+                  color: activeBoard === "MACHINES" ? "var(--primary)" : "var(--text-muted)",
+                  boxShadow: activeBoard === "MACHINES" ? "var(--shadow-sm)" : "none",
+                  fontSize: "0.75rem",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
+                  transition: "all 0.2s",
+                }}
+                onClick={() => {
+                  setActiveBoard("MACHINES");
+                  fetchLabMachines();
+                }}
+              >
+                <Radio size={16} /> Sync Bridge
+              </button>
+
+
               <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
 
               <button
@@ -1938,6 +2048,125 @@ const AdminMasters = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            ) : activeBoard === "MACHINES" ? (
+              <div className="fade-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Regional Sync Bridge</h3>
+                        <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Configure project linking and monitoring for {projects.find(p => String(p.id) === String(selectedProject))?.name} hardware</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button 
+                            className="btn btn-secondary"
+                            onClick={() => navigate('/bridge-hub')}
+                            style={{ borderRadius: '12px', padding: '0.75rem 1.25rem', fontSize: '0.75rem' }}
+                        >
+                            <Radio size={16} /> Global Hub
+                        </button>
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={() => {
+                              setIsEditingMachine(false);
+                              setMachineForm({ machine_id: "", machine_name: "", lab_id: "", location: "", is_active: true });
+                              setShowMachineModal(true);
+                            }}
+                            style={{ background: 'var(--primary)', borderRadius: '12px', padding: '0.75rem 1.5rem' }}
+                        >
+                            <Plus size={18} /> Register Station
+                        </button>
+                    </div>
+                </div>
+
+                {isLoadingMachines ? (
+                  <div style={{ padding: '8rem', textAlign: 'center', background: 'white', borderRadius: '32px' }}>
+                      <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
+                      <p style={{ fontWeight: 800, color: '#94a3b8' }}>Syncing registry states...</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1.25rem' }}>
+                      {labMachines.map(m => (
+                        <div key={m.id} className="card" style={{ 
+                            padding: '1.5rem', 
+                            borderRadius: '24px', 
+                            border: '1px solid #eef2f6', 
+                            background: 'linear-gradient(to bottom right, #ffffff, #f9fafb)',
+                            position: 'relative',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative' }}>
+                                        <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '16px', border: m.is_online ? '2.5px solid #10b981' : '2px solid #e2e8f0' }}>
+                                            <Radio size={24} color={m.is_online ? '#10b981' : '#94a3b8'} />
+                                        </div>
+                                        {m.is_online && <div style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, background: '#10b981', borderRadius: '50%', border: '3px solid white', animation: 'pulse 2s infinite' }} />}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#1e293b' }}>{m.machine_name || m.name}</div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{m.lab_id || 'LOCAL_GW'} • {m.location || 'SITE'}</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button 
+                                      onClick={() => { setCurrentMachine(m); setMachineForm({...m}); setIsEditingMachine(true); setShowMachineModal(true); }}
+                                      style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#f1f5f9', color: '#64748b' }}
+                                    >
+                                      <Edit2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '18px', border: '1px solid #f1f5f9', marginBottom: '1.25rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Session Health</span>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: m.is_online ? '#059669' : '#eab308' }}>
+                                        {m.is_online ? 'ACTIVE SIGNAL' : 'SIGNAL IDLE'}
+                                    </span>
+                                </div>
+                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{ width: m.is_online ? '100%' : '30%', height: '100%', background: m.is_online ? '#10b981' : '#f59e0b', transition: 'width 1s' }} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>TELEMETRY</div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#6366f1' }}>{m.telemetry_data?.total_records || 0} Records</div>
+                                </div>
+                                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>LAST PULSE</div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>{m.last_pulse ? new Date(m.last_pulse).toLocaleTimeString() : '---'}</div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '0.5rem', background: '#f0f9ff', padding: '0.75rem', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 800 }}>
+                                    Security Managed Centrally
+                                </div>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.65rem', background: '#0284c7', border: 'none', borderRadius: '8px' }}
+                                    onClick={() => navigate('/bridge-hub')}
+                                >
+                                    View Project Master Key
+                                </button>
+                            </div>
+                        </div>
+                      ))}
+                      {labMachines.length === 0 && (
+                        <div style={{ gridColumn: '1/-1', padding: '8rem 2rem', textAlign: 'center', background: '#ffffff', borderRadius: '32px', border: '2px dashed #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                            <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                <Radio size={32} />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '0.25rem' }}>No Bridge Data Available</h3>
+                                <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>Establishing a sync bridge is required to begin ingestion for this project workspace. Please ensure your local agents are configured with the correct project key.</p>
+                            </div>
+                        </div>
+                      )}
+                  </div>
+                )}
               </div>
             ) : activeBoard === "DIAGNOSTICS" ? (
               <div className="fade-in">
@@ -5624,6 +5853,55 @@ const AdminMasters = () => {
         </div>,
         document.body
       )}
+      {showMachineModal && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
+          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ padding: '0.6rem', background: 'linear-gradient(135deg, #6366f1 0%, #44403c 100%)', borderRadius: '12px' }}>
+                     <Radio size={20} color="white" />
+                  </div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>{isEditingMachine ? 'Edit Station' : 'Register Station'}</h2>
+               </div>
+               <button onClick={() => setShowMachineModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 <X size={18} color="#64748b" />
+               </button>
+            </div>
+            <form onSubmit={handleMachineSubmit}>
+              <div style={{ display: 'grid', gap: '1.25rem' }}>
+                <div>
+                   <label>Station ID (e.g. CBC_01)</label>
+                   <input type="text" className="form-control" placeholder="Unique machine identifier" required value={machineForm.machine_id} onChange={e => setMachineForm({ ...machineForm, machine_id: e.target.value })} />
+                </div>
+                <div>
+                   <label>Station Name (e.g. CBC Machine 1)</label>
+                   <input type="text" className="form-control" placeholder="Display name" required value={machineForm.machine_name} onChange={e => setMachineForm({ ...machineForm, machine_name: e.target.value })} />
+                </div>
+                <div>
+                   <label>Lab Room / ID</label>
+                   <input type="text" className="form-control" placeholder="e.g. Lab Room 1" required value={machineForm.lab_id} onChange={e => setMachineForm({ ...machineForm, lab_id: e.target.value })} />
+                </div>
+                <div>
+                   <label>Location / Facility</label>
+                   <input type="text" className="form-control" placeholder="e.g. Area Hospital" required value={machineForm.location} onChange={e => setMachineForm({ ...machineForm, location: e.target.value })} />
+                </div>
+                <div 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', padding: '1rem 1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s' }} 
+                   onClick={() => setMachineForm({ ...machineForm, is_active: !machineForm.is_active })}
+                >
+                   <input type="checkbox" id="m-active" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={machineForm.is_active} readOnly />
+                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#334155', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Station</label>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: '#1e293b' }}>
+                {isEditingMachine ? 'Update Station Profile' : 'Register in Bridge Hub'}
+              </button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showLabTestModal && createPortal(
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
           <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
@@ -5683,9 +5961,12 @@ const AdminMasters = () => {
                   <textarea className="form-control" style={{ height: '80px', padding: '10px' }} value={labTestForm.description} onChange={e => setLabTestForm({ ...labTestForm, description: e.target.value })} />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                   <input type="checkbox" id="lab-active" checked={labTestForm.is_active} onChange={e => setLabTestForm({ ...labTestForm, is_active: e.target.checked })} />
-                   <label htmlFor="lab-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569', marginBottom: 0 }}>Active Registry Entry</label>
+                <div 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s' }} 
+                   onClick={() => setLabTestForm({ ...labTestForm, is_active: !labTestForm.is_active })}
+                >
+                   <input type="checkbox" id="lab-active" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={labTestForm.is_active} readOnly />
+                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#334155', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Entry</label>
                 </div>
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: isEditingLabTest ? '#2563eb' : 'var(--primary)' }}>{isEditingLabTest ? 'Update Test Master' : 'Save Test Master'}</button>
@@ -5892,6 +6173,7 @@ const AdminMasters = () => {
         .btn-secondary { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }
         .btn-secondary:hover { background: #e2e8f0; }
         .card { background: white; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); }
+        @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
       `}</style>
     </>
   );

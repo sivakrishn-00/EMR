@@ -16,7 +16,8 @@ import {
   Database,
   ShieldCheck,
   BarChart3,
-  HardDrive
+  HardDrive,
+  Radio
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -41,7 +42,6 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
 
   const adminItems = [
     { name: 'Admin Masters', icon: Database, path: '/admin-masters' },
-    { name: 'Project Linking', icon: HardDrive, path: '/lab-machines' },
     { name: 'Project Management', icon: Settings, path: '/projects' },
     { name: 'Role Management', icon: ShieldCheck, path: '/roles' },
     { name: 'User Management', icon: UserCheck, path: '/users' },
@@ -57,50 +57,34 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
   return (
     <>
       <div className={`sidebar-container ${isOpen ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
-        <div style={{ height: 'var(--header-height)', display: 'flex', alignItems: 'center', padding: '0 1rem', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+        <div style={{ height: 'var(--header-height)', display: 'flex', alignItems: 'center', padding: '0 1rem', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', width: '100%' }}>
-            <div style={{
-              background: 'white',
-              padding: '4px',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-              minWidth: isCollapsed ? '32px' : '36px'
-            }}>
-              <img
-                src="/white_bavya.jpg"
-                alt="Logo"
-                style={{
-                  height: isCollapsed ? '20px' : '24px',
-                  objectFit: 'contain',
-                  transition: 'all 0.3s'
-                }}
-              />
-            </div>
             {!isCollapsed && (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{
                   color: 'white',
                   fontWeight: 900,
-                  fontSize: '0.75rem',
+                  fontSize: '0.9rem',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  lineHeight: 1
+                  lineHeight: 1,
+                  color: 'var(--primary)'
                 }}>
-                  EMR
+                  {user?.branding?.project_name || 'EMR'}
                 </span>
                 <span style={{
                   color: '#94a3b8',
                   fontWeight: 600,
-                  fontSize: '0.6rem',
+                  fontSize: '0.65rem',
                   letterSpacing: '0.02em',
-                  marginTop: '2px'
+                  marginTop: '4px'
                 }}>
                   Electronic Medical Records
                 </span>
               </div>
+            )}
+            {isCollapsed && (
+              <div style={{ height: '24px' }}></div>
             )}
           </div>
         </div>

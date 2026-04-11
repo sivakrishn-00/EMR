@@ -76,7 +76,7 @@ const Dashboard = () => {
       <header style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-0.025em', color: 'var(--text-main)' }}>
-            Hello, System
+            Hello, {user?.first_name || user?.username || 'System'}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', color: 'var(--text-muted)' }}>
             <CalendarIcon size={12} />
@@ -92,9 +92,9 @@ const Dashboard = () => {
       </header>
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-        <StatCard title="Total Registered" value={stats.total_patients} icon={Users} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
-        <StatCard title="Visits (Current)" value={stats.visits_today} icon={Clock} gradient="linear-gradient(135deg, #059669 0%, #10b981 100%)" />
-        <StatCard title="Laboratory" value={`${stats.lab_pending || 0} Open`} icon={FlaskConical} gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" />
+        <StatCard title="Total Registered" value={stats.total_patients} icon={Users} gradient="linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)" />
+        <StatCard title="Visits (Current)" value={stats.visits_today} icon={Clock} gradient="linear-gradient(135deg, var(--secondary) 0%, var(--secondary) 100%)" />
+        <StatCard title="Laboratory" value={`${stats.lab_pending || 0} Open`} icon={FlaskConical} gradient="linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%)" />
         <StatCard title="Pharmacy" value={`${stats.prescriptions_today || 0} Issued`} icon={Pill} gradient="linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)" />
         <StatCard title="Emergency" value={stats.emergency_today || 0} icon={Activity} gradient="linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)" />
       </div>

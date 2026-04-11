@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField
+from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo
 
 class ProjectFieldConfigSerializer(serializers.ModelSerializer):
     class Meta:
@@ -142,3 +142,8 @@ class PatientSerializer(serializers.ModelSerializer):
         try:
             return Visit.objects.filter(patient=obj).count()
         except: return 0
+
+class ProjectLogoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectLogo
+        fields = '__all__'

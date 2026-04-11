@@ -14,10 +14,11 @@ class UserSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
     data_isolation = serializers.SerializerMethodField()
     project_name = serializers.ReadOnlyField(source='project.name')
+    branding = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name')
+        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name', 'branding')
 
     def get_permissions(self, obj):
         if obj.role == 'ADMIN':
@@ -33,6 +34,18 @@ class UserSerializer(serializers.ModelSerializer):
         if roles.exists():
             return all(r.data_isolation for r in roles)
         return True if obj.role != 'ADMIN' else False
+
+    def get_branding(self, obj):
+        if obj.project:
+            first_logo = obj.project.header_logos.first()
+            return {
+                'primary_color': obj.project.primary_color,
+                'secondary_color': obj.project.secondary_color,
+                'accent_color': obj.project.accent_color,
+                'project_name': obj.project.name,
+                'project_logo': first_logo.image.url if first_logo and first_logo.image else None
+            }
+        return None
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)

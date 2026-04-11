@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachineData
+from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachineData, LabMachine, LabProjectBridge
 
 class LabTestTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,5 +46,17 @@ class LabRequestSerializer(serializers.ModelSerializer):
 class LabMachineDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabMachineData
+        fields = '__all__'
+
+class LabMachineSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    class Meta:
+        model = LabMachine
+        fields = '__all__'
+
+class LabProjectBridgeSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    class Meta:
+        model = LabProjectBridge
         fields = '__all__'
 

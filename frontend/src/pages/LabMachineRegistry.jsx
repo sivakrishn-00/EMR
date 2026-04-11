@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../services/api';
 import { 
     HardDrive, 
     Link as LinkIcon, 
@@ -36,8 +37,8 @@ const LabMachineRegistry = () => {
         try {
             const ts = new Date().getTime();
             const [machineRes, projectRes] = await Promise.all([
-                axios.get(`/api/laboratory/machines/registry-list/?t=${ts}`),
-                axios.get('/api/patients/projects/')
+                api.get(`laboratory/machines/registry-list/?t=${ts}`),
+                api.get('patients/projects/')
             ]);
 
             console.log("Registry Data Response:", machineRes.data);
@@ -75,13 +76,10 @@ const LabMachineRegistry = () => {
     const handleLinkProject = async (machineId, projectId) => {
         setLinking(machineId);
         try {
-            const token = localStorage.getItem('token');
-            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-            
-            await axios.post('/api/laboratory/machines/link_discovery/', {
+            await api.post('laboratory/machines/link_discovery/', {
                 machine_db_id: machineId,
                 project_id: projectId
-            }, { headers });
+            });
             
             toast.success("Machine configuration updated!");
             fetchData(); // Sync everything back from server
@@ -97,7 +95,7 @@ const LabMachineRegistry = () => {
         setShowAudit(true);
         setAuditLoading(true);
         try {
-            const res = await axios.get(`/api/laboratory/machines/${machine.id}/sync-audit/`);
+            const res = await api.get(`laboratory/machines/${machine.id}/sync-audit/`);
             setAuditHistory(res.data || []);
         } catch (err) {
             toast.error("Failed to fetch audit trail");
