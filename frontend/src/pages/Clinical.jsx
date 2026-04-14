@@ -705,9 +705,7 @@ const Clinical = () => {
                                      <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
                                      {labMasters.filter(l => {
                                          const query = searchLab.toLowerCase();
-                                         const alreadyAdded = consultData.lab_investigations.some(i => i.id === l.id);
-                                         const alreadyRequested = (selectedVisit?.lab_requests || []).some(r => r.test_master === l.id);
-                                         return l.name.toLowerCase().includes(query) && !alreadyAdded && !alreadyRequested;
+                                         return l.name.toLowerCase().includes(query);
                                      }).map(l => (
                                         <div key={l.id} 
                                              onMouseDown={(e) => {
@@ -731,9 +729,7 @@ const Clinical = () => {
                                      ))}
                                      {labMasters.filter(l => {
                                          const q = searchLab.toLowerCase();
-                                         const added = consultData.lab_investigations.some(i => i.id === l.id);
-                                         const done = (selectedVisit?.lab_requests || []).some(r => r.test_master === l.id);
-                                         return l.name.toLowerCase().includes(q) && !added && !done;
+                                         return l.name.toLowerCase().includes(q);
                                      }).length === 0 && (
                                         <div style={{ padding: '20px', textAlign: 'center' }}>
                                            <p style={{ color: '#94a3b8', fontSize: '0.8125rem', fontWeight: 600 }}>No unticked investigations matching search</p>
