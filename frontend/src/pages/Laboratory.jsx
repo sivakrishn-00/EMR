@@ -108,42 +108,74 @@ const Laboratory = () => {
 
   const applyHardwareResult = (record) => {
     const newValues = { ...resultData.values };
+    
+    // Helper to normalize strings for comparison (remove spaces/underscores/special chars)
+    const normalize = (str) => (str || "").toString().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
     const mappingDict = {
-        'wbc': ['WBC'], 'rbc': ['RBC'], 'hgb': ['HGB', 'HB'], 'hct': ['HCT', 'PCV'], 'plt': ['PLT'],
-        'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'], 'rdw_cv': ['RDW-CV'], 'rdw_sd': ['RDW-SD'],
-        'lym_pct': ['LYM%', 'LYM'], 'mid_pct': ['MID%', 'MID'], 'gran_pct': ['GRAN%', 'GRAN', 'NEU%', 'GRA%'],
-        'neu_pct': ['NEU%', 'NEUTROPHIL%', 'NEU'],
-        'mon_pct': ['MON%', 'MON'], 'eos_pct': ['EOS%', 'EOS'], 'bas_pct': ['BAS%', 'BAS'],
-        'lym_abs': ['LYM#'], 'mid_abs': ['MID#'], 'gran_abs': ['GRAN#'], 'mon_abs': ['MON#'], 'eos_abs': ['EOS#'], 'bas_abs': ['BAS#'], 'neu_abs': ['NEU#'],
-        'mpv': ['MPV'], 'pct': ['PCT'], 'p_lcr': ['P-LCR'], 'p_lcc': ['P-LCC']
+        'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'CELLS'], 
+        'rbc': ['RBC', 'RED'], 
+        'hgb': ['HGB', 'HB', 'HEMOGLOBIN', 'HEAMO'], 
+        'hct': ['HCT', 'PCV', 'HEMATOCRIT'], 
+        'plt': ['PLT', 'PLATELET'],
+        'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'],
+        'rdw_cv': ['RDW-CV', 'RDW_CV', 'RDW'], 
+        'rdw_sd': ['RDW-SD', 'RDW_SD'],
+        'lym_pct': ['LYM%', 'LYMPH%', 'LYM'], 
+        'mid_pct': ['MID%', 'MID'], 
+        'gran_pct': ['GRAN%', 'GRAN', 'NEU%', 'GRA%', 'NEUT'],
+        'total_bilirubin': ['TBIL', 'TOTAL BILIRUBIN', 'T.BIL', 'T-BIL'],
+        'direct_bilirubin': ['DBIL', 'DIRECT BILIRUBIN', 'D.BIL', 'D-BIL'],
+        'indirect_bilirubin': ['IBIL', 'INDIRECT BILIRUBIN']
     };
 
     if (selectedRequest?.test_master_details?.sub_tests) {
         selectedRequest.test_master_details.sub_tests.forEach(st => {
-            const stName = st.name.toUpperCase();
-            const stCode = (st.code || '').toUpperCase();
+            const stNameNorm = normalize(st.name);
+            const stCodeNorm = normalize(st.code || "");
             
+            // 1. Try Mapping Dictionary
             Object.entries(mappingDict).forEach(([hwKey, aliases]) => {
-                const val = record[hwKey];
+                const hwValKey = Object.keys(record).find(k => k.toLowerCase() === hwKey.toLowerCase());
+                const val = hwValKey ? record[hwValKey] : undefined;
                 if (val === undefined || val === null) return;
+
+                const hwKeyNorm = normalize(hwKey);
+                const matchesAlias = aliases.some(alias => stNameNorm.includes(normalize(alias)) || stCodeNorm === normalize(alias));
                 
-                const isMatch = (stName === hwKey.toUpperCase()) || 
-                                (stCode === hwKey.toUpperCase()) ||
-                                aliases.some(a => stName.includes(a.toUpperCase())) || 
-                                aliases.some(a => stCode === a.toUpperCase()) ||
-                                stName.includes(hwKey.toUpperCase());
-                
-                if (isMatch) newValues[st.name] = val;
+                if (stNameNorm === hwKeyNorm || stCodeNorm === hwKeyNorm || matchesAlias) {
+                    newValues[st.name] = val;
+                }
             });
             
-            if (!newValues[st.name] && record[st.name.toLowerCase()] !== undefined) {
-                newValues[st.name] = record[st.name.toLowerCase()];
+            // 2. Try Direct Case-Insensitive / Fuzzy Match if not found
+            if (!newValues[st.name]) {
+                Object.entries(record).forEach(([rawKey, rawVal]) => {
+                    if (['id', 'patient_id', 'raw_data'].includes(rawKey.toLowerCase())) return;
+                    const rawKeyNorm = normalize(rawKey);
+                    if (stNameNorm === rawKeyNorm || stNameNorm.includes(rawKeyNorm) || rawKeyNorm.includes(stNameNorm)) {
+                        newValues[st.name] = rawVal;
+                    }
+                });
             }
         });
     }
 
-    setResultData({ ...resultData, values: newValues, interpretation: `Differential Pulse Synced: ${Object.keys(newValues).length} results verified.` });
-    toast.success(`${Object.keys(newValues).length} values captured from machine!`);
+    const matchCount = Object.keys(newValues).length - Object.keys(resultData.values).length;
+    
+    if (matchCount > 0) {
+        setResultData({ 
+            ...resultData, 
+            values: newValues, 
+            interpretation: `Differential Pulse Synced from ${record.machine_name} (${new Date(record.received_at_machine).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}): ${Object.keys(newValues).length} results verified.` 
+        });
+        toast.success(`${matchCount} new values captured from ${record.machine_name}!`);
+    } else {
+        toast.error(`No matching parameters found in this machine record for ${selectedRequest.test_name}.`, {
+            icon: '⚠️',
+            duration: 4000
+        });
+    }
   };
 
   return (
@@ -284,9 +316,19 @@ const Laboratory = () => {
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         {hardwareMatches.map(m => (
                            <div key={m.id} style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                                 <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
-                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: '#4f46e5', color: 'white', padding: '4px 12px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700 }}>Apply All Results</button>
+                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
+                                 <div>
+                                     <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
+                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px' }}>
+                                            <Clock size={10} color="#64748b" />
+                                            <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>
+                                                {new Date(m.received_at_machine).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
+                                            </span>
+                                        </div>
+                                     </div>
+                                 </div>
+                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: '#4f46e5', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
                               </div>
                               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                  {Object.entries(m).filter(([k, v]) => 

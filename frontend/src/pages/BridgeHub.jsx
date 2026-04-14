@@ -206,6 +206,13 @@ const BridgeHub = () => {
                     <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.875rem' }}>Full-spectrum telemetry and connectivity management for all clinical hardware.</p>
                 </div>
                 <button 
+                    onClick={() => navigate('/dashboard')}
+                    style={{ 
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '0.625rem 1.125rem', 
+                        background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', 
+                        fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                        color: '#64748b', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    }}
                 >
                     <ArrowLeft size={16} /> Back to Dashboard
                 </button>
@@ -539,7 +546,7 @@ const BridgeHub = () => {
                                         <React.Fragment key={log.id}>
                                             <tr style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', border: '1px solid #f1f5f9' }}>
                                                 <td style={{ padding: '1.25rem', borderRadius: '16px 0 0 16px', fontSize: '0.8125rem', fontWeight: 800, color: '#1e293b', border: '1px solid #f1f5f9' }}>
-                                                    {new Date(log.received_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                                    {new Date(log.received_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
                                                 </td>
                                                 <td style={{ fontWeight: 800, color: '#6366f1' }}>{log.batch_size} <small style={{ opacity: 0.5 }}>rec</small></td>
                                                 <td style={{ color: '#10b981', fontWeight: 800 }}>{log.success_count}</td>
