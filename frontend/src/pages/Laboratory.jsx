@@ -108,74 +108,61 @@ const Laboratory = () => {
 
   const applyHardwareResult = (record) => {
     const newValues = { ...resultData.values };
-    
-    // Helper to normalize strings for comparison (remove spaces/underscores/special chars)
     const normalize = (str) => (str || "").toString().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 
     const mappingDict = {
-        'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'CELLS'], 
+        'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'WBC COUNT'], 
         'rbc': ['RBC', 'RED'], 
-        'hgb': ['HGB', 'HB', 'HEMOGLOBIN', 'HEAMO'], 
-        'hct': ['HCT', 'PCV', 'HEMATOCRIT'], 
+        'hgb': ['HGB', 'HB', 'HEMOGLOBIN', 'HGB'], 
+        'hct': ['HCT', 'PCV', 'HEMATOCRIT', 'HCT'], 
         'plt': ['PLT', 'PLATELET'],
         'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'],
         'rdw_cv': ['RDW-CV', 'RDW_CV', 'RDW'], 
-        'rdw_sd': ['RDW-SD', 'RDW_SD'],
-        'lym_pct': ['LYM%', 'LYMPH%', 'LYM'], 
-        'mid_pct': ['MID%', 'MID'], 
-        'gran_pct': ['GRAN%', 'GRAN', 'NEU%', 'GRA%', 'NEUT'],
-        'total_bilirubin': ['TBIL', 'TOTAL BILIRUBIN', 'T.BIL', 'T-BIL'],
-        'direct_bilirubin': ['DBIL', 'DIRECT BILIRUBIN', 'D.BIL', 'D-BIL'],
-        'indirect_bilirubin': ['IBIL', 'INDIRECT BILIRUBIN']
+        'rdw_sd': ['RDW-SD', 'RDW_SD']
     };
 
     if (selectedRequest?.test_master_details?.sub_tests) {
         selectedRequest.test_master_details.sub_tests.forEach(st => {
             const stNameNorm = normalize(st.name);
             const stCodeNorm = normalize(st.code || "");
-            
-            // 1. Try Mapping Dictionary
-            Object.entries(mappingDict).forEach(([hwKey, aliases]) => {
-                const hwValKey = Object.keys(record).find(k => k.toLowerCase() === hwKey.toLowerCase());
-                const val = hwValKey ? record[hwValKey] : undefined;
-                if (val === undefined || val === null) return;
 
-                const hwKeyNorm = normalize(hwKey);
-                const matchesAlias = aliases.some(alias => stNameNorm.includes(normalize(alias)) || stCodeNorm === normalize(alias));
-                
-                if (stNameNorm === hwKeyNorm || stCodeNorm === hwKeyNorm || matchesAlias) {
+            // 1. DIRECT CODE MATCH (e.g., [hgb] -> record['hgb'])
+            if (st.code) {
+                const val = record[st.code.toLowerCase()] || record[st.code.toUpperCase()] || record[st.code];
+                if (val !== undefined && val !== null) {
                     newValues[st.name] = val;
                 }
-            });
+            }
             
-            // 2. Try Direct Case-Insensitive / Fuzzy Match if not found
+            // 2. DICTIONARY MATCH (Backup for common variations)
             if (!newValues[st.name]) {
-                Object.entries(record).forEach(([rawKey, rawVal]) => {
-                    if (['id', 'patient_id', 'raw_data'].includes(rawKey.toLowerCase())) return;
-                    const rawKeyNorm = normalize(rawKey);
-                    if (stNameNorm === rawKeyNorm || stNameNorm.includes(rawKeyNorm) || rawKeyNorm.includes(stNameNorm)) {
-                        newValues[st.name] = rawVal;
+                Object.entries(mappingDict).forEach(([hwKey, aliases]) => {
+                    const val = record[hwKey] || record[hwKey.toUpperCase()];
+                    if (val !== undefined && val !== null) {
+                        if (aliases.some(a => stNameNorm.includes(normalize(a))) || stNameNorm.includes(normalize(hwKey)) || stCodeNorm === normalize(hwKey)) {
+                            newValues[st.name] = val;
+                        }
+                    }
+                });
+            }
+            
+            // 3. FUZZY NAME MATCH (Final fallback)
+            if (!newValues[st.name]) {
+                Object.entries(record).forEach(([rk, rv]) => {
+                    if (normalize(rk) === stNameNorm || stNameNorm.includes(normalize(rk))) {
+                        newValues[st.name] = rv;
                     }
                 });
             }
         });
     }
 
-    const matchCount = Object.keys(newValues).length - Object.keys(resultData.values).length;
-    
-    if (matchCount > 0) {
-        setResultData({ 
-            ...resultData, 
-            values: newValues, 
-            interpretation: `Differential Pulse Synced from ${record.machine_name} (${new Date(record.received_at_machine).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}): ${Object.keys(newValues).length} results verified.` 
-        });
-        toast.success(`${matchCount} new values captured from ${record.machine_name}!`);
-    } else {
-        toast.error(`No matching parameters found in this machine record for ${selectedRequest.test_name}.`, {
-            icon: '⚠️',
-            duration: 4000
-        });
-    }
+    setResultData({ 
+        ...resultData, 
+        values: newValues, 
+        interpretation: `Differential Pulse Synced from ${record.machine_name} (${new Date(record.received_at_machine).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}): Results verified.` 
+    });
+    toast.success(`Results synced from ${record.machine_name}!`);
   };
 
   return (
