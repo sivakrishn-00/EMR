@@ -12,9 +12,9 @@ import {
   Pill, 
   CheckCircle,
   AlertCircle,
-  ChevronLeft,
   ChevronRight,
-  Pencil
+  Pencil,
+  FileText
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,6 +41,11 @@ const Clinical = () => {
   const [registryTypes, setRegistryTypes] = useState([]);
   const [searchLab, setSearchLab] = useState("");
   const [showLabSearch, setShowLabSearch] = useState(false);
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [patientHistory, setPatientHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [detailedVisit, setDetailedVisit] = useState(null);
 
   useEffect(() => {
     fetchVisitsToSee();
@@ -172,6 +177,21 @@ const Clinical = () => {
     }
   };
 
+  const fetchHistory = async () => {
+    if (!selectedVisit?.patient) return;
+    setIsLoadingHistory(true);
+    setShowHistory(true);
+    try {
+      // Scale Optimization: Only fetch last 5 completed encounters to prevent memory bloat
+      const res = await api.get(`clinical/visits/?patient=${selectedVisit.patient}&status=COMPLETED&page_size=5`);
+      setPatientHistory(res.data.results || res.data || []);
+    } catch (err) {
+      toast.error("Cloud link slow, retrying...");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2.5rem' }}>
@@ -298,8 +318,93 @@ const Clinical = () => {
 
         {/* Examination & Plan - Only show if a patient is selected */}
         {selectedVisit && (
-          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-            <div className="card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+        <div className="workspace-split" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          {/* TOP: HISTORICAL REFERENCE PANEL (Unified MNC View) */}
+          {detailedVisit && (
+            <div className="reference-panel">
+                <div className="reference-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div className="dossier-icon-box">
+                            <ClipboardList size={20} color="white" />
+                        </div>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h2 className="dossier-title">Historical Reference Summary</h2>
+                                <span className="dossier-badge">Date: {new Date(detailedVisit.visit_date).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={() => setDetailedVisit(null)} className="dossier-close">
+                       <X size={18} />
+                    </button>
+                </div>
+                <div className="reference-content">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.5rem' }}>
+                         {/* Snapshot */}
+                         <div className="snapshot-list">
+                            {[
+                                { label: 'Weight', value: `${detailedVisit.vitals?.weight_kg || '--'} kg` },
+                                { label: 'BP', value: `${detailedVisit.vitals?.blood_pressure_sys || '--'}/${detailedVisit.vitals?.blood_pressure_dia || '--'}` },
+                                { label: 'HR', value: `${detailedVisit.heart_rate || '--'} BPM` },
+                                { label: 'Temp', value: `${detailedVisit.vitals?.temperature_c || '--'} °C` },
+                                { label: 'BMI', value: `${detailedVisit.vitals?.bmi || '--'}` }
+                            ].map((item, id) => (
+                                <div key={id} className="snapshot-item" style={{ padding: '0.625rem 0.875rem' }}>
+                                    <span className="item-label" style={{ fontSize: '0.6rem' }}>{item.label}</span>
+                                    <span className="item-value" style={{ fontSize: '0.7rem' }}>{item.value}</span>
+                                </div>
+                            ))}
+                         </div>
+                         {/* Details */}
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className="diagnosis-box" style={{ padding: '0.75rem' }}>
+                                <p className="section-label-alt" style={{ fontSize: '0.55rem' }}>PAST IMPRESSION</p>
+                                <p className="diagnosis-text" style={{ fontSize: '0.8rem' }}>{detailedVisit.consultation?.diagnosis || 'N/A'}</p>
+                            </div>
+                            <div style={{ background: 'white', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', maxHeight: '100px', overflowY: 'auto' }}>
+                                <p style={{ fontSize: '0.6rem', fontWeight: 900, color: '#6366f1', marginBottom: '4px' }}>PAST MEDS</p>
+                                {detailedVisit.prescriptions?.map((m, i) => (
+                                    <p key={i} style={{ fontSize: '0.7rem', fontWeight: 700 }}>• {m.medication_name}</p>
+                                ))}
+                            </div>
+                         </div>
+                         {/* Labs */}
+                         <div style={{ background: 'white', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', maxHeight: '200px', overflowY: 'auto' }}>
+                             <p style={{ fontSize: '0.6rem', fontWeight: 900, color: '#10b981', marginBottom: '8px' }}>HISTORICAL LABS</p>
+                             {detailedVisit.lab_requests?.map((lr, i) => (
+                                 <div key={i} style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                                     <p style={{ fontSize: '0.75rem', fontWeight: 950, color: '#1e293b', marginBottom: '6px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>{lr.test_name}</p>
+                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                         {lr.test_master_details?.sub_tests?.map(st => {
+                                             const val = lr.result?.values?.[st.name];
+                                             return (
+                                                 <div key={st.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>{st.name}</span>
+                                                         <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a' }}>{val || '--'} {st.units}</span>
+                                                     </div>
+                                                     {st.biological_range && (
+                                                         <span style={{ fontSize: '0.55rem', color: '#94a3b8', fontStyle: 'italic' }}>Range: {st.biological_range}</span>
+                                                     )}
+                                                 </div>
+                                             );
+                                         })}
+                                         {!lr.test_master_details?.sub_tests?.length && lr.result?.value && (
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                  <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>{lr.result.value}</span>
+                                                  <span style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{lr.result.reference_range}</span>
+                                              </div>
+                                         )}
+                                     </div>
+                                 </div>
+                             ))}
+                         </div>
+                    </div>
+                </div>
+            </div>
+          )}
+
+          <div className="active-consult-panel card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '0.5rem' }}>
                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
                     <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
@@ -329,10 +434,18 @@ const Clinical = () => {
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
                  </div>
-                 <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Status</p>
-                    <span style={{ fontSize: '0.6875rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content', marginLeft: 'auto' }}>EXAMINING</span>
-                 </div>
+                  <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
+                     {selectedVisit?.patient_details?.total_visits > 1 && (
+                        <button 
+                           type="button"
+                           onClick={fetchHistory}
+                           style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#6d28d9', padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                        >
+                           <History size={13} /> VIEW HISTORY
+                        </button>
+                     )}
+                     <span style={{ fontSize: '0.6875rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content' }}>EXAMINING</span>
+                  </div>
               </div>
 
              {/* Clinic History & Lab Results */}
@@ -784,11 +897,161 @@ const Clinical = () => {
             </form>
           </div>
         </div>
-        )}
-      </div>
+      )}
+    </div>
       <style>{`
         textarea { border-radius: 12px !important; padding: 0.75rem !important; }
+        
+        /* MNC Enterprise Workspace System 🏢 */
+        .workspace-split { display: flex; flex-direction: column; height: 100%; gap: 1rem; }
+        .reference-panel { 
+            background: #f8fafc; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 24px; 
+            height: 420px; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+            animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .reference-header { padding: 1.25rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: white; }
+        .reference-content { flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
+        .active-consult-panel { flex: 1; min-height: 0; overflow-y: auto; }
+        
+        .dossier-icon-box { width: 42px; height: 42px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .dossier-title { font-size: 1.15rem; font-weight: 950; color: #1e293b; letter-spacing: -0.02em; margin: 0; }
+        .dossier-badge { font-size: 0.65rem; padding: 3px 8px; background: #e0e7ff; color: #4338ca; border-radius: 6px; font-weight: 900; }
+        .dossier-subtitle { font-size: 0.8125rem; color: #64748b; fontWeight: 600; margin-top: 2px; }
+        .dossier-close { border: none; background: white; width: 40px; height: 40px; border-radius: 14px; cursor: pointer; color: #64748b; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; }
+        
+        .dossier-content { flex: 1; overflow-y: auto; padding: 2.5rem; }
+        .dossier-grid { display: grid; grid-template-columns: 320px 1fr; gap: 3rem; }
+        .dossier-sidebar { display: flex; flex-direction: column; gap: 2rem; }
+        .section-label { font-size: 0.7rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; }
+        .section-label-alt { font-size: 0.625rem; font-weight: 900; color: #c2410c; text-transform: uppercase; margin-bottom: 8px; }
+        
+        .snapshot-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .snapshot-item { display: flex; justify-content: space-between; padding: 0.875rem 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; }
+        .item-label { font-size: 0.75rem; font-weight: 700; color: #64748b; }
+        .item-value { font-size: 0.75rem; font-weight: 800; color: #1e293b; }
+        
+        .diagnosis-box { padding: 1.25rem; background: #fff7ed; border-radius: 20px; border: 1px dotted #fb923c; }
+        .diagnosis-text { font-size: 0.875rem; font-weight: 800; color: #9a3412; line-height: 1.5; margin: 0; }
+        
+        .dossier-main { display: flex; flex-direction: column; }
+        .section-header { font-size: 0.875rem; font-weight: 900; color: #1e293b; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 10px; }
+        .med-row { padding: 1rem; background: white; border: 1.2px solid #e2e8f0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .med-name { font-size: 0.875rem; font-weight: 800; color: #1e293b; margin: 0; }
+        .med-meta { font-size: 0.7rem; color: #64748b; font-weight: 600; margin: 0; }
+        .med-qty { font-size: 0.8125rem; font-weight: 900; color: #6366f1; margin: 0; }
+        .qty-label { font-size: 0.55rem; font-weight: 800; color: #94a3b8; margin: 0; }
+        
+        .lab-card { padding: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 24px; }
+        .lab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; }
+        .lab-name { font-size: 0.9375rem; font-weight: 950; color: #1e293b; margin: 0; }
+        .lab-dept { font-size: 0.65rem; color: #64748b; font-weight: 700; margin: 0; }
+        .status-badge { font-size: 0.625rem; background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 8px; font-weight: 900; }
+        
+        .lab-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .lab-table th { padding: 0.5rem; font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+        .lab-table tr { border-bottom: 1px solid #f1f5f9; }
+        .param-name { padding: 0.75rem 0.5rem; font-size: 0.75rem; font-weight: 700; color: #475569; }
+        .param-val { padding: 0.75rem 0.5rem; font-size: 0.8125rem; font-weight: 900; color: #1e293b; }
+        .param-val span { font-size: 0.6rem; color: #94a3b8; }
+        .param-range { padding: 0.75rem 0.5rem; font-size: 0.6875rem; font-weight: 700; color: #64748b; }
+        
+        .dossier-footer { padding: 1.5rem 2.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9; text-align: right; }
+        .dossier-confirm-btn { padding: 0.75rem 2.5rem; border-radius: 14px; font-weight: 800; background: #1e293b; border: none; color: white; cursor: pointer; transition: 0.2s; }
+        .dossier-confirm-btn:hover { background: #000; }
+        .empty-text { font-size: 0.8125rem; color: #94a3b8; font-style: italic; }
+
+        @media (max-width: 1200px) {
+            .dossier-card { right: 2rem; } /* Overlays the drawer on smaller screens */
+        }
+        
+        @media (max-width: 900px) {
+            .dossier-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .dossier-overlay { padding: 0.5rem; }
+            .dossier-card { top: 0.5rem; bottom: 0.5rem; left: 0.5rem; right: 0.5rem; border-radius: 20px; }
+            .dossier-header { padding: 1.25rem; }
+            .dossier-content { padding: 1.25rem; }
+        }
       `}</style>
+
+      {/* PATIENT HISTORY DRAWER (AUTO-SCALING COMPONENT) */}
+      {showHistory && (
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2000 }}>
+             <div onClick={() => setShowHistory(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(241, 245, 249, 0.8)', backdropFilter: 'blur(12px)' }} />
+             <div className="fade-in-right" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '450px', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 50px rgba(0,0,0,0.1)' }}>
+                <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                   <div>
+                      <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)' }}>Patient History</h3>
+                      <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Longitudinal Record for {selectedVisit.patient_details?.first_name}</p>
+                   </div>
+                   <button onClick={() => setShowHistory(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', color: '#64748b' }}><X size={18} /></button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+                   {isLoadingHistory ? (
+                       <div style={{ textAlign: 'center', padding: '3rem' }}>
+                          <Clock size={40} className="spin" style={{ color: '#cbd5e1', marginBottom: '1rem' }} />
+                          <p style={{ fontWeight: 600, color: '#94a3b8' }}>Fetching global records...</p>
+                       </div>
+                   ) : patientHistory.length === 0 ? (
+                       <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed #f1f5f9', borderRadius: '20px' }}>
+                           <p style={{ fontWeight: 700, color: '#94a3b8' }}>No past records found for this patient.</p>
+                       </div>
+                   ) : (
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                          {patientHistory.map((h, idx) => (
+                              <div key={h.id} style={{ position: 'relative', paddingLeft: '1.5rem', borderLeft: '2px solid #e2e8f0' }}>
+                                 <div style={{ position: 'absolute', top: 0, left: '-6px', width: '10px', height: '10px', borderRadius: '50%', background: '#6366f1', border: '2px solid white' }} />
+                                 <div className="card" style={{ padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                                       <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#6366f1' }}>{new Date(h.visit_date).toLocaleDateString()}</span>
+                                       <span style={{ fontSize: '0.625rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>COMPLETED</span>
+                                    </div>
+                                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Diagnosis</p>
+                                    <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem' }}>{h.consultation?.diagnosis || 'No diagnosis recorded'}</p>
+                                    
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '10px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                       <div>
+                                          <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8' }}>BP</p>
+                                          <p style={{ fontSize: '0.75rem', fontWeight: 800 }}>{h.vitals?.blood_pressure_sys || '--'}/{h.vitals?.blood_pressure_dia || '--'}</p>
+                                       </div>
+                                       <div>
+                                          <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8' }}>Meds</p>
+                                          <p style={{ fontSize: '0.75rem', fontWeight: 800 }}>{h.prescriptions?.length || 0} drugs</p>
+                                       </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => { setDetailedVisit(h); setShowHistory(false); }}
+                                        style={{ width: '100%', marginTop: '1rem', background: 'white', border: '1.2px solid #e2e8f0', borderRadius: '12px', padding: '0.625rem', fontSize: '0.6875rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', transition: '0.2s' }}
+                                        onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                        onMouseOut={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                                    >
+                                        <FileText size={14} /> VIEW FULL SUMMARY
+                                    </button>
+                                 </div>
+                              </div>
+                          ))}
+                       </div>
+                   )}
+                </div>
+                
+                <div style={{ padding: '1.5rem', background: '#f8fafc', borderTop: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 700, textAlign: 'center' }}>Limited to last 5 encounters for system performance.</p>
+                </div>
+              </div>
+           </div>
+       )}
     </div>
   );
 };

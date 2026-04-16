@@ -37,6 +37,7 @@ const Patients = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({ total_registered: 0, opd_today: 0, emergency_today: 0 });
   const [tabCounts, setTabCounts] = useState({ active: 0, scheduled: 0, completed: 0, all: 0 });
+  const [activeDropdown, setActiveDropdown] = useState(null);
   const [employeeMasters, setEmployeeMasters] = useState([]);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
@@ -61,6 +62,9 @@ const Patients = () => {
     relationship: ''
   });
   const [formAttempted, setFormAttempted] = useState(false);
+  const [showTriageModal, setShowTriageModal] = useState(false);
+  const [triagePatient, setTriagePatient] = useState(null);
+  const [triageReason, setTriageReason] = useState('Routine Checkup');
 
   useEffect(() => {
     fetchEmployeeMasters();
@@ -91,12 +95,12 @@ const Patients = () => {
         const url_params = projectFilter ? `?project=${projectFilter}` : '';
         const res = await api.get(`patients/patients/stats/${url_params}`);
         setStats(res.data);
-        // Also update individual tab counts from stats if available, or fetch separately
-        setTabCounts(prev => ({
-            ...prev,
-            all: res.data.total_registered,
-            // We can add more specific counts to the stats endpoint later
-        }));
+        setTabCounts({
+            active: res.data.active_count || 0,
+            scheduled: res.data.scheduled_count || 0,
+            completed: res.data.completed_count || 0,
+            all: res.data.total_registered || 0
+        });
     } catch (err) {}
   };
 
@@ -173,6 +177,28 @@ const Patients = () => {
     }
   };
 
+  const handleInstantTriageSubmit = async (e) => {
+    e.preventDefault();
+    if (!triagePatient) return;
+
+    const loadingToast = toast.loading('Initiating instant triage...');
+    try {
+      await api.post('clinical/visits/', {
+        patient: triagePatient.id,
+        reason: triageReason || 'OPD Consultation',
+        status: 'PENDING_VITALS'
+      });
+      toast.success('Patient moved to Triage/Vitals queue!', { id: loadingToast });
+      setShowTriageModal(false);
+      setTriagePatient(null);
+      setTriageReason('Routine Checkup');
+      fetchPatients(1, viewMode, projectFilter);
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to start visit', { id: loadingToast });
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       first_name: '', last_name: '', dob: '', gender: '', phone: '', address: '',
@@ -187,6 +213,238 @@ const Patients = () => {
     });
     setFormAttempted(false);
   };
+
+  const downloadMasterReport = async (patient) => {
+    const loading = toast.loading(`clinical report for ${patient.first_name}...`);
+    try {
+      if (!window.html2pdf) {
+        await new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          document.head.appendChild(script);
+        });
+      }
+
+      const res = await api.get(`patients/patients/${patient.id}/full_report/`);
+      const { visits, patient: patientData } = res.data;
+      const institutionName = (patientData.project_name || "Bavya Health Service").toUpperCase();
+      const themeColor = "#0d9488"; // Premium Aqua Deep Teal
+
+      const element = document.createElement('div');
+      
+      const renderV = (v) => {
+          if (!v) return '<span style="color: #94a3b8;">--</span>';
+          const upper = v.toString().toUpperCase();
+          // ORANGE FOR POSITIVE INDICATORS
+          const color = (upper === 'YES' || upper === 'FND' || upper === 'POSITIVE') ? '#f97316' : (upper === 'NO' || upper === 'NAD' || upper === 'NEGATIVE' ? '#059669' : '#1e1b4b');
+          return `<span style="color: ${color}; font-weight: 950;">${upper}</span>`;
+      };
+
+      const renderHistoryItem = (label, value, labelWidth = "120px") => `
+        <div style="display: flex; align-items: flex-start; margin-bottom: 8px; font-size: 11.5px;">
+            <span style="width: ${labelWidth}; color: #64748b; font-weight: 900; text-transform: uppercase; font-size: 10px;">${label}</span>
+            <span style="width: 20px; color: ${themeColor}; font-weight: 900; text-align: center;">:</span>
+            <span style="flex: 1; color: #000; font-weight: 800;">${value}</span>
+        </div>
+      `;
+
+      element.innerHTML = `
+        <div style="background: #fff; padding: 0px 45px 30px 45px; font-family: 'Inter', sans-serif; color: #1e1b4b; width: 720px; box-sizing: border-box;">
+            
+            <!-- MASTER BRANDING -->
+            <div style="text-align: center; margin-bottom: 35px;">
+              <h1 style="margin: 0; font-size: 42px; font-weight: 800; text-transform: uppercase; color: #191731ff; letter-spacing: -1.5px;">${institutionName}</h1>
+              <div style="font-size: 13px; font-weight: 950; letter-spacing: 5px; color: #64748b; text-transform: uppercase; margin-top: 6px;">Patient Clinical Report</div>
+              <div style="border-bottom: 3.5px solid ${themeColor}; width: 400px; margin: 15px auto;"></div>
+            </div>
+
+            <!-- I. PATIENT DETAILS -->
+            <div style="margin-bottom: 30px; page-break-inside: avoid;">
+              <div style="background: ${themeColor}; color: #fff; padding: 7px 15px; font-size: 11.5px; font-weight: 950; text-transform: uppercase; margin-bottom: 15px;">PATIENT DETAILS</div>
+              <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; padding: 0 10px;">
+                <div>
+                  ${renderHistoryItem('Patient Name', `${patientData.first_name} ${patientData.last_name}`, "100px")}
+                  ${renderHistoryItem('Age / Gender', `${new Date().getFullYear() - new Date(patientData.dob).getFullYear()}Y / ${patientData.gender}`, "100px")}
+                </div>
+                <div>
+                  ${renderHistoryItem('Patient ID', patientData.patient_id, "90px")}
+                  ${renderHistoryItem('Aadhar No', patientData.id_proof_number || '--', "90px")}
+                </div>
+              </div>
+            </div>
+
+            ${visits.map((v, vidx) => `
+              <div style="${vidx > 0 ? 'page-break-before: always; padding-top: 0px;' : ''}">
+                
+                <div style="display: flex; justify-content: space-between; background: ${themeColor}; color: #fff; padding: 6px 15px; margin-bottom: 18px; border-radius: 2px;">
+                  <span style="font-size: 13px; font-weight: 950;">DATE: ${new Date(v.visit_date).toLocaleDateString()}</span>
+                  <span style="font-size: 10px; font-weight: 900; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">STATUS: VERIFIED</span>
+                </div>
+
+                <!-- VITALS BAR -->
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); background: #f0f9f9; border: 2px solid ${themeColor}; padding: 12px; margin-bottom: 30px; text-align: center; page-break-inside: avoid;">
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">BP</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.blood_pressure_sys}/${v.vitals?.blood_pressure_dia}</span></div>
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">HR</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.heart_rate || '--'}</span></div>
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">SPO2</div><span style="font-size: 14px; font-weight: 950; color: #dc2626;">${v.vitals?.spo2}%</span></div>
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">TEMP</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.temperature_c || '--'}°</span></div>
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">RR</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.respiratory_rate || '--'}</span></div>
+                    <div style="border-right: 1px solid #99f6e4;"><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">WT</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.weight_kg || '--'}</span></div>
+                    <div><div style="font-size: 8px; font-weight: 950; color: ${themeColor};">BMI</div><span style="font-size: 14px; font-weight: 950;">${v.vitals?.bmi || '--'}</span></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 0 10px; margin-bottom: 25px; page-break-inside: avoid;">
+                    <div>
+                        <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 15px;">PERSONAL HISTORY</div>
+                        ${renderHistoryItem('Smoking Status', v.vitals?.smoking)}
+                        ${renderHistoryItem('Alcohol Usage', v.vitals?.alcohol)}
+                        ${renderHistoryItem('Physical Activity', v.vitals?.physical_activity)}
+                        ${renderHistoryItem('Food Habit', ` ${v.vitals?.food_habit || '--'}`)}
+                        ${renderHistoryItem('Drug Allergy', v.vitals?.allergy_drug)}
+                    </div>
+                    <div>
+                        <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 15px;"> FAMILY HISTORY</div>
+                        ${renderHistoryItem('Diabetes Mellitus', v.vitals?.family_dm)}
+                        ${renderHistoryItem('Hypertension', v.vitals?.family_htn)}
+                        ${renderHistoryItem('Oncology History', v.vitals?.family_cancer)}
+                        ${renderHistoryItem('CVS Condition', v.vitals?.family_cvs)}
+                        ${renderHistoryItem('Thyroid Hist', v.vitals?.family_thyroid)}
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 0 10px; margin-bottom: 25px; page-break-inside: avoid;">
+                    <div>
+                        <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 15px;">SYSTEMIC EXAMINATION</div>
+                        ${renderHistoryItem('Respiratory', v.vitals?.sys_respiratory)}
+                        ${renderHistoryItem('CVS System', v.vitals?.sys_cvs)}
+                        ${renderHistoryItem('CNS Function', v.vitals?.sys_cns)}
+                        ${renderHistoryItem('GIS Status', v.vitals?.sys_gis)}
+                        ${renderHistoryItem('MSS Integrity', v.vitals?.sys_mss)}
+                    </div>
+                    <div>
+                        <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 15px;">KNOWN HISTORY</div>
+                        ${renderHistoryItem('Known DM Status', v.vitals?.known_dm)}
+                        ${renderHistoryItem('Known HTN Status', v.vitals?.known_htn)}
+                        ${renderHistoryItem('Known Oncology', v.vitals?.known_cancer)}
+                        ${renderHistoryItem('Known CVS Status', v.vitals?.known_cvs)}
+                        ${renderHistoryItem('Thyroid / TB', v.vitals?.known_thyroid)}
+                    </div>
+                </div>
+
+                <!-- VI. LAB DATA -->
+                ${v.lab_requests?.length > 0 ? `
+                <div style="margin-bottom: 25px; padding: 0 10px; page-break-inside: avoid;">
+                  <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 12px;">LABORATORY DATA</div>
+                  <div style="border: 2px solid ${themeColor}; border-radius: 4px; overflow: hidden;">
+                    ${v.lab_requests.map(l => `
+                        <div style="background: #f0fdfa; border-bottom: 1.5px solid ${themeColor}; padding: 8px 15px; font-weight: 950; font-size: 12.5px; color: ${themeColor};">&raquo; TEST: ${l.test_name}</div>
+                        <table style="width: 100%; border-collapse: collapse;">
+                          <thead>
+                            <tr style="background: #e6faf8;">
+                              <th style="padding: 6px 15px; font-size: 9.5px; font-weight: 950; color: ${themeColor}; text-transform: uppercase; text-align: left; border-bottom: 1px solid #99f6e4; width: 40%;">Investigation</th>
+                              <th style="padding: 6px 15px; font-size: 9.5px; font-weight: 950; color: ${themeColor}; text-transform: uppercase; text-align: center; border-bottom: 1px solid #99f6e4; width: 25%;">Observed Value</th>
+                              <th style="padding: 6px 15px; font-size: 9.5px; font-weight: 950; color: ${themeColor}; text-transform: uppercase; text-align: center; border-bottom: 1px solid #99f6e4; width: 35%;">Biological Ref. Range</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${(l.test_master_details?.sub_tests || []).map((st, stIdx) => {
+                              const observedVal = l.result?.values?.[st.name] || l.result?.values?.[st.code] || '--';
+                              const unit = st.units || '';
+                              const bioRange = st.biological_range || '--';
+                              const rowBg = stIdx % 2 === 0 ? '#ffffff' : '#f8fffe';
+                              return `
+                              <tr style="background: ${rowBg}; border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 7px 15px; font-size: 11px; font-weight: 800; color: #334155;">${st.name}</td>
+                                <td style="padding: 7px 15px; font-size: 11px; text-align: center;">
+                                  <b style="color: #0f172a; font-size: 12px;">${observedVal}</b>
+                                  ${unit ? `<small style="color: #64748b; font-weight: 900; margin-left: 3px;">${unit}</small>` : ''}
+                                </td>
+                                <td style="padding: 7px 15px; font-size: 10.5px; text-align: center; color: #059669; font-weight: 800;">${bioRange}${unit && bioRange !== '--' ? ` <span style="color:#94a3b8; font-weight: 700;">${unit}</span>` : ''}</td>
+                              </tr>`;
+                            }).join('')}
+                          </tbody>
+                        </table>
+                    `).join('')}
+                  </div>
+                </div>
+                ` : ''}
+
+                <!-- VII. MEDICATION -->
+                ${v.prescriptions?.length > 0 ? `
+                <div style="margin-bottom: 25px; padding: 0 10px; page-break-inside: avoid;">
+                  <div style="background: ${themeColor}; color: #fff; padding: 5px 12px; font-size: 10px; font-weight: 950; text-transform: uppercase; margin-bottom: 12px;">DRUGS PRESCRIBED</div>
+                  <div style="border: 2px solid ${themeColor}; border-radius: 4px; padding: 8px;">
+                      ${v.prescriptions.map((p, pidx) => `
+                        <div style="display: flex; gap: 20px; font-size: 12px; padding: 10px; border-bottom: 1px solid #f1f5f9;">
+                          <b style="color: #64748b; width: 25px;">${pidx + 1}.</b>
+                          <span style="flex: 1;"><b style="color:#1e1b4b; font-size: 13px;">${p.medication_name}</b> &bull; ${p.dosage} [${p.frequency}]</span>
+                          <b style="color: #dc2626; width: 85px; text-align: right; font-weight: 950;">${p.duration} DAYS</b>
+                        </div>
+                      `).join('')}
+                  </div>
+                </div>
+                ` : ''}
+
+                <!-- VIII. ASSESSMENT -->
+                <div style="margin-top: 25px; padding: 0; background: #fff; border: 2.5px solid ${themeColor}; border-radius: 4px; page-break-inside: avoid; overflow: hidden;">
+                  <div style="background: ${themeColor}; color: #fff; padding: 7px 15px; font-size: 10px; font-weight: 950; text-transform: uppercase;">ASSESSMENT & TREATMENT PLAN</div>
+                  <div style="padding: 15px;">
+                    <div style="font-size: 15px; font-weight: 950; color: #1e1b4b; margin-bottom: 10px; text-transform: uppercase;">DIAGNOSIS: ${v.consultation?.diagnosis || 'Standard Observation'}</div>
+                    <div style="font-size: 12px; color: #475569; line-height: 1.7;">
+                      <b style="color: ${themeColor};">CHIEF COMPLAINTS:</b> ${v.consultation?.chief_complaint || v.reason || '--'}<br/>
+                      <b style="color: ${themeColor};">OUTLINED TREATMENT:</b> ${v.consultation?.plan || '--'}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            `).join('')}
+        </div>
+      `;
+
+
+      const opt = {
+        margin: [0.15, 0.3, 1.2, 0.3], // Ultra-compact top margin for multi-page consistency
+        filename: `BavyaRegistry_${patientData.patient_id}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().from(element).set(opt).toPdf().get('pdf').then(function (pdf) {
+        const totalPages = pdf.internal.getNumberOfPages();
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        
+        for (let i = 1; i <= totalPages; i++) {
+            pdf.setPage(i);
+            
+            // MASTER SOLID 4-SIDED RECTANGLE
+            pdf.setLineWidth(0.06); 
+            pdf.setDrawColor(themeColor); 
+            pdf.rect(0.1, 0.1, pageWidth - 0.2, pageHeight - 0.2, 'S'); 
+
+            // FOOTER - Placed in the 1.2-inch protected margin zone
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(themeColor);
+            pdf.text("SYSTEM GENERATED CLINICAL REPORT", pageWidth / 2, pageHeight - 0.8, { align: "center" });
+            
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(`BAVYA HEALTH SERVICE PVT LTD\u2022 ${institutionName}`, pageWidth / 2, pageHeight - 0.6, { align: "center" });
+            pdf.text(`UHID: ${patientData.patient_id} \u2022 Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 0.45, { align: "center" });
+        }
+      }).save();
+
+      toast.success("Clinical Registry Optimized & Exported!", { id: loading });
+    } catch (err) {
+      console.error("PDF Export Failure:", err);
+      toast.error("Failed to generate clinical registry", { id: loading });
+    }
+  };
+
 
   const StatusStepper = ({ status }) => {
     const steps = [
@@ -466,7 +724,7 @@ const Patients = () => {
                                     {p.visits && p.visits.length > 0 ? "Returned Patient" : "Registered Only"}
                                 </span>
                                 {p.upcoming_appointment && (
-                                     <span style={{ fontSize: '0.625rem', color: 'var(--primary)', fontWeight: 700 }}>Next Appt: {p.upcoming_appointment.date}</span>
+                                     <span style={{ fontSize: '0.625rem', color: 'var(--primary)', fontWeight: 700 }}>Next Appt: {p.upcoming_appointment.date}</span>  
                                 )}
                                 {p.last_visit_details && (
                                     <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -512,22 +770,25 @@ const Patients = () => {
                             <button 
                                 className="btn btn-primary" 
                                 style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: '#f59e0b', borderColor: '#f59e0b', borderRadius: '10px' }}
-                                onClick={async () => {
-                                    const loading = toast.loading('Re-opening clinical visit...');
-                                    try {
-                                        await api.post('clinical/visits/', { patient: p.id, reason: 'OPD Consultation', status: 'PENDING_VITALS' });
-                                        toast.success("Joined Nurse Queue!", { id: loading });
-                                        fetchPatients();
-                                        fetchStats();
-                                    } catch (e) { toast.error("Patient visit already active", { id: loading }); }
+                                onClick={() => {
+                                    setTriagePatient(p);
+                                    setTriageReason('Routine Checkup');
+                                    setShowTriageModal(true);
                                 }}
                             >
                                 <Activity size={12} /> Triage
                             </button>
                         )}
-                        <button className="btn btn-secondary" style={{ padding: '0.4rem', border: 'none', background: 'transparent' }}>
-                          <MoreVertical size={18} color="var(--text-muted)" />
-                        </button>
+                        {(viewMode === 'ALL' || viewMode === 'COMPLETED') && (
+                            <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: '0.4rem 0.6rem', border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '10px' }}
+                                onClick={() => downloadMasterReport(p)}
+                                title="Download Case Summary PDF"
+                            >
+                                <Download size={16} color="var(--primary)" />
+                            </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1007,6 +1268,87 @@ const Patients = () => {
                         boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
                     }}
                 >Complete Registration</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* INSTANT TRIAGE MODAL FOR EXISTING PATIENTS */}
+      {showTriageModal && triagePatient && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(241, 245, 249, 0.85)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
+          <div className="fade-in" style={{ background: 'white', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px -4px rgba(245, 158, 11, 0.3)' }}>
+                  <Activity size={24} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: '#1e293b' }}>Confirm Triage</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Create new visit for returning patient</p>
+                </div>
+              </div>
+              <button onClick={() => setShowTriageModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#4f46e5', fontSize: '1rem' }}>
+                    {triagePatient.first_name[0]}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>{triagePatient.first_name} {triagePatient.last_name}</h3>
+                    <p style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>UHID: {triagePatient.patient_id} • {triagePatient.phone}</p>
+                  </div>
+               </div>
+               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                  Linked Project: {triagePatient.project_name || 'General Registry'}
+               </div>
+            </div>
+
+            <form onSubmit={handleInstantTriageSubmit}>
+              <div className="form-group" style={{ marginBottom: '2.5rem' }}>
+                <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Info size={14} /> Reason for Visit <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select 
+                  className="form-control"
+                  style={{ height: '54px', borderRadius: '16px', background: '#f8fafc', fontWeight: 700, fontSize: '0.875rem' }}
+                  value={triageReason}
+                  onChange={(e) => setTriageReason(e.target.value)}
+                  required
+                >
+                  <option value="Routine Checkup">Routine Checkup</option>
+                  <option value="Follow-up">Follow-up Visit</option>
+                  <option value="OPD Consultation">OPD Consultation</option>
+                  <option value="Emergency Care">Emergency Care</option>
+                  <option value="Diagnostic Review">Diagnostic Review</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  style={{ 
+                    padding: '1rem', borderRadius: '18px', fontWeight: 900, letterSpacing: '0.01em',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', border: 'none',
+                    boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.2)'
+                  }}
+                >
+                  START CLINICAL VISIT
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowTriageModal(false)}
+                  style={{ padding: '0.875rem', borderRadius: '18px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white' }}
+                >
+                  Back to Registry
+                </button>
               </div>
             </form>
           </div>

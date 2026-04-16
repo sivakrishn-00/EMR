@@ -4,8 +4,9 @@
     "db_name": "bc_cbc_db",
     "db_user": "root",
     "db_pass": "root_123",
-    "emr_endpoint": "http://localhost:8000/api/laboratory/requests/sync_batch/",
-    "sync_key": "7f57245668b0df5dfa88f6c64b95a5ef",
+    "emr_endpoint": "http://103.174.161.68:9002/api/laboratory/requests/sync_batch/",
+    "sync_key": "84ed5ec6156e1cec0152c71c5e790c2e",
     "interval": 6,
-    "theme": "Forest"
+    "theme": "Forest",
+    "last_synced_id": 91
 }

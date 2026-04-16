@@ -265,57 +265,80 @@ class LabSyncAgent:
 
     def run_sync_logic(self):
         try:
-            self.log_message(f"Scanning Local DB: {self.config['db_name']}...", "INFO")
+            self.log_message(f"Initiating High-Speed Delta Sync...", "INFO")
             
-            # Connection with Retry Logic
+            # 1. Start from our watermark
+            last_id = self.config.get("last_synced_id", 0)
+            batch_limit = 5000
+            total_session_synced = 0
+
             conn = mysql.connector.connect(
                 host=self.config["db_host"], port=self.config["db_port"],
                 user=self.config["db_user"], password=self.config["db_pass"], 
                 database=self.config["db_name"], connect_timeout=5
             )
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM cbc_results LIMIT 1000") # High speed batching
-            rows = cursor.fetchall()
-            conn.close()
-
-            if not rows:
-                self.log_message("Delta Scan: No new records found within scope.", "INFO")
-                return
-
-            self.log_message(f"Data Compression: Prepared {len(rows)} records for transmission.", "INFO")
-
-            def json_serial(obj):
-                from datetime import datetime, date
-                if isinstance(obj, (datetime, date)): return obj.isoformat()
-                return str(obj)
-
-            headers = {"X-Machine-Sync-Key": self.config["sync_key"], "Content-Type": "application/json"}
             
-            start_t = time.time()
-            response = requests.post(
-                self.config["emr_endpoint"], 
-                data=json.dumps({"results": rows}, default=json_serial), 
-                headers=headers, timeout=15
-            )
-            latency = round((time.time() - start_t) * 1000, 2)
+            while True:
+                cursor = conn.cursor(dictionary=True)
+                # QUERY: Fetch everything AFTER our last successful ID
+                query = "SELECT * FROM cbc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
+                cursor.execute(query, (last_id, batch_limit))
+                rows = cursor.fetchall()
+                cursor.close()
 
-            if response.status_code in [200, 201, 202]:
-                self.total_synced_count += len(rows)
-                self.last_sync_time = datetime.now().strftime("%H:%M:%S")
+                if not rows:
+                    if total_session_synced == 0:
+                        self.log_message("✔ IDLE: Cloud fully matched with Local DB.", "INFO")
+                    else:
+                        self.log_message(f"✔ SYNC SESSION COMPLETE: {total_session_synced} records pushed.", "INFO")
+                    break
+
+                self.log_message(f"Pumping {len(rows)} records (Last ID: {last_id})...", "INFO")
+
+                def json_serial(obj):
+                    from datetime import datetime, date
+                    if isinstance(obj, (datetime, date)): return obj.isoformat()
+                    return str(obj)
+
+                headers = {
+                    "X-Machine-Sync-Key": self.config["sync_key"], 
+                    "Content-Type": "application/json"
+                }
                 
-                # UI UPDATES
-                self.root.after(0, lambda: self.total_val.config(text=str(self.total_synced_count)))
-                self.root.after(0, lambda: self.last_val.config(text=self.last_sync_time))
-                self.log_message(f"✔ SYNCHRONIZED: {len(rows)} records in {latency}ms. Bridge Latency: Stable.", "INFO")
-            else:
-                self.log_message(f"✖ BRIDGE ERROR: HTTP {response.status_code} - {response.text[:100]}", "ERR")
+                response = requests.post(
+                    self.config["emr_endpoint"], 
+                    data=json.dumps({"results": rows}, default=json_serial), 
+                    headers=headers, timeout=30
+                )
 
+                if response.status_code in [200, 201, 202]:
+                    # Update Watermark
+                    last_id = rows[-1]['id']
+                    total_session_synced += len(rows)
+                    self.total_synced_count += len(rows)
+                    
+                    self.config["last_synced_id"] = last_id
+                    with open(CONFIG_FILE, "w") as f:
+                        json.dump(self.config, f, indent=4)
+
+                    # Update UI Dashboard
+                    self.root.after(0, lambda: self.total_val.config(text=f"{self.total_synced_count:,}"))
+                    self.root.after(0, lambda: self.last_val.config(text=f"ID {last_id}")) 
+                    self.log_message(f"✔ BATCH OK: Synced to ID {last_id}", "INFO")
+                    
+                    if len(rows) < batch_limit: break 
+                else:
+                    self.log_message(f"✖ BRIDGE ERROR: HTTP {response.status_code}. Pausing.", "ERR")
+                    break
+
+            conn.close()
+            
         except mysql.connector.Error as err:
-            self.log_message(f"✖ DB CONNECTIVITY FAILURE: {err}", "ERR")
+            self.log_message(f"✖ DB FAILURE: {err}", "ERR")
         except requests.exceptions.RequestException as e:
-            self.log_message(f"✖ NETWORK TIMEOUT: EMR Endpoint Unreachable. Retrying in next cycle.", "WARN")
+            self.log_message(f"✖ NETWORK TIMEOUT: Retrying...", "WARN")
         except Exception as e:
-            self.log_message(f"✖ SYSTEM FAULT: {str(e)}", "ERR")
+            self.log_message(f"✖ CRITICAL FAULT: {str(e)}", "ERR")
         finally:
             self.root.after(0, lambda: self.sync_btn.config(state="normal", text="⚡ FORCE SYNC"))
 

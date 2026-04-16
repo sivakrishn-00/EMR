@@ -609,7 +609,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no']
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         queryset = Patient.objects.all().order_by('-created_at')
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
@@ -626,12 +626,58 @@ class PatientViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def get_queryset(self):
+        queryset = self.get_base_queryset()
+            
+        # --- Workflow Tab Filtering ---
+        view_mode = self.request.query_params.get('view', 'all').lower()
+        if view_mode == 'active':
+            # Only show patients with a currently active clinical visit
+            queryset = queryset.filter(visits__is_active=True).distinct()
+        elif view_mode == 'scheduled':
+            # Only show patients with upcoming scheduled appointments
+            from django.utils import timezone
+            queryset = queryset.filter(appointments__status='SCHEDULED', appointments__appointment_date__gte=timezone.now()).distinct()
+        elif view_mode == 'completed':
+            # Only show patients who completed their visit today
+            from django.utils import timezone
+            today = timezone.localdate()
+            queryset = queryset.filter(visits__is_active=False, visits__visit_date__date=today).distinct()
+        # 'all' (Master Registry) requires no further filtering
+
+        return queryset.distinct()
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        today = timezone.now().date()
-        patient_qs = self.get_queryset()
+        from django.utils import timezone
+        today = timezone.localdate()
+        base_qs = self.get_base_queryset()
+        
+        # Calculate real-time counts for all columns
+        q_active = base_qs.filter(visits__is_active=True).distinct().count()
+        q_scheduled = base_qs.filter(appointments__status='SCHEDULED', appointments__appointment_date__gte=timezone.now()).distinct().count()
+        q_completed = base_qs.filter(visits__is_active=False, visits__visit_date__date=today).distinct().count()
+        q_all = base_qs.distinct().count()
+
         return Response({
-            "total_registered": patient_qs.count(),
-            "opd_today": 0, # Simplified
-            "emergency_today": 0
+            "total_registered": q_all,
+            "active_count": q_active,
+            "scheduled_count": q_scheduled,
+            "completed_count": q_completed,
+            "opd_today": q_active + q_completed,
+            "emergency_today": base_qs.filter(patient_type='Emergency', visits__visit_date__date=today).count()
+        })
+
+    @action(detail=True, methods=['get'])
+    def full_report(self, request, pk=None):
+        patient = self.get_object()
+        from clinical.models import Visit
+        from clinical.serializers import VisitSerializer
+        
+        # Fetch all visits with nested details (vitals, consult, lab, pharmacy)
+        visits = Visit.objects.filter(patient=patient).order_by('-visit_date')
+        
+        return Response({
+            "patient": PatientSerializer(patient).data,
+            "visits": VisitSerializer(visits, many=True).data
         })
