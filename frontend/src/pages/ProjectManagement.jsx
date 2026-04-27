@@ -13,7 +13,8 @@ const ProjectManagement = () => {
         categories: [],
         primary_color: '#6366f1',
         secondary_color: '#a5b4fc',
-        accent_color: '#f43f5e'
+        accent_color: '#f43f5e',
+        allow_appointments: true
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -57,6 +58,7 @@ const ProjectManagement = () => {
             formData.append('primary_color', projectFormData.primary_color);
             formData.append('secondary_color', projectFormData.secondary_color);
             formData.append('accent_color', projectFormData.accent_color);
+            formData.append('allow_appointments', projectFormData.allow_appointments);
 
             let projectId = editingProjectId;
             if (isEditing) {
@@ -96,7 +98,8 @@ const ProjectManagement = () => {
             logo: null,
             primary_color: p.primary_color || '#6366f1',
             secondary_color: p.secondary_color || '#a5b4fc',
-            accent_color: p.accent_color || '#f43f5e'
+            accent_color: p.accent_color || '#f43f5e',
+            allow_appointments: p.allow_appointments ?? true
         });
         setLogoPreview(p.logo ? (p.logo.startsWith('http') ? p.logo : `${MEDIA_URL}${p.logo}`) : null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -163,6 +166,9 @@ const ProjectManagement = () => {
                                                         {m.category === 'EMPLOYEE' ? 'Staff (IE)' : m.category === 'FAMILY' ? 'Dependents' : 'General'}
                                                     </span>
                                                 ))}
+                                                <span style={{ fontSize: '0.675rem', fontWeight: 800, padding: '4px 10px', background: p.allow_appointments !== false ? '#eef2ff' : '#f8fafc', color: p.allow_appointments !== false ? '#4338ca' : '#94a3b8', borderRadius: '6px', textTransform: 'uppercase', border: '1px solid ' + (p.allow_appointments !== false ? '#c7d2fe' : '#e2e8f0') }}>
+                                                    {p.allow_appointments !== false ? 'Appointments Enabled' : 'Appointments Disabled'}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -331,6 +337,33 @@ const ProjectManagement = () => {
                                             </label>
                                         ))}
                                     </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label 
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '1rem', 
+                                            padding: '1.25rem', 
+                                            background: projectFormData.allow_appointments ? 'rgba(79, 70, 229, 0.03)' : '#f8fafc',
+                                            border: '1px solid ' + (projectFormData.allow_appointments ? 'var(--primary)' : '#e2e8f0'),
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: '0.2s'
+                                        }}
+                                    >
+                                        <input 
+                                            type="checkbox"
+                                            style={{ width: '20px', height: '20px' }}
+                                            checked={projectFormData.allow_appointments}
+                                            onChange={e => setProjectFormData({ ...projectFormData, allow_appointments: e.target.checked })}
+                                        />
+                                        <div>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enable Patient Self-Service Appointments</p>
+                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Allow patients in this project to book consultations and tests from their portal.</p>
+                                        </div>
+                                    </label>
                                 </div>
 
                                 <div className="form-group">

@@ -90,16 +90,19 @@ class Vitals(models.Model):
 class Consultation(models.Model):
     visit = models.OneToOneField(Visit, on_delete=models.CASCADE, related_name='consultation')
     doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='consultations_given')
-    chief_complaint = models.TextField()
-    history_of_present_illness = models.TextField(blank=True)
-    physical_examination = models.TextField(blank=True)
-    diagnosis = models.TextField()
-    plan = models.TextField()
+    chief_complaint = models.TextField(blank=True, null=True)
+    history_of_present_illness = models.TextField(blank=True, null=True)
+    physical_examination = models.TextField(blank=True, null=True)
+    diagnosis = models.TextField(blank=True, null=True)
+    plan = models.TextField(blank=True, null=True)
     conducted_at = models.DateTimeField(auto_now_add=True)
 
 class Appointment(models.Model):
     STATUS_CHOICES = (
-        ('SCHEDULED', 'Scheduled'),
+        ('SCHEDULED', 'Scheduled (Pending)'),
+        ('CONFIRMED', 'Confirmed (Acknowledged by Admin)'),
+        ('PATIENT_ACKNOWLEDGED', 'Patient Acknowledged'),
+        ('REJECTED', 'Rejected by Patient'),
         ('CHECKED_IN', 'Checked In'),
         ('CANCELLED', 'Cancelled'),
         ('NO_SHOW', 'No Show'),
@@ -107,7 +110,8 @@ class Appointment(models.Model):
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointments')
     doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='doctor_appointments')
-    appointment_date = models.DateTimeField()
+    appointment_date = models.DateTimeField() # This acts as Start Time
+    end_time = models.DateTimeField(null=True, blank=True) # Explicit range support
     reason = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SCHEDULED')
     created_at = models.DateTimeField(auto_now_add=True)

@@ -90,6 +90,10 @@ class VisitViewSet(viewsets.ModelViewSet):
             project_obj = visit.patient.project or (visit.patient.employee_master.project if visit.patient.is_employee_linked and visit.patient.employee_master else None)
             notify_team(project_obj, ['DOCTOR', 'ADMIN'], "Vitals Ready", f"Vitals recorded for {visit.patient}. Ready for consultation.")
             
+            # Notify Patient
+            if visit.patient.user:
+                notify_user(visit.patient.user, "Vitals Recorded", "Your vital parameters have been successfully recorded and shared with your doctor.")
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED if not vitals_instance else status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -212,9 +216,16 @@ class VisitViewSet(viewsets.ModelViewSet):
             # Notify Pharmacy if pending
             if next_step == 'PENDING_PHARMACY':
                 notify_team(project_obj, ['PHARMACIST', 'ADMIN'], "New Prescription", f"New medication order for {visit.patient}.")
+                if visit.patient.user:
+                    notify_user(visit.patient.user, "Prescription Ready", "Your doctor has prescribed medications. Please proceed to the pharmacy.")
             # Notify Lab if pending
             elif next_step == 'PENDING_LAB':
                 notify_team(project_obj, ['LAB_TECHNICIAN', 'ADMIN'], "New Lab Request", f"New lab tests ordered for {visit.patient}.")
+                if visit.patient.user:
+                    notify_user(visit.patient.user, "Laboratory Investigations Ordered", "Your doctor has requested laboratory tests. Please visit the lab for sample collection.")
+            elif next_step == 'COMPLETED':
+                if visit.patient.user:
+                    notify_user(visit.patient.user, "Clinical Session Completed", "Your clinical visit is now complete. You can download your report from the portal.")
 
             return Response(serializer.data, status=status.HTTP_201_CREATED if not consult_instance else status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -292,7 +303,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         
         from django.db.models import Q
         if not is_admin:
-            if user.project:
+            # Allow patients to see their own appointments (linked via username matching patient_id)
+            if user.role == 'PATIENT':
+                queryset = queryset.filter(patient__patient_id=user.username)
+            elif user.project:
                 queryset = queryset.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
             else:
                 queryset = queryset.filter(patient__registered_by=user)
@@ -310,6 +324,49 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(appointment_date__date__range=[from_date, to_date])
             
         return queryset
+
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        appt = self.get_object()
+        if appt.status != 'SCHEDULED':
+            return Response({"error": "Can only confirm pending scheduled appointments"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Professional Slot Allocation: Allow adjusting date/time range during acknowledgment
+        new_start = request.data.get('appointment_date')
+        new_end = request.data.get('end_time')
+        
+        if new_start:
+            appt.appointment_date = new_start
+        if new_end:
+            appt.end_time = new_end
+            
+        appt.status = 'CONFIRMED'
+        appt.save()
+        
+        log_action(request.user, 'Clinical', 'Appointment Confirmed', f"Administrative slot allocation for appt {appt.id}")
+        return Response({"message": "Appointment acknowledged and slot allocated successfully"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def acknowledge(self, request, pk=None):
+        """Allows a patient to formally acknowledge their confirmed clinical slot."""
+        appt = self.get_object()
+        if appt.status != 'CONFIRMED':
+            return Response({"error": "Can only acknowledge confirmed slots"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        appt.status = 'PATIENT_ACKNOWLEDGED'
+        appt.save()
+        return Response({"status": "Appointment acknowledged by patient"})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Allows a patient to formally reject a proposed clinical slot."""
+        appt = self.get_object()
+        if appt.status != 'CONFIRMED':
+            return Response({"error": "Can only reject proposed slots"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        appt.status = 'REJECTED'
+        appt.save()
+        return Response({"status": "Appointment rejected by patient"})
 
     @action(detail=True, methods=['post'])
     def check_in(self, request, pk=None):
@@ -338,6 +395,26 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response({"message": "Checked in successfully"}, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
-        serializer.save()
-        log_action(self.request.user, 'Clinical', 'Appointment Created', f"Scheduled appt for patient {serializer.validated_data['patient']}")
+        user = self.request.user
+        patient = None
+        
+        # Automatically associate patient if user is a patient profile
+        if hasattr(user, 'patient_profile'):
+            patient = user.patient_profile
+        
+        # Allow overriding if provided (for admins)
+        target_patient = serializer.validated_data.get('patient', patient)
+        
+        if not target_patient:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"error": "Patient profile not found"})
 
+        # Edge Case: Check for active visits (ongoing clinical session)
+        from clinical.models import Visit
+        active_visit = Visit.objects.filter(patient=target_patient, is_active=True).exists()
+        if active_visit:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"error": "You currently have an active clinical visit in progress. Please complete your current session before scheduling a new appointment."})
+
+        serializer.save(patient=target_patient)
+        log_action(user, 'Clinical', 'Appointment Created', f"Scheduled appt for patient {target_patient}")

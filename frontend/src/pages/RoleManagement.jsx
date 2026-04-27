@@ -178,10 +178,10 @@ const RoleManagement = () => {
                             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Active Policies</h3>
                             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>Total established roles</p>
                         </div>
-                        <span style={{ fontSize: '1.125rem', fontWeight: 800, background: 'var(--primary)', color: 'white', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', boxShadow: '0 4px 10px rgba(99, 102, 241, 0.3)' }}>{roles.length}</span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: 800, background: 'var(--primary)', color: 'white', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', boxShadow: '0 4px 10px rgba(99, 102, 241, 0.3)' }}>{roles.filter(r => r.name !== 'PATIENT').length}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '700px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-                        {roles.map(r => (
+                        {roles.filter(r => r.name !== 'PATIENT').map(r => (
                             <div key={r.id} style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
@@ -194,8 +194,14 @@ const RoleManagement = () => {
                                         <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{r.description || 'Generic security access policy'}</p>
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button onClick={() => { setEditingRoleId(r.id); setIsEditingRole(true); setRoleForm({ name: r.name, description: r.description, data_isolation: r.data_isolation, permissions: r.permissions || [] }); window.scrollTo({top:0, behavior:'smooth'}) }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Pencil size={14} /></button>
-                                        <button onClick={async () => { if(window.confirm(`Delete role ${r.name}?`)) { await api.delete(`accounts/user-roles/${r.id}/`); fetchRoles(); } }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Trash2 size={14} /></button>
+                                        {r.name === 'PATIENT' ? (
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 850, padding: '6px 12px', background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', letterSpacing: '0.05em' }}>SYSTEM PROTECTED</span>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => { setEditingRoleId(r.id); setIsEditingRole(true); setRoleForm({ name: r.name, description: r.description, data_isolation: r.data_isolation, permissions: r.permissions || [] }); window.scrollTo({top:0, behavior:'smooth'}) }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Pencil size={14} /></button>
+                                                <button onClick={async () => { if(window.confirm(`Delete role ${r.name}?`)) { await api.delete(`accounts/user-roles/${r.id}/`); fetchRoles(); } }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Trash2 size={14} /></button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

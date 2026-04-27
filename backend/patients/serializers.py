@@ -82,10 +82,20 @@ class PatientSerializer(serializers.ModelSerializer):
     employee_details = serializers.SerializerMethodField()
     family_details = serializers.SerializerMethodField()
     project_name = serializers.CharField(source='project.name', read_only=True)
+    portal_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = '__all__'
+
+    def get_portal_status(self, obj):
+        from accounts.models import User
+        try:
+            user = User.objects.get(username=obj.patient_id)
+            if user.is_active: return 'ENABLED'
+            return 'PENDING'
+        except User.DoesNotExist:
+            return 'DISABLED'
 
     def get_employee_details(self, obj):
         if obj.employee_master:
@@ -127,12 +137,31 @@ class PatientSerializer(serializers.ModelSerializer):
         from clinical.models import Appointment
         from django.utils import timezone
         try:
-            appt = Appointment.objects.filter(patient=obj, appointment_date__gte=timezone.now(), status='SCHEDULED').order_by('appointment_date').first()
+            # Include both Scheduled and Confirmed for the upcoming tracking
+            appt = Appointment.objects.filter(
+                patient=obj, 
+                appointment_date__gte=timezone.now() - timezone.timedelta(hours=2) # Grace period
+            ).filter(status__in=['SCHEDULED', 'CONFIRMED', 'PATIENT_ACKNOWLEDGED']).order_by('appointment_date').first()
+            
             if appt:
+                # Reuse the same range logic as clinical serializer
+                start_dt = appt.appointment_date
+                start_str = start_dt.strftime("%H:%M")
+                
+                # If end_time is missing, default to 30 mins range for UI consistency
+                end_dt = appt.end_time or (start_dt + timezone.timedelta(minutes=30))
+                end_str = end_dt.strftime("%H:%M")
+                
+                formatted_range = f"{start_str} - {end_str}"
+                
                 return {
-                    'time': appt.appointment_date.strftime("%H:%M"),
+                    'id': appt.id,
+                    'time': start_str,
+                    'formatted_time': formatted_range,
+                    'end_time_only': end_str,
                     'date': appt.appointment_date.strftime("%Y-%m-%d"),
-                    'reason': appt.reason
+                    'reason': appt.reason,
+                    'status': appt.status
                 }
         except: return None
         return None

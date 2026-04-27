@@ -53,17 +53,34 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
     doctor_name = serializers.ReadOnlyField(source='doctor.username')
     formatted_time = serializers.SerializerMethodField()
+    end_time_only = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
         fields = '__all__'
+        extra_kwargs = {
+            'patient': {'required': False}
+        }
 
     def get_patient_name(self, obj):
         return f"{obj.patient.first_name} {obj.patient.last_name}"
 
-    def get_formatted_time(self, obj):
-        # Return only the local time part HH:MM
-        if obj.appointment_date:
-            return obj.appointment_date.strftime("%H:%M")
+    def get_end_time_only(self, obj):
+        if obj.end_time:
+            return obj.end_time.strftime("%H:%M")
         return ""
+
+    def get_formatted_time(self, obj):
+        if not obj.appointment_date:
+            return ""
+        
+        from django.utils import timezone
+        start_dt = obj.appointment_date
+        start_str = start_dt.strftime("%H:%M")
+        
+        # Consistent professional range: Default to 30 mins if not explicitly set
+        end_dt = obj.end_time or (start_dt + timezone.timedelta(minutes=30))
+        end_str = end_dt.strftime("%H:%M")
+        
+        return f"{start_str} - {end_str}"
 

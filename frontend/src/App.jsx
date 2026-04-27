@@ -19,6 +19,7 @@ import RoleManagement from './pages/RoleManagement';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import BridgeHub from './pages/BridgeHub';
+import PatientDashboard from './pages/Portal/PatientDashboard';
 import { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children, requiredModule }) => {
@@ -33,7 +34,15 @@ const ProtectedRoute = ({ children, requiredModule }) => {
       `}</style>
     </div>
   );
-  if (!user) return <Navigate to="/login" />;
+  if (!user) {
+    const isPortal = window.location.pathname.startsWith('/portal/');
+    return <Navigate to={isPortal ? "/portal/login" : "/login"} />;
+  }
+
+  // 🛡️ SECURITY: Force patients to complete password setup before dashboard access
+  if (user.role === 'PATIENT' && !user.is_password_set) {
+      return <Navigate to="/portal/login" replace />;
+  }
   
   // Base dashboard access without specific module requirement
   if (!requiredModule) return children;
@@ -156,6 +165,13 @@ const ThemedApp = ({ children }) => {
   return children;
 };
 
+const RootRedirect = () => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={user.role === 'PATIENT' ? "/portal/dashboard" : "/dashboard"} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -178,7 +194,25 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Patient Portal Area (Billion Scale UX) */}
+          <Route path="/portal/login" element={<Login />} />
+          <Route path="/portal/dashboard" element={
+            <ProtectedRoute>
+                <PatientDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/portal/records" element={
+            <ProtectedRoute>
+                <PatientDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/portal/appointments" element={
+            <ProtectedRoute>
+                <PatientDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/" element={<RootRedirect />} />
           
           <Route path="/dashboard" element={
             <MainLayout>
@@ -294,7 +328,7 @@ function App() {
             </MainLayout>
           } />
 
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>
       </ThemedApp>

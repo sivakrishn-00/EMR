@@ -15,6 +15,7 @@ class Project(models.Model):
     secondary_color = models.CharField(max_length=20, default='#a5b4fc')
     accent_color = models.CharField(max_length=20, default='#f43f5e')
     use_registry_for_personnel = models.BooleanField(default=False, help_text="Prioritize polymorphic registry for Staff/Family")
+    allow_appointments = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -61,7 +62,7 @@ class EmployeeMaster(models.Model):
     dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     aadhar_no = models.CharField(max_length=20, unique=True, blank=True, null=True)
-    mobile_no = models.CharField(max_length=15, blank=True, null=True)
+    mobile_no = models.CharField(max_length=15, blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     designation = models.CharField(max_length=100, blank=True, null=True)
     additional_fields = models.JSONField(default=dict, blank=True)
@@ -128,7 +129,7 @@ class Patient(models.Model):
     last_name = models.CharField(max_length=100)
     dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
-    phone = models.CharField(max_length=15, blank=True, null=True) # Family members often share a contact number
+    phone = models.CharField(max_length=15, blank=True, null=True, db_index=True) # Family members often share a contact number
     address = models.TextField(blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     
@@ -138,6 +139,7 @@ class Patient(models.Model):
     id_proof_number = models.CharField(max_length=50, unique=True, null=False, help_text="Aadhaar or primary ID number")
     abha_id = models.CharField(max_length=20, blank=True, null=True)
     patient_type = models.CharField(max_length=20, choices=PATIENT_TYPE_CHOICES, default='OPD')
+    blood_group = models.CharField(max_length=10, blank=True, null=True)
     
     # Employee Fields
     is_employee_linked = models.BooleanField(default=False)

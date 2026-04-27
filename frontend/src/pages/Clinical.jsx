@@ -64,10 +64,8 @@ const Clinical = () => {
   useEffect(() => {
     if (selectedVisit) {
       const pid = selectedVisit.patient_details?.project_id || selectedVisit.patient_details?.project || "";
-      if (pid) {
-          fetchProjectLabMasters(pid);
-          fetchPharmacyInventory(pid);
-      }
+      fetchProjectLabMasters(pid);
+      fetchPharmacyInventory(pid);
     }
   }, [selectedVisit]);
 
@@ -95,7 +93,7 @@ const Clinical = () => {
 
       // Filter strictly for pharmacy-drugs protocol and isolate by project if specified
       let url = `patients/registry-data/?registry_type=${slug}&page_size=1000`;
-      if (projectId) url += `&project=${projectId}`;
+      if (projectId && slug !== 'pharmacy-drugs') url += `&project=${projectId}`;
       const res = await api.get(url);
       const data = res.data.results || res.data;
       setPharmacyInventory(Array.isArray(data) ? data : []);
@@ -621,10 +619,12 @@ const Clinical = () => {
                     <label>Diagnosis</label>
                     <textarea rows="3" required value={consultData.diagnosis} onChange={e => setConsultData({...consultData, diagnosis: e.target.value})} placeholder="Differential or final diagnosis..."></textarea>
                   </div>
-                  <div className="form-group">
-                    <label>Treatment / Plan</label>
-                    <textarea rows="3" required value={consultData.plan} onChange={e => setConsultData({...consultData, plan: e.target.value})} placeholder="Instructions, follow-up, lifestyle changes..."></textarea>
-                  </div>
+                  {consultData.next_step !== 'PENDING_LAB' && (
+                     <div className="form-group fade-in">
+                       <label>Treatment / Plan</label>
+                       <textarea rows="3" required={consultData.next_step !== 'PENDING_LAB'} value={consultData.plan} onChange={e => setConsultData({...consultData, plan: e.target.value})} placeholder="Instructions, follow-up, lifestyle changes..."></textarea>
+                     </div>
+                   )}
                </div>
 
                {/* Medication Section */}

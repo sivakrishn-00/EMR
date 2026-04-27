@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../services/api';
-import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check, ShieldCheck } from 'lucide-react';
+import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check, ShieldCheck, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Users = () => {
@@ -18,6 +18,13 @@ const Users = () => {
     });
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [viewMode, setViewMode] = useState('CLINICAL');
+    const [statusFilter, setStatusFilter] = useState('ACTIVE');
+    const [showProvisionModal, setShowProvisionModal] = useState(false);
+    const [availablePatients, setAvailablePatients] = useState([]);
+    const [provisionSearch, setProvisionSearch] = useState('');
+    const [selectedPatients, setSelectedPatients] = useState([]);
+    const [isProvisioning, setIsProvisioning] = useState(null);
 
     useEffect(() => {
         fetchUsers();
@@ -27,7 +34,8 @@ const Users = () => {
 
     const fetchUsers = async (pageNum = 1) => {
         try {
-            const res = await api.get(`accounts/users/?page=${pageNum}`);
+            // Increase page_size to 100 to show more users at once
+            const res = await api.get(`accounts/users/?page=${pageNum}&page_size=100`);
             if (res.data.results) {
                 setUsers(res.data.results);
                 setTotalCount(res.data.count);
@@ -113,6 +121,62 @@ const Users = () => {
         }
     };
 
+    const handleToggleStatus = async (user) => {
+        const loadingToast = toast.loading(user.is_active ? 'Disabling access...' : 'Activating user...');
+        try {
+            await api.patch(`accounts/users/${user.id}/`, { is_active: !user.is_active });
+            toast.success(`User ${!user.is_active ? 'activated' : 'deactivated'} successfully`, { id: loadingToast });
+            fetchUsers(page);
+        } catch (err) {
+            toast.error("Failed to update status", { id: loadingToast });
+        }
+    };
+
+    const fetchAvailablePatients = async () => {
+        try {
+            // Increase limit to 1000 to see more patients in the provisioning list
+            const res = await api.get('patients/patients/?limit=1000');
+            // Filter only those who don't have an active portal account yet
+            const data = res.data.results || res.data; // Handle both paginated and non-paginated
+            const unprovisioned = data.filter(p => p.portal_status === 'DISABLED');
+            setAvailablePatients(unprovisioned);
+        } catch (err) {
+            console.error("Failed to fetch registry");
+        }
+    };
+
+    const handleEnablePortal = async (patientId) => {
+        setIsProvisioning(patientId);
+        const loading = toast.loading("Provisioning Portal Credentials...");
+        try {
+            await api.post(`patients/patients/${patientId}/enable_portal/`);
+            toast.success("Portal Access Enabled!", { id: loading });
+            fetchUsers(page);
+            fetchAvailablePatients();
+        } catch (err) {
+            toast.error(err.response?.data?.error || "Provisioning failed", { id: loading });
+        } finally {
+            setIsProvisioning(null);
+        }
+    };
+
+    const handleBulkEnablePortal = async () => {
+        if (selectedPatients.length === 0) return;
+        setIsProvisioning('BULK');
+        const loading = toast.loading(`Provisioning ${selectedPatients.length} accounts...`);
+        try {
+            await api.post('patients/patients/bulk_enable_portal/', { patient_ids: selectedPatients });
+            toast.success(`Access granted for ${selectedPatients.length} patients!`, { id: loading });
+            setSelectedPatients([]);
+            setShowProvisionModal(false);
+            fetchUsers(page);
+        } catch (err) {
+            toast.error("Bulk provisioning failed", { id: loading });
+        } finally {
+            setIsProvisioning(null);
+        }
+    };
+
     const handleUserRoleSave = async (userId) => {
         const loadingToast = toast.loading('Updating user roles...');
         try {
@@ -132,12 +196,73 @@ const Users = () => {
                     <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Staff Directory</h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Full management of clinical and administrative access</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-                    <UserPlus size={20} /> Add Staff Member
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', background: 'var(--surface)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        {['ACTIVE', 'INACTIVE'].map(s => (
+                            <button 
+                                key={s}
+                                onClick={() => setStatusFilter(s)}
+                                style={{ 
+                                    padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
+                                    background: statusFilter === s ? 'var(--primary)' : 'transparent',
+                                    color: statusFilter === s ? 'white' : 'var(--text-muted)',
+                                    fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', transition: '0.3s'
+                                }}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                    {viewMode === 'PATIENTS' && (
+                        <button 
+                            className="btn btn-primary" 
+                            style={{ 
+                                background: '#f59e0b', 
+                                borderColor: '#f59e0b', 
+                                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
+                                cursor: 'pointer',
+                                zIndex: 1000 // Ensure it's clickable
+                            }}
+                            onClick={() => {
+                                console.log("Provision Button Clicked");
+                                setProvisionSearch('');
+                                setSelectedPatients([]);
+                                fetchAvailablePatients();
+                                setShowProvisionModal(true);
+                            }}
+                        >
+                            <ShieldCheck size={20} /> Authorize New Access
+                        </button>
+                    )}
+                    {viewMode !== 'PATIENTS' && (
+                        <button className="btn btn-primary" onClick={() => handleOpenModal()}>
+                            <UserPlus size={20} /> Add Staff Member
+                        </button>
+                    )}
+                </div>
             </header>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: '2rem', padding: '0 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                    {[
+                        { id: 'CLINICAL', label: 'Clinical Team', roles: ['DOCTOR', 'NURSE', 'LAB_TECH'] },
+                        { id: 'MANAGEMENT', label: 'Admin & Operations', roles: ['ADMIN', 'DEO', 'PHARMACIST'] },
+                        { id: 'PATIENTS', label: 'Patient Portal Users', roles: ['PATIENT'] }
+                    ].map(tab => (
+                        <button 
+                            key={tab.id}
+                            onClick={() => setViewMode(tab.id)}
+                            style={{ 
+                                padding: '1rem 0.5rem', background: 'none', border: 'none',
+                                borderBottom: viewMode === tab.id ? '3px solid var(--primary)' : '3px solid transparent',
+                                fontWeight: 800, color: viewMode === tab.id ? 'var(--primary)' : 'var(--text-muted)',
+                                cursor: 'pointer', transition: '0.3s', fontSize: '0.85rem', textTransform: 'uppercase'
+                            }}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="table-responsive">
                     <table>
                         <thead>
@@ -150,7 +275,17 @@ const Users = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {users.map(u => (
+                            {users.filter(u => {
+                                // First Filter by Status
+                                const matchesStatus = statusFilter === 'ACTIVE' ? u.is_active : !u.is_active;
+                                if (!matchesStatus) return false;
+
+                                // Then Filter by Tab
+                                if (viewMode === 'CLINICAL') return ['DOCTOR', 'NURSE', 'LAB_TECH'].includes(u.role);
+                                if (viewMode === 'MANAGEMENT') return ['ADMIN', 'DEO', 'PHARMACIST'].includes(u.role);
+                                if (viewMode === 'PATIENTS') return u.role === 'PATIENT';
+                                return true;
+                            }).map(u => (
                                 <tr key={u.id}>
                                     <td style={{ padding: '1.25rem 1.5rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -165,14 +300,38 @@ const Users = () => {
                                             </div>
                                             <div>
                                                 <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{u.first_name} {u.last_name || '(No Name)'}</p>
-                                                <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Joined {new Date(u.date_joined).toLocaleDateString('en-GB')}</p>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    {u.role === 'PATIENT' && (
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                            ID: {u.username}
+                                                        </span>
+                                                    )}
+                                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Joined {new Date(u.date_joined).toLocaleDateString('en-GB')}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
-                                        {editingUserRoles === u.id ? (
+                                    <td style={{ verticalAlign: 'middle' }}>
+                                        {viewMode === 'PATIENTS' ? (
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase' }}>Patient</span>
+                                                {u.is_password_set ? (
+                                                    <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <CheckCircle size={10} /> Active Portal
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <Clock size={10} /> Provisioned
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            editingUserRoles === u.id ? (
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxWidth: '300px' }}>
-                                                {roles.map(r => {
+                                                {roles.filter(r => {
+                                                    if (u.role === 'PATIENT') return r.name === 'PATIENT';
+                                                    return r.name !== 'PATIENT';
+                                                }).map(r => {
                                                     const isChecked = tempUserRoles.includes(r.id);
                                                     return (
                                                         <label key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', padding: '0.3rem 0.5rem', background: isChecked ? 'rgba(16, 185, 129, 0.1)' : 'white', border: `1px solid ${isChecked ? '#10b981' : '#e2e8f0'}`, borderRadius: '6px', transition: 'all 0.2s', fontSize: '0.7rem', fontWeight: 600 }}>
@@ -201,19 +360,30 @@ const Users = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                        )}
+                                        ))}
                                     </td>
                                     <td>
                                         <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-main)' }}>{u.email}</div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.phone || 'No phone'}</div>
                                     </td>
                                     <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <button 
+                                            onClick={() => handleToggleStatus(u)}
+                                            style={{ 
+                                                display: 'flex', alignItems: 'center', gap: '0.5rem', 
+                                                background: 'none', border: 'none', cursor: 'pointer',
+                                                padding: '0.4rem 0.6rem', borderRadius: '8px',
+                                                transition: '0.2s',
+                                                outline: 'none'
+                                            }}
+                                            className="status-toggle-btn"
+                                            title={u.is_active ? "Click to Deactivate" : "Click to Activate"}
+                                        >
                                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.is_active ? '#10b981' : '#ef4444' }}></div>
                                             <span style={{ color: u.is_active ? '#10b981' : '#ef4444', fontWeight: 700, fontSize: '0.75rem' }}>
                                                 {u.is_active ? 'Active' : 'Disabled'}
                                             </span>
-                                        </div>
+                                        </button>
                                     </td>
                                     <td style={{ textAlign: 'right', paddingRight: '1.5rem' }}>
                                         {editingUserRoles === u.id ? (
@@ -227,13 +397,17 @@ const Users = () => {
                                             </div>
                                         ) : (
                                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem' }}>
-                                                <button className="btn btn-secondary" title="Manage Roles" style={{ padding: '0.45rem', borderRadius: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} onClick={() => { setEditingUserRoles(u.id); setTempUserRoles((u.user_roles || [])); }}>
-                                                    <Shield size={16} />
-                                                </button>
-                                                <button className="btn btn-secondary" title="Edit Profile" style={{ padding: '0.45rem', borderRadius: '10px' }} onClick={() => handleOpenModal(u)}>
-                                                    <Edit size={16} />
-                                                </button>
-                                                <button className="btn btn-secondary" title="Revoke Access" style={{ padding: '0.45rem', borderRadius: '10px', color: '#ef4444' }} onClick={() => setConfirmDelete(u)}>
+                                                {viewMode !== 'PATIENTS' && (
+                                                    <>
+                                                        <button className="btn btn-secondary" title="Manage Roles" style={{ padding: '0.45rem', borderRadius: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }} onClick={() => { setEditingUserRoles(u.id); setTempUserRoles((u.user_roles || [])); }}>
+                                                            <Shield size={16} />
+                                                        </button>
+                                                        <button className="btn btn-secondary" title="Edit Profile" style={{ padding: '0.45rem', borderRadius: '10px' }} onClick={() => handleOpenModal(u)}>
+                                                            <Edit size={16} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button className="btn btn-secondary" title="Revoke Access" style={{ padding: '0.45rem', borderRadius: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.05)' }} onClick={() => setConfirmDelete(u)}>
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
@@ -468,6 +642,131 @@ const Users = () => {
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button className="btn btn-secondary" style={{ flex: 1, borderRadius: '16px', fontWeight: 800 }} onClick={() => setConfirmDelete(null)}>Keep User</button>
                             <button className="btn btn-primary" style={{ flex: 1, background: '#ef4444', borderColor: '#ef4444', borderRadius: '16px', fontWeight: 800, border: 'none', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }} onClick={handleDelete}>Delete User</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {showProvisionModal && createPortal(
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '600px', borderRadius: '24px', padding: 0, overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)', padding: '1.5rem 2rem', borderBottom: '1px solid #fde68a' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ width: '40px', height: '40px', background: '#f59e0b', color: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <ShieldCheck size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ fontWeight: 900, fontSize: '1.2rem', color: '#92400e' }}>Bulk Provisioning</h2>
+                                        <p style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Authorize {selectedPatients.length > 0 ? selectedPatients.length : 'multiple'} patients at once</p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    {availablePatients.length > 0 && (
+                                        <button 
+                                            onClick={() => {
+                                                const filtered = availablePatients.filter(p => 
+                                                    p.patient_id?.toLowerCase().includes(provisionSearch.toLowerCase()) ||
+                                                    `${p.first_name} ${p.last_name}`.toLowerCase().includes(provisionSearch.toLowerCase())
+                                                );
+                                                if (selectedPatients.length >= filtered.length && filtered.every(p => selectedPatients.includes(p.id))) {
+                                                    setSelectedPatients(selectedPatients.filter(id => !filtered.map(f => f.id).includes(id)));
+                                                } else {
+                                                    setSelectedPatients([...new Set([...selectedPatients, ...filtered.map(p => p.id)])]);
+                                                }
+                                            }}
+                                            style={{ background: 'white', border: '1px solid #fde68a', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#b45309', cursor: 'pointer' }}
+                                        >
+                                            Toggle Filtered
+                                        </button>
+                                    )}
+                                    <button onClick={() => { setShowProvisionModal(false); setSelectedPatients([]); setProvisionSearch(''); }} style={{ background: 'white', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <X size={18} color="#b45309" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Search Bar inside Modal */}
+                        <div style={{ padding: '1rem 2rem', background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+                            <div style={{ position: 'relative' }}>
+                                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#b45309' }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by Patient ID or Name..." 
+                                    style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: '12px', border: '1px solid #fde68a', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
+                                    value={provisionSearch}
+                                    onChange={(e) => setProvisionSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ padding: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
+                            {availablePatients.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                    <p style={{ fontWeight: 700 }}>No unprovisioned patients found.</p>
+                                    <p style={{ fontSize: '0.75rem' }}>All registered patients have portal access or are already enabled.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {availablePatients
+                                        .filter(p => 
+                                            p.patient_id?.toLowerCase().includes(provisionSearch.toLowerCase()) ||
+                                            `${p.first_name} ${p.last_name}`.toLowerCase().includes(provisionSearch.toLowerCase())
+                                        )
+                                        .map(p => {
+                                            const isSelected = selectedPatients.includes(p.id);
+                                        return (
+                                            <div 
+                                                key={p.id} 
+                                                onClick={() => {
+                                                    if (isSelected) setSelectedPatients(selectedPatients.filter(id => id !== p.id));
+                                                    else setSelectedPatients([...selectedPatients, p.id]);
+                                                }}
+                                                style={{ 
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', 
+                                                    background: isSelected ? '#fffbeb' : '#f8fafc', 
+                                                    borderRadius: '16px', border: `1px solid ${isSelected ? '#f59e0b' : '#e2e8f0'}`,
+                                                    cursor: 'pointer', transition: '0.2s'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <div style={{ 
+                                                        width: '20px', height: '20px', borderRadius: '6px', 
+                                                        border: `2px solid ${isSelected ? '#f59e0b' : '#cbd5e1'}`,
+                                                        background: isSelected ? '#f59e0b' : 'white',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        color: 'white'
+                                                    }}>
+                                                        {isSelected && <Check size={14} strokeWidth={4} />}
+                                                    </div>
+                                                    <div>
+                                                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>{p.first_name} {p.last_name}</p>
+                                                        <p style={{ fontSize: '0.75rem', color: '#64748b' }}>ID: {p.patient_id} • {p.phone}</p>
+                                                    </div>
+                                                </div>
+                                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: isSelected ? '#f59e0b' : '#94a3b8', textTransform: 'uppercase' }}>
+                                                    {isSelected ? 'Selected' : 'Click to select'}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ padding: '1.25rem 1.5rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{selectedPatients.length} patients selected</p>
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button className="btn btn-secondary" onClick={() => { setShowProvisionModal(false); setSelectedPatients([]); setProvisionSearch(''); }}>Cancel</button>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ background: '#f59e0b', borderColor: '#f59e0b', padding: '0.6rem 1.5rem', fontWeight: 800 }}
+                                    onClick={handleBulkEnablePortal}
+                                    disabled={selectedPatients.length === 0 || isProvisioning === 'BULK'}
+                                >
+                                    {isProvisioning === 'BULK' ? 'PROVISIONING...' : `Authorize Selected Access`}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>,

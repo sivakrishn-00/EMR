@@ -35,13 +35,19 @@ export const AuthProvider = ({ children }) => {
     return userRes.data;
   };
 
+  const loginFromData = (userData, access, refresh) => {
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.clear();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginFromData, logout }}>
       {children}
     </AuthContext.Provider>
   );

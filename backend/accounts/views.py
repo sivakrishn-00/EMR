@@ -15,7 +15,17 @@ class UserRoleViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    def get_queryset(self):
+        # 🚀 AUTO-REPAIR: Ensure all patients have the 'PATIENT' role linked
+        from .models import UserRole
+        patient_role = UserRole.objects.filter(name='PATIENT').first()
+        if patient_role:
+            # Fix patients who were created without the dynamic role link
+            users_needing_repair = User.objects.filter(role='PATIENT', user_roles=None)
+            for u in users_needing_repair:
+                u.user_roles.add(patient_role)
+        
+        return User.objects.all().order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
 
@@ -51,6 +61,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None # Return full list for dropdown
 
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user)
@@ -60,8 +71,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({'status': 'notifications marked as read'})
 
+from .permissions import IsStaffUser
+
 class DashboardStatsView(generics.GenericAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsStaffUser]
     
     def get(self, request):
         from django.utils import timezone

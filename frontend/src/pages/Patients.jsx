@@ -65,6 +65,11 @@ const Patients = () => {
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [triagePatient, setTriagePatient] = useState(null);
   const [triageReason, setTriageReason] = useState('Routine Checkup');
+  const [showAckModal, setShowAckModal] = useState(false);
+  const [ackAppointment, setAckAppointment] = useState(null);
+  const [ackForm, setAckForm] = useState({ date: '', startTime: '', endTime: '' });
+  const [isAcking, setIsAcking] = useState(false);
+  const [isEnablingPortal, setIsEnablingPortal] = useState(null);
 
   useEffect(() => {
     fetchEmployeeMasters();
@@ -196,6 +201,20 @@ const Patients = () => {
       fetchStats();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to start visit', { id: loadingToast });
+    }
+  };
+
+  const handleEnablePortal = async (patientId) => {
+    setIsEnablingPortal(patientId);
+    const loading = toast.loading("Provisioning Portal Credentials...");
+    try {
+      await api.post(`patients/patients/${patientId}/enable_portal/`);
+      toast.success("Portal Access Enabled! Patient can now log in.", { id: loading });
+      fetchPatients(page, viewMode, projectFilter);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Portal sync failed", { id: loading });
+    } finally {
+      setIsEnablingPortal(null);
     }
   };
 
@@ -503,6 +522,108 @@ const Patients = () => {
     );
   };
 
+  const handleAckSubmit = async (e) => {
+    e.preventDefault();
+    if (!ackAppointment) return;
+
+    setIsAcking(true);
+    const loading = toast.loading('Allocating clinical slot range...');
+    try {
+      const appointment_date = `${ackForm.date}T${ackForm.startTime}:00`;
+      const end_time = ackForm.endTime ? `${ackForm.date}T${ackForm.endTime}:00` : null;
+      
+      await api.post(`clinical/appointments/${ackAppointment.id}/confirm/`, {
+        appointment_date,
+        end_time
+      });
+      toast.success("Clinical Slot Allocated & Confirmed!", { id: loading });
+      setShowAckModal(false);
+      fetchPatients(1, viewMode, projectFilter);
+    } catch (err) {
+      toast.error("Failed to allocate slot. Check connectivity.", { id: loading });
+    } finally {
+      setIsAcking(false);
+    }
+  };
+
+  const renderAckModal = () => {
+    if (!showAckModal) return null;    return createPortal(
+      <div className="modal-overlay">
+        <div className="modal-content" style={{ maxWidth: '500px', borderRadius: '28px', padding: '0', overflow: 'hidden' }}>
+          <div style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'white', color: 'var(--primary)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+              <ShieldCheck size={24} />
+            </div>
+            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Slot Allocation</h2>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>Validate and confirm clinical encounter</p>
+          </div>
+
+          <form onSubmit={handleAckSubmit} style={{ padding: '1.5rem 2.5rem 2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.75rem' }}>
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.625rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Allocation Date</label>
+                <input 
+                  type="date" 
+                  className="form-control" 
+                  required 
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                  value={ackForm.date}
+                  onChange={(e) => setAckForm({ ...ackForm, date: e.target.value })}
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Start Time</label>
+                  <input 
+                    type="time" 
+                    className="form-control" 
+                    required 
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                    value={ackForm.startTime}
+                    onChange={(e) => setAckForm({ ...ackForm, startTime: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>End Time</label>
+                  <input 
+                    type="time" 
+                    className="form-control" 
+                    required 
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                    value={ackForm.endTime}
+                    onChange={(e) => setAckForm({ ...ackForm, endTime: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={isAcking}
+                style={{ padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: 'var(--primary)', boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.3)', width: '100%' }}
+              >
+                {isAcking ? 'SYNCHRONIZING...' : 'CONFIRM ALLOCATION'}
+              </button>
+              <button 
+                type="button" 
+                className="btn" 
+                onClick={() => setShowAckModal(false)}
+                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', width: '100%', fontSize: '0.875rem' }}
+              >
+                Cancel Action
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   const filteredPatients = (patients || []).filter(p => {
     const searchLow = searchQuery.toLowerCase();
     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
@@ -516,15 +637,13 @@ const Patients = () => {
 
   return (
     <div className="fade-in">
+      {renderAckModal()}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Patient Management</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>Manage registration and records of all patients</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn btn-secondary" style={{ padding: '0.625rem 1rem' }}>
-            <Download size={18} /> Export
-          </button>
           <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
             <UserPlus size={20} /> Register New Patient
           </button>
@@ -710,12 +829,20 @@ const Patients = () => {
                         ) : viewMode === 'SCHEDULED' && p.upcoming_appointment ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                    APPT: {p.upcoming_appointment.time}
+                                    APPT: {p.upcoming_appointment.formatted_time || p.upcoming_appointment.time}
                                 </span>
                                 <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 700 }}>{p.upcoming_appointment.date}</span>
                                 <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>{p.upcoming_appointment.reason}</span>
-                                <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.05)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>
-                                    Awaiting Arrival
+                                <div style={{ 
+                                    fontSize: '0.625rem', 
+                                    fontWeight: 700, 
+                                    color: (p.upcoming_appointment.status === 'CONFIRMED' || p.upcoming_appointment.status === 'PATIENT_ACKNOWLEDGED') ? '#059669' : '#f59e0b', 
+                                    background: (p.upcoming_appointment.status === 'CONFIRMED' || p.upcoming_appointment.status === 'PATIENT_ACKNOWLEDGED') ? 'rgba(5, 150, 105, 0.05)' : 'rgba(245, 158, 11, 0.05)', 
+                                    padding: '2px 6px', 
+                                    borderRadius: '4px', 
+                                    width: 'fit-content' 
+                                }}>
+                                    {p.upcoming_appointment.status === 'PATIENT_ACKNOWLEDGED' ? 'Verified Attendance' : p.upcoming_appointment.status === 'CONFIRMED' ? 'Slot Proposed' : 'Awaiting Slot Allocation'}
                                 </div>
                             </div>
                         ) : (
@@ -724,7 +851,14 @@ const Patients = () => {
                                     {p.visits && p.visits.length > 0 ? "Returned Patient" : "Registered Only"}
                                 </span>
                                 {p.upcoming_appointment && (
-                                     <span style={{ fontSize: '0.625rem', color: 'var(--primary)', fontWeight: 700 }}>Next Appt: {p.upcoming_appointment.date}</span>  
+                                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '4px' }}>
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 800 }}>
+                                            NEXT: {p.upcoming_appointment.formatted_time || p.upcoming_appointment.time}
+                                        </span>
+                                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                            {p.upcoming_appointment.date}
+                                        </span>
+                                     </div>
                                 )}
                                 {p.last_visit_details && (
                                     <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -746,26 +880,44 @@ const Patients = () => {
                                 <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>In Clinic</span>
                             </div>
                         ) : viewMode === 'SCHEDULED' ? (
-                            <button 
-                                className="btn btn-primary" 
-                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', borderRadius: '10px' }}
-                                onClick={async () => {
-                                    const loading = toast.loading('Initiating Arrived Status...');
-                                    try {
-                                        if (p.upcoming_appointment?.id) {
-                                            // Call the official check-in action
-                                            await api.post(`clinical/appointments/${p.upcoming_appointment.id}/check_in/`);
-                                        } else {
-                                            // Fallback to direct visit creation
-                                            await api.post('clinical/visits/', { patient: p.id, reason: 'Scheduled Visit', status: 'PENDING_VITALS' });
-                                        }
-                                        toast.success("Patient Arrived & Registered!", { id: loading });
-                                        fetchPatients();
-                                    } catch (e) { toast.error("Check-in sync failed", { id: loading }); }
-                                }}
-                            >
-                                <Check size={12} /> Start Visit
-                            </button>
+                            p.upcoming_appointment?.status === 'SCHEDULED' ? (
+                                <button 
+                                    className="btn btn-secondary" 
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    onClick={() => {
+                                        setAckAppointment(p.upcoming_appointment);
+                                        setAckForm({ 
+                                            date: p.upcoming_appointment.date, 
+                                            startTime: p.upcoming_appointment.time,
+                                            endTime: p.upcoming_appointment.end_time_only || '' 
+                                        });
+                                        setShowAckModal(true);
+                                    }}
+                                >
+                                    <ShieldCheck size={12} /> Acknowledge
+                                </button>
+                            ) : (
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', borderRadius: '10px' }}
+                                    onClick={async () => {
+                                        const loading = toast.loading('Initiating Arrived Status...');
+                                        try {
+                                            if (p.upcoming_appointment?.id) {
+                                                // Call the official check-in action
+                                                await api.post(`clinical/appointments/${p.upcoming_appointment.id}/check_in/`);
+                                            } else {
+                                                // Fallback to direct visit creation
+                                                await api.post('clinical/visits/', { patient: p.id, reason: 'Scheduled Visit', status: 'PENDING_VITALS' });
+                                            }
+                                            toast.success("Patient Arrived & Registered!", { id: loading });
+                                            fetchPatients();
+                                        } catch (e) { toast.error("Check-in sync failed", { id: loading }); }
+                                    }}
+                                >
+                                    <Check size={12} /> Start Visit
+                                </button>
+                            )
                         ) : (
                             <button 
                                 className="btn btn-primary" 
@@ -853,7 +1005,7 @@ const Patients = () => {
         <div style={{
           position: 'fixed', 
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(255, 255, 255, 0.85)', 
+          background: 'var(--glass-bg)', 
           backdropFilter: 'blur(12px)',
           display: 'flex', 
           justifyContent: 'center', 
@@ -868,7 +1020,7 @@ const Patients = () => {
             padding: 0, 
             borderRadius: '32px', 
             boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid var(--border)',
             position: 'relative'
           }}>
@@ -895,7 +1047,7 @@ const Patients = () => {
                 onClick={() => setShowModal(false)}
                 style={{ 
                     border: 'none', 
-                    background: '#f1f5f9', 
+                    background: 'var(--background)', 
                     width: '36px', 
                     height: '36px', 
                     borderRadius: '12px', 
@@ -917,14 +1069,14 @@ const Patients = () => {
                 <div style={{ gridColumn: 'span 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
-                    <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', background: 'var(--background)', padding: '4px', borderRadius: '12px' }}>
                         {(!user?.project || (projects.find(p => p.id === user.project)?.category_mappings?.some(m => m.category === 'GENERAL'))) && (
                         <button 
                             type="button"
                             onClick={() => setFormData({...formData, is_employee_linked: false})}
                             style={{ 
                                 padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
-                                background: !formData.is_employee_linked ? 'white' : 'transparent',
+                                background: !formData.is_employee_linked ? 'var(--surface)' : 'transparent',
                                 color: !formData.is_employee_linked ? 'var(--primary)' : '#64748b',
                                 boxShadow: !formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                 cursor: 'pointer', transition: '0.3s'
@@ -937,7 +1089,7 @@ const Patients = () => {
                              onClick={() => setFormData({...formData, is_employee_linked: true})}
                              style={{ 
                                  padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
-                                 background: formData.is_employee_linked ? 'white' : 'transparent',
+                                 background: formData.is_employee_linked ? 'var(--surface)' : 'transparent',
                                  color: formData.is_employee_linked ? 'var(--primary)' : '#64748b',
                                  boxShadow: formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                  cursor: 'pointer', transition: '0.3s'
@@ -951,7 +1103,7 @@ const Patients = () => {
                     <input 
                         required 
                         className="form-control"
-                        style={{ height: '52px', borderRadius: '16px', background: '#f8fafc' }}
+                        style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                         value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="e.g. Fever and body pain, Regular followup..." 
                     />
                     {formAttempted && !formData.reason && <p style={{ color: '#ef4444', fontSize: '10px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
@@ -959,7 +1111,7 @@ const Patients = () => {
                 </div>
 
                 {formData.is_employee_linked && (
-                    <div style={{ gridColumn: 'span 2', background: '#f8fafc', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                         <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Link Employee Record</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                             <div className="form-group" style={{ position: 'relative' }}>
@@ -968,7 +1120,7 @@ const Patients = () => {
                                     <input 
                                         type="text"
                                         className="form-control"
-                                        style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                        style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                                         placeholder="Type name or card number..."
                                         value={employeeSearchTerm}
                                         onChange={(e) => {
@@ -1042,7 +1194,7 @@ const Patients = () => {
                                     <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Select Family Member</label>
                                     <select 
                                         className="form-control"
-                                        style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                        style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                                         onChange={(e) => {
                                             const emp = employeeMasters.find(em => em.id === formData.employee_master);
                                             const fam = emp.family_members.find(f => f.id === parseInt(e.target.value));
@@ -1097,7 +1249,7 @@ const Patients = () => {
                         <select 
                             required 
                             className="form-control"
-                            style={{ height: '52px', borderRadius: '16px', background: '#f8fafc' }}
+                            style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                             value={formData.project} 
                             onChange={e => setFormData({...formData, project: e.target.value})} 
                         >
@@ -1138,14 +1290,14 @@ const Patients = () => {
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <div style={{ background: '#f1f5f9', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Identity Verification (Primary ID)</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Fingerprint size={14} /> ID Proof Type *</label>
                             <select 
                                 className="form-control"
-                                style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                                 value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})}
                             >
                                 <option value="AADHAAR">Aadhaar Card</option>
@@ -1159,7 +1311,7 @@ const Patients = () => {
                             <input 
                                 required 
                                 className="form-control"
-                                style={{ height: '52px', borderRadius: '16px', background: 'white' }}
+                                style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
                                 value={formData.id_proof_number} onChange={e => setFormData({...formData, id_proof_number: e.target.value})} placeholder="Enter Aadhaar/ID number" 
                             />
                             {formAttempted && !formData.id_proof_number && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required Field</p>}
@@ -1277,8 +1429,8 @@ const Patients = () => {
 
       {/* INSTANT TRIAGE MODAL FOR EXISTING PATIENTS */}
       {showTriageModal && triagePatient && createPortal(
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(241, 245, 249, 0.85)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div className="fade-in" style={{ background: 'white', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
+          <div className="fade-in" style={{ background: 'var(--surface)', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px -4px rgba(245, 158, 11, 0.3)' }}>
@@ -1294,17 +1446,17 @@ const Patients = () => {
               </button>
             </div>
 
-            <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+            <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)', marginBottom: '2rem' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#4f46e5', fontSize: '1rem' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#4f46e5', fontSize: '1rem' }}>
                     {triagePatient.first_name[0]}
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>{triagePatient.first_name} {triagePatient.last_name}</h3>
+                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>{triagePatient.first_name} {triagePatient.last_name}</h3>
                     <p style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>UHID: {triagePatient.patient_id} • {triagePatient.phone}</p>
                   </div>
                </div>
-               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
                   Linked Project: {triagePatient.project_name || 'General Registry'}
                </div>
             </div>
@@ -1316,7 +1468,7 @@ const Patients = () => {
                 </label>
                 <select 
                   className="form-control"
-                  style={{ height: '54px', borderRadius: '16px', background: '#f8fafc', fontWeight: 700, fontSize: '0.875rem' }}
+                  style={{ height: '54px', borderRadius: '16px', background: 'var(--background)', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.875rem' }}
                   value={triageReason}
                   onChange={(e) => setTriageReason(e.target.value)}
                   required
@@ -1345,7 +1497,7 @@ const Patients = () => {
                   type="button" 
                   className="btn btn-secondary" 
                   onClick={() => setShowTriageModal(false)}
-                  style={{ padding: '0.875rem', borderRadius: '18px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white' }}
+                  style={{ padding: '0.875rem', borderRadius: '18px', fontWeight: 800, border: '1px solid var(--border)', background: 'var(--surface)' }}
                 >
                   Back to Registry
                 </button>
@@ -1387,12 +1539,37 @@ const Patients = () => {
           padding: 0.35rem 0.75rem;
           border-radius: 20px;
         }
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          animation: fadeIn 0.3s ease;
+        }
+        .modal-content {
+          background: white;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(30px) scale(0.95); opacity: 0; }
+          to { transform: translateY(0) scale(1); opacity: 1; }
+        }
       `}</style>
     </div>
   );
 };
 
-// Premium Hub-Style Metric Components 🎯
+// Premium Hub-Style Metric Components 
 const DashboardMetric = ({ label, value, icon, gradient }) => (
     <div style={{ 
         background: gradient || 'var(--surface)', 

@@ -17,8 +17,9 @@ class User(AbstractUser):
     role = models.CharField(max_length=50, default='PATIENT')
     user_roles = models.ManyToManyField(UserRole, blank=True, related_name='users')
     project = models.ForeignKey('patients.Project', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
-    phone = models.CharField(max_length=15, blank=True, null=True)
+    phone = models.CharField(max_length=15, blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
+    is_password_set = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.username}"

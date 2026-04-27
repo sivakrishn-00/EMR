@@ -349,17 +349,25 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
         {/* Left Section: Simplified Text Branding */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {isCollapsed && (
-            <div className="fade-in">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{
-                fontSize: '0.9375rem',
+                fontSize: '1rem',
                 fontWeight: 900,
                 color: 'var(--primary)',
                 textTransform: 'uppercase',
-                letterSpacing: '0.125em',
-                whiteSpace: 'nowrap',
+                letterSpacing: '0.05em',
                 lineHeight: 1
               }}>
-                {user?.branding?.project_name || 'Electronic Medical Records'}
+                {user?.project_name || 'EMR'}
+              </span>
+              <span style={{
+                fontSize: '0.6875rem',
+                fontWeight: 800,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em'
+              }}>
+                ELECTRONIC MEDICAL RECORDS
               </span>
             </div>
           )}

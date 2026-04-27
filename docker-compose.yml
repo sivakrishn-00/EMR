@@ -22,7 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: emr_redis
-    command: redis-server --appendonly yes # Redis-AOF: Recover 100% of data after crash
+    command: redis-server --appendonly yes
     restart: always
     ports:
       - "6379:6379"
@@ -32,7 +32,33 @@ services:
       timeout: 5s
       retries: 5
 
-  # 3. Principal EMR Backend (Django Gateway)
+  # 3. MongoDB Cluster (High-Speed Read Layer)
+  mongodb:
+    image: mongo:latest
+    container_name: emr_mongodb
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # 4. Mongo Express (Clinical Data Explorer)
+  mongo-express:
+    image: mongo-express
+    container_name: emr_mongo_explorer
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # 5. Principal EMR Backend (Django Gateway)
   backend:
     build:
       context: ./backend
@@ -41,6 +67,8 @@ services:
     environment:
       - MYSQL_HOST=mysql
       - REDIS_URL=redis://redis:6379
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB_NAME=emr_clinical_records
       - DB_NAME=emr_v1
       - DB_USER=root
       - DB_PASS=rootx.
@@ -49,10 +77,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "9002:8000"
 
-  # 4. LANE 1: Urgent Cluster (Critical Result Workers)
+  # 6. LANE 1: Urgent Cluster (Critical Result Workers)
   emr_worker_urgent:
     build:
       context: ./backend
@@ -62,13 +92,16 @@ services:
     environment:
       - MYSQL_HOST=mysql
       - REDIS_URL=redis://redis:6379
+      - MONGO_URI=mongodb://mongodb:27017
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
 
-  # 5. LANE 2: Bulk Cluster (Mass Sync Laboratory Workers)
+  # 7. LANE 2: Bulk Cluster (Mass Sync Laboratory Workers)
   emr_worker_bulk:
     build:
       context: ./backend
@@ -78,40 +111,27 @@ services:
     environment:
       - MYSQL_HOST=mysql
       - REDIS_URL=redis://redis:6379
+      - MONGO_URI=mongodb://mongodb:27017
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-
-  # 6. LANE 3: Retry / DLQ Cluster (Failover Recovery)
-  emr_worker_retry:
-    build:
-      context: ./backend
-    container_name: emr_worker_retry
-    command: celery -A emr_backend worker -Q celery -n worker_retry@%h --loglevel=info --concurrency=2
-    restart: always
-    environment:
-      - MYSQL_HOST=mysql
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
+      mongodb:
         condition: service_healthy
 
-  # 5. EMR User Interface (React + Nginx)
+  # 8. EMR User Interface (React + Nginx)
   frontend:
     build:
       context: ./frontend
     container_name: emr_frontend
     restart: always
     ports:
-      - "8080:80"
+      - "9001:80"
     depends_on:
       - backend
 
-  # 6. Global Sync Monitor (Flower Dashboard)
+  # 9. Global Sync Monitor (Flower Dashboard)
   flower:
     build:
       context: ./backend
@@ -121,10 +141,11 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
     ports:
-      - "5555:5555"
+      - "8008:5555"
     depends_on:
       redis:
         condition: service_healthy
 
 volumes:
   mysql_data:
+  mongo_data:

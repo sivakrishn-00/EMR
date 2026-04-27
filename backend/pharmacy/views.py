@@ -70,7 +70,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                 request.user, 
                 'Pharmacy', 
                 'Medication Dispensed', 
-                f"Dispensed medicines for prescription {prescription.id}"
+                f"[CONSUMPTION] {prescription.medication_name} | {serializer.instance.quantity} | Project:{visit.patient.project_id if visit.patient.project else 'NONE'} | ID:{prescription.id}"
             )
             
             # Notify doctor

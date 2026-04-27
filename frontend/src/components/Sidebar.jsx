@@ -70,7 +70,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
                   lineHeight: 1,
                   color: 'var(--primary)'
                 }}>
-                  {user?.branding?.project_name || 'EMR'}
+                  {user?.project_name || 'EMR'}
                 </span>
                 <span style={{
                   color: '#94a3b8',

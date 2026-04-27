@@ -187,7 +187,7 @@ const Reports = () => {
       }}>
         {[
           { label: 'Patient Volume', val: reportData?.total_registered, icon: Users, gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' },
-          { label: 'Units Dispensed', val: reportData?.top_medications?.reduce((a,c)=>a+c.total,0), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+          { label: 'Units Dispensed', val: reportData?.all_consumption?.reduce((a,c)=>a+c.total,0), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
           { label: 'Workflow Efficiency', val: `${reportData?.conversion_rate}%`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
           { label: 'Inventory Assets', val: `₹${reportData?.inventory_value?.toLocaleString()}`, icon: IndianRupee, gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' }
         ].map((stat, i) => (

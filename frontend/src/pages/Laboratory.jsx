@@ -302,12 +302,12 @@ const Laboratory = () => {
                   {hardwareMatches.length > 0 ? (
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         {hardwareMatches.map(m => (
-                           <div key={m.id} style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
+                           <div key={m.id} style={{ padding: '1rem', background: 'var(--background)', borderRadius: '16px', border: '1px solid var(--border)' }}>
                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
                                  <div>
                                      <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface)', padding: '2px 8px', borderRadius: '6px' }}>
                                             <Clock size={10} color="#64748b" />
                                             <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>
                                                 {new Date(m.received_at_machine).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
@@ -315,15 +315,15 @@ const Laboratory = () => {
                                         </div>
                                      </div>
                                  </div>
-                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: '#4f46e5', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
+                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
                               </div>
                               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                  {Object.entries(m).filter(([k, v]) => 
                                      v !== null && v !== undefined && v !== '' && 
                                      !['id', 'patient_id', 'patient_name', 'machine_id', 'machine_name', 'received_at_machine', 'lab_id', 'location', 'project', 'project_id', 'sample_id', 'is_processed', 'synced_at_cloud', 'raw_data'].includes(k)
                                  ).map(([key, value]) => (
-                                     <span key={key} style={{ fontSize: '0.6rem', padding: '2px 8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', fontWeight: 800 }}>
-                                         <span style={{ color: '#4f46e5', fontWeight: 900 }}>{key.toUpperCase()}</span>: {value}
+                                     <span key={key} style={{ fontSize: '0.6rem', padding: '2px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 800 }}>
+                                         <span style={{ color: 'var(--primary)', fontWeight: 900 }}>{key.toUpperCase()}</span>: {value}
                                      </span>
                                  ))}
                               </div>
@@ -371,11 +371,11 @@ const Laboratory = () => {
                       </div>
 
                       {selectedRequest.status !== 'COMPLETED' ? (
-                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: '#1e293b', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
+                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: 'var(--primary)', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
                               Finalize & Transmit <ArrowRight size={18} style={{ marginLeft: '8px' }} />
                           </button>
                       ) : (
-                           <div style={{ padding: '1rem', background: '#ecfdf5', borderRadius: '20px', color: '#065f46', fontSize: '0.8rem', fontWeight: 800, textAlign: 'center', marginTop: '1.5rem' }}>
+                           <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '20px', color: '#10b981', fontSize: '0.8rem', fontWeight: 800, textAlign: 'center', marginTop: '1.5rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                               Results Transmitted to Doctor
                            </div>
                       )}

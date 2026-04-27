@@ -523,8 +523,11 @@ class RegistryReportView(viewsets.ViewSet):
         from pharmacy.models import DispensingRecord, Prescription
         dispensed_records = DispensingRecord.objects.filter(dispensed_at__date__gte=week_ago)
         
-        # Source 3: Active Prescriptions (Doctor) - as fallback for units
-        prescriptions = Prescription.objects.filter(created_at__date__gte=week_ago)
+        # Source 3: All Prescriptions (Doctor/Pharmacy) 
+        # We look for prescriptions that were either created this week OR marked as DISPENSED this week
+        prescriptions = Prescription.objects.filter(
+            Q(created_at__date__gte=week_ago) | Q(status__in=['DISPENSED', 'PARTIALLY_DISPENSED'])
+        )
 
         if active_project:
             # Filter all sources by project
@@ -560,17 +563,18 @@ class RegistryReportView(viewsets.ViewSet):
                     add_to_series(timezone.localtime(log.timestamp).date(), int(match.group(2)), match.group(1).strip())
             except: continue
 
-        # Process Dispensed Records
+        # Process Dispensed Records (Highest Priority)
+        processed_prescription_ids = set()
         for dr in dispensed_records:
             add_to_series(timezone.localtime(dr.dispensed_at).date(), dr.quantity, dr.prescription.medication_name)
+            processed_prescription_ids.add(dr.prescription_id)
 
-        # Process Prescriptions (if count hasn't been added yet for this visit/medicine)
-        # We only use this if consumption_map is low to ensure something shows up
-        if not any(v > 0 for v in daily_series.values()):
-            for p in prescriptions:
-                # Rough estimate of quantity if not explicitly in a log
-                qty = 10 # Default fallback
-                add_to_series(timezone.localtime(p.created_at).date(), qty, p.medication_name)
+        # Process Prescriptions (Secondary Priority - fallback if no explicit records)
+        # We count all 'DISPENSED' prescriptions as at least 1 unit if not tracked via DispensingRecord
+        for p in prescriptions:
+            if p.id not in processed_prescription_ids and p.status in ['DISPENSED', 'PARTIALLY_DISPENSED']:
+                # If no records, we assume a standard issue of 1 unit per prescription duration/cycle
+                add_to_series(timezone.localtime(p.created_at).date(), 1, p.medication_name)
 
         trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])
 
@@ -603,11 +607,20 @@ class RegistryReportView(viewsets.ViewSet):
             'project_name': active_project.name if active_project else "All Projects"
         })
 
+from .reports import generate_patient_pdf_report
+from django.http import HttpResponse
+
 class PatientViewSet(viewsets.ModelViewSet):
 
     serializer_class = PatientSerializer
     search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no']
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        from accounts.permissions import IsStaffUser
+        if self.action in ['my_full_report', 'download_report']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), IsStaffUser()]
 
     def get_base_queryset(self):
         queryset = Patient.objects.all().order_by('-created_at')
@@ -635,9 +648,15 @@ class PatientViewSet(viewsets.ModelViewSet):
             # Only show patients with a currently active clinical visit
             queryset = queryset.filter(visits__is_active=True).distinct()
         elif view_mode == 'scheduled':
-            # Only show patients with upcoming scheduled appointments
+            # Only show patients with upcoming or today's pending appointments
             from django.utils import timezone
-            queryset = queryset.filter(appointments__status='SCHEDULED', appointments__appointment_date__gte=timezone.now()).distinct()
+            from datetime import timedelta
+            # Include anything from today onwards that hasn't been checked in
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            queryset = queryset.filter(
+                appointments__status__in=['SCHEDULED', 'CONFIRMED'], 
+                appointments__appointment_date__gte=today_start
+            ).distinct()
         elif view_mode == 'completed':
             # Only show patients who completed their visit today
             from django.utils import timezone
@@ -654,8 +673,12 @@ class PatientViewSet(viewsets.ModelViewSet):
         base_qs = self.get_base_queryset()
         
         # Calculate real-time counts for all columns
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         q_active = base_qs.filter(visits__is_active=True).distinct().count()
-        q_scheduled = base_qs.filter(appointments__status='SCHEDULED', appointments__appointment_date__gte=timezone.now()).distinct().count()
+        q_scheduled = base_qs.filter(
+            appointments__status__in=['SCHEDULED', 'CONFIRMED'], 
+            appointments__appointment_date__gte=today_start
+        ).distinct().count()
         q_completed = base_qs.filter(visits__is_active=False, visits__visit_date__date=today).distinct().count()
         q_all = base_qs.distinct().count()
 
@@ -680,4 +703,150 @@ class PatientViewSet(viewsets.ModelViewSet):
         return Response({
             "patient": PatientSerializer(patient).data,
             "visits": VisitSerializer(visits, many=True).data
+        })
+
+    @action(detail=False, methods=['get'], url_path='me/full_report')
+    def my_full_report(self, request):
+        """
+        Fetches the clinical dossier. Prioritizes the high-speed MongoDB 'Hot Dossier'
+        with an automatic SQL fallback for absolute reliability.
+        """
+        user = request.user
+        if user.role != 'PATIENT':
+            return Response({"error": "This record is restricted to Patient portal access."}, status=403)
+        
+        # Find the patient profile linked to this user
+        patient = getattr(user, 'patient_profile', None)
+        if not patient:
+             return Response({"error": "No patient profile linked to this account."}, status=404)
+
+        # 🚀 PHASE 2: MongoDB High-Speed Retrieval
+        from .dossier_manager import dossier_manager
+        hot_dossier = dossier_manager.get_dossier(patient.patient_id)
+        
+        if hot_dossier:
+             # Ensure live identity context is preserved
+             hot_dossier["patient_id"] = patient.patient_id
+             return Response(hot_dossier)
+
+        # 🧊 FALLBACK: Standard SQL Retrieval (Cold Data)
+        from clinical.models import Visit, Appointment
+        from clinical.serializers import VisitSerializer, AppointmentSerializer
+        from .tasks import sync_patient_dossier_task
+        
+        # Schedule a materialization since the Hot Dossier was missing
+        try:
+            sync_patient_dossier_task.delay(patient.patient_id)
+        except Exception as e:
+            print(f"⚠️ INFRA: Celery/Redis Offline. Skipping background sync. ({str(e)})")
+            # Optional: Run synchronously if we really need the data hot next time
+            # sync_patient_dossier_task(patient.patient_id) 
+        
+        visits = Visit.objects.filter(patient=patient)\
+            .select_related('vitals', 'consultation')\
+            .prefetch_related('lab_requests', 'prescriptions')\
+            .order_by('-visit_date')
+        
+        return Response({
+            "patient_id": patient.patient_id,
+            "full_name": f"{patient.first_name} {patient.last_name}",
+            "project_name": patient.project.name if patient.project else (patient.employee_master.project.name if patient.employee_master and patient.employee_master.project else "Global Workspace"),
+            "registry_metadata": {
+                "gender": patient.gender,
+                "dob": str(patient.dob) if patient.dob else None,
+                "phone": patient.phone,
+                "blood_group": patient.blood_group,
+                "address": patient.address,
+                "allow_appointments": patient.project.allow_appointments if patient.project else True
+            },
+            "clinical_summary": {
+                "total_visits": visits.count(),
+                "total_lab_investigations": sum(v.lab_requests.count() for v in visits),
+                "total_active_prescriptions": sum(v.prescriptions.count() for v in visits),
+                "total_appointments": Appointment.objects.filter(patient=patient).count()
+            },
+            "visit_history": VisitSerializer(visits, many=True).data,
+            "appointments": AppointmentSerializer(Appointment.objects.filter(patient=patient).order_by('-appointment_date'), many=True).data,
+            "system_status": "SQL_COLD_RETRIEVAL"
+        })
+
+    @action(detail=False, methods=['get'], url_path='download_report')
+    def download_report(self, request):
+        user = request.user
+        # Patient ID is the username
+        patient_id = user.username
+        visit_date = request.query_params.get('date')
+        
+        pdf_buffer = generate_patient_pdf_report(patient_id, visit_date)
+        
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        filename = f"Clinical_Report_{patient_id}_{visit_date or 'latest'}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def enable_portal(self, request, pk=None):
+        patient = self.get_object()
+        from accounts.models import User
+        
+        if User.objects.filter(username=patient.patient_id).exists():
+            return Response({"error": "Portal account already exists for this patient"}, status=400)
+            
+        # Create the locked user account
+        user = User.objects.create(
+            username=patient.patient_id,
+            first_name=patient.first_name,
+            last_name=patient.last_name,
+            phone=patient.phone,
+            role='PATIENT',
+            is_active=False,      # Must be activated via OTP setup
+            is_password_set=False # Force password setup
+        )
+
+        # 🚀 AUTOMATIC PROVISIONING: Link the 'PATIENT' Role instantly
+        from accounts.models import UserRole
+        patient_role, created = UserRole.objects.get_or_create(
+            name='PATIENT',
+            defaults={'description': 'Default role for MNC Portal patients'}
+        )
+        user.user_roles.add(patient_role)
+        
+        # In a real scenario, you would trigger an SMS here with the Registry ID
+        # For now, we'll return success
+        return Response({
+            "message": f"Portal access enabled for {patient.patient_id}. Patient can now login via Mobile OTP.",
+            "username": user.username
+        })
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def bulk_enable_portal(self, request):
+        patient_ids = request.data.get('patient_ids', [])
+        if not patient_ids:
+            return Response({"error": "No patients selected"}, status=400)
+            
+        from accounts.models import User, UserRole
+        patient_role, _ = UserRole.objects.get_or_create(
+            name='PATIENT',
+            defaults={'description': 'Default role for MNC Portal patients'}
+        )
+        
+        success_count = 0
+        patients = Patient.objects.filter(id__in=patient_ids)
+        
+        for patient in patients:
+            if not User.objects.filter(username=patient.patient_id).exists():
+                user = User.objects.create(
+                    username=patient.patient_id,
+                    first_name=patient.first_name,
+                    last_name=patient.last_name,
+                    phone=patient.phone,
+                    role='PATIENT',
+                    is_active=False,
+                    is_password_set=False
+                )
+                user.user_roles.add(patient_role)
+                success_count += 1
+                
+        return Response({
+            "message": f"Bulk provisioning complete. {success_count} portal accounts activated.",
+            "processed": len(patients)
         })

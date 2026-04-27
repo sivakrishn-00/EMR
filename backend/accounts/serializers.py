@@ -1,6 +1,7 @@
 from .models import User, AuditLog, Notification, UserRole
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
+from django.db.models import Q
 
 class UserRoleSerializer(serializers.ModelSerializer):
     users = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), required=False)
@@ -18,7 +19,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name', 'branding')
+        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name', 'branding', 'is_password_set')
 
     def get_permissions(self, obj):
         if obj.role == 'ADMIN':
@@ -116,3 +117,33 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['name'] = f"{user.first_name} {user.last_name}"
         return token
+
+    def validate(self, attrs):
+        identifier = attrs.get("username")
+        password = attrs.get("password")
+
+        # 🚀 MULTI-IDENTIFIER LOGIC: Resolve User by ID (Username) or mobile number (Phone)
+        user = User.objects.filter(Q(username=identifier) | Q(phone=identifier)).first()
+        
+        if user and not user.is_active:
+            raise serializers.ValidationError({"error": "Your account is deactivated. Please contact the clinical administrator."})
+
+        if user and user.check_password(password):
+            # Map the resolved username back to keep JWT built-in validation happy
+            attrs['username'] = user.username
+        
+        data = super().validate(attrs)
+
+        # 🛡️ SECURITY: ZERO-ROLE BLOCK (MNC Standard)
+        if not self.user.is_superuser and not self.user.user_roles.exists():
+             raise serializers.ValidationError({"error": "Access Restricted: Your account has no assigned permissions. Please contact clinical administration to link your role."})
+        
+        # 🚀 PORTAL SYNC: Include user info in the response body for immediate frontend use
+        data['user'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'role': self.user.role if hasattr(self.user, 'role') else 'PATIENT',
+            'is_password_set': self.user.is_password_set
+        }
+        
+        return data

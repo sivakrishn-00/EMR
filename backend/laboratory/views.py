@@ -107,6 +107,14 @@ class LabRequestViewSet(viewsets.ModelViewSet):
                     message=f"Lab Results are ready for patient {visit.patient.first_name}"
                 )
             
+            # Notify Patient
+            if visit.patient.user:
+                Notification.objects.create(
+                    recipient=visit.patient.user,
+                    title='Laboratory Results Released',
+                    message=f"Your laboratory results for {lab_request.test_name} are now available in your portal."
+                )
+            
             # Also notify any admins or other lab techs in the project about completion
             notify_team(visit.patient.project, ['ADMIN', 'LAB_TECH'], "Lab Job Completed", f"Results finalized for {visit.patient}")
                 
