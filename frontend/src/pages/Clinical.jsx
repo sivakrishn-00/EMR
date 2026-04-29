@@ -33,7 +33,7 @@ const Clinical = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
+  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
   const [totalInventoryCount, setTotalInventoryCount] = useState(0);
   
@@ -168,7 +168,7 @@ const Clinical = () => {
         medications: []
       });
       setSearchLab("");
-      setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
+      setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
       fetchVisitsToSee();
     } catch (err) {
       toast.error("Error saving consultation", { id: loadingToast });
@@ -252,7 +252,8 @@ const Clinical = () => {
                                     name: p.medication_name,
                                     dosage: p.dosage,
                                     frequency: p.frequency,
-                                    duration: p.duration
+                                    duration: p.duration,
+                                    timing: p.timing || 'After Food'
                                 })) || []
                               });
                             }} 
@@ -289,27 +290,25 @@ const Clinical = () => {
               </table>
             </div>
             
-            {/* Pagination remains same... */}
-          
-          {/* Pagination */}
-          {totalCount > 10 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                        className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVisitsToSee(page - 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                        className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchVisitsToSee(page + 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
-            </div>
+            {/* Pagination */}
+            {totalCount > 10 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                          className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVisitsToSee(page - 1)}
+                          style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
+                      >
+                          <ChevronLeft size={16} />
+                      </button>
+                      <button 
+                          className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchVisitsToSee(page + 1)}
+                          style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
+                      >
+                          <ChevronRight size={16} />
+                      </button>
+                  </div>
+              </div>
             )}
           </div>
         )}
@@ -648,10 +647,10 @@ const Clinical = () => {
                         <Pill size={14} /> Prescribe Medications
                       </span>
                       <span style={{ fontSize: "0.625rem", color: "#64748b", background: "white", padding: "2px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-                        Inventory: {totalInventoryCount} Drugs Available
+                        Total Available: {totalInventoryCount} Drug Variations 
                       </span>
                     </p>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <div style={{ position: 'relative' }}>
                         <input 
                           list="drug-inventory"
@@ -692,12 +691,30 @@ const Clinical = () => {
                           onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem' }}
                        >
-                          <option value="1-0-1">1-0-1</option>
-                          <option value="1-1-1">1-1-1</option>
-                          <option value="OD">OD</option>
-                          <option value="BD">BD</option>
-                          <option value="TDS">TDS</option>
+                           <option value="1-0-1">1-0-1</option>
+                           <option value="1-1-1">1-1-1</option>
+                           <option value="1-0-0">1-0-0 (Morning Only)</option>
+                           <option value="0-1-0">0-1-0 (Afternoon Only)</option>
+                           <option value="0-0-1">0-0-1 (Night Only)</option>
+                           <option value="1-1-0">1-1-0 (Morning/Afternoon)</option>
+                           <option value="0-1-1">0-1-1 (Afternoon/Night)</option>
+                           <option value="OD">OD (Once a day)</option>
+                           <option value="BD">BD (Twice a day)</option>
+                           <option value="TDS">TDS (Thrice a day)</option>
+                           <option value="QID">QID (Four times a day)</option>
+                           <option value="HS">HS (At Bedtime)</option>
+                           <option value="SOS">SOS (When needed)</option>
+                           <option value="STAT">STAT (Immediately)</option>
                        </select>
+                       <select 
+                           value={newMed.timing} 
+                           onChange={e => setNewMed({...newMed, timing: e.target.value})} 
+                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem' }}
+                        >
+                           <option value="Before Food">Before Food</option>
+                           <option value="After Food">After Food</option>
+                           <option value="Empty Stomach">Empty Stomach</option>
+                        </select>
                        <input placeholder="Days" type="number" value={newMed.duration} onChange={e => setNewMed({...newMed, duration: e.target.value})} style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem' }} />
                        <button type="button" onClick={() => {
                           if (!newMed.name || !newMed.duration) {
@@ -705,7 +722,7 @@ const Clinical = () => {
                               return;
                           }
                           setConsultData({...consultData, medications: [...consultData.medications, newMed]});
-                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '' });
+                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
                        }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
                     </div>
 
@@ -718,9 +735,39 @@ const Clinical = () => {
                                         <div style={{ width: '30px', height: '30px', background: '#f5f3ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             <Pill size={14} color="#6366f1" />
                                         </div>
-                                        <div>
-                                            <p style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{m.name}</p>
-                                            <p style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>{m.dosage} • {m.frequency} • {m.duration} Days ({getDoseCount(m.frequency, m.duration)} units)</p>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)', marginBottom: '4px' }}>{m.name}</p>
+                                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>| {m.frequency} | {m.timing} | {m.duration} days</span>
+                                                
+                                                <span style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '3px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900, boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)' }}>
+                                                    Dose: {getDoseCount(m.frequency, m.duration)}
+                                                </span>
+
+                                                {(() => {
+                                                    const drug = pharmacyInventory.find(d => d.name.toLowerCase() === m.name.toLowerCase());
+                                                    if (drug) {
+                                                        const isLow = drug.quantity < getDoseCount(m.frequency, m.duration);
+                                                        return (
+                                                            <span style={{ 
+                                                                background: isLow ? '#fef2f2' : '#f0fdf4', 
+                                                                color: isLow ? '#ef4444' : '#10b981', 
+                                                                padding: '3px 12px', 
+                                                                borderRadius: '8px', 
+                                                                fontSize: '0.75rem', 
+                                                                fontWeight: 900, 
+                                                                border: `1px solid ${isLow ? '#fee2e2' : '#dcfce7'}`,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}>
+                                                                {isLow ? 'Low Stock' : 'In Stock'}: {drug.quantity} items
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '6px' }}>
