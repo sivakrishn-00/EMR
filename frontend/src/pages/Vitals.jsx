@@ -20,6 +20,16 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const RANGES = {
+  weight_kg: { min: 1, max: 350, label: 'Weight', unit: 'KG' },
+  temperature_c: { min: 34, max: 43, label: 'Temp', unit: '°C' },
+  heart_rate: { min: 30, max: 220, label: 'Pulse', unit: 'BPM' },
+  respiratory_rate: { min: 6, max: 60, label: 'Resp', unit: 'B/M' },
+  blood_pressure_sys: { min: 70, max: 220, label: 'SYS', unit: 'mmHg' },
+  blood_pressure_dia: { min: 40, max: 130, label: 'DIA', unit: 'mmHg' },
+  spo2: { min: 50, max: 100, label: 'SPO2', unit: '%' },
+};
+
 const Vitals = () => {
   const [activeVisits, setActiveVisits] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
@@ -151,10 +161,10 @@ const Vitals = () => {
   const updateBiometrics = (updates) => {
     let newData = { ...vitalsData, ...updates };
     
-    // Hard limits for typing sanity
-    if (newData.weight_kg > 2000) newData.weight_kg = 2000;
-    if (newData.height_ft > 15) newData.height_ft = 15;
-    if (newData.height_in > 100) newData.height_in = 100;
+    // Hard limits for typing sanity (Human Scale)
+    if (newData.weight_kg > 500) newData.weight_kg = 500;
+    if (newData.height_ft > 8) newData.height_ft = 8;
+    if (newData.height_in > 11) newData.height_in = 11;
 
     // Calculate Height in CM
     const ft = parseFloat(newData.height_ft) || 0;
@@ -176,6 +186,12 @@ const Vitals = () => {
     });
   };
 
+  const blockInvalidChar = (e) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const getBMIStatus = (bmi) => {
     if (!bmi) return { label: 'PENDING', color: '#94a3b8' };
     const val = parseFloat(bmi);
@@ -185,6 +201,24 @@ const Vitals = () => {
     return { label: 'Obese', color: '#ef4444' };
   };
 
+  const getRangeError = (field, value) => {
+    if (!value || isNaN(value)) return null;
+    const val = parseFloat(value);
+    
+    // BP Logic check: DIA must be < SYS
+    if (field === 'blood_pressure_dia' && vitalsData.blood_pressure_sys) {
+        if (val >= parseFloat(vitalsData.blood_pressure_sys)) {
+            return "Warning: Diastolic must be lower than Systolic";
+        }
+    }
+    const range = RANGES[field];
+    if (!range) return null;
+    if (val < range.min || val > range.max) {
+      return `Warning: Unusual ${range.label} range (${range.min}-${range.max} ${range.unit})`;
+    }
+    return null;
+  };
+ 
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2rem' }}>
@@ -385,9 +419,10 @@ const Vitals = () => {
                    <div className="form-group">
                       <label><Scale size={14} /> Weight <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.01" min="0.1" max="650" required value={vitalsData.weight_kg} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <input type="number" step="0.01" min="0.1" max="650" required value={vitalsData.weight_kg} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
                       </div>
+                      {getRangeError('weight_kg', vitalsData.weight_kg) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('weight_kg', vitalsData.weight_kg)}</p>}
                       {formAttempted && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
                    
@@ -395,14 +430,15 @@ const Vitals = () => {
                       <label>Height (Feet/Inches) <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                          <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" step="1" min="0" max="10" required value={vitalsData.height_ft} onChange={e => updateBiometrics({height_ft: e.target.value})} placeholder="Ft" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_ft > 10 || !vitalsData.height_ft)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                            <input type="number" step="1" min="0" max="8" required value={vitalsData.height_ft} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({height_ft: e.target.value})} placeholder="Ft" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_ft > 8 || !vitalsData.height_ft)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                             <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>FT</span>
                          </div>
                          <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" step="1" min="0" max="11" value={vitalsData.height_in} onChange={e => updateBiometrics({height_in: e.target.value})} placeholder="In" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_in > 11)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                            <input type="number" step="1" min="0" max="11" value={vitalsData.height_in} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({height_in: e.target.value})} placeholder="In" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_in > 11)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                             <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>IN</span>
                          </div>
                       </div>
+                      {(vitalsData.height_ft > 7) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Warning: Unusual Height Range</p>}
                       {formAttempted && !vitalsData.height_ft && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
 
@@ -433,24 +469,27 @@ const Vitals = () => {
                    <div className="form-group">
                       <label><Thermometer size={14} /> Temperature <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.1" required value={vitalsData.temperature_c} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder="36.5" style={{ paddingRight: '2.5rem !important', border: (formAttempted && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <input type="number" step="0.1" required value={vitalsData.temperature_c} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder="36.5" style={{ paddingRight: '2.5rem !important', border: (formAttempted && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>°C</span>
                       </div>
+                      {getRangeError('temperature_c', vitalsData.temperature_c) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('temperature_c', vitalsData.temperature_c)}</p>}
                       {formAttempted && !vitalsData.temperature_c && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
                    <div className="form-group">
                       <label><Heart size={14} /> Pulse</label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.heart_rate} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important' }} />
+                         <input type="number" required value={vitalsData.heart_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>BPM</span>
                       </div>
+                      {getRangeError('heart_rate', vitalsData.heart_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('heart_rate', vitalsData.heart_rate)}</p>}
                    </div>
                    <div className="form-group">
                       <label><Wind size={14} /> Resp Rate</label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.respiratory_rate} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important' }} />
+                         <input type="number" required value={vitalsData.respiratory_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>B/M</span>
                       </div>
+                      {getRangeError('respiratory_rate', vitalsData.respiratory_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('respiratory_rate', vitalsData.respiratory_rate)}</p>}
                    </div>
                 </div>
 
@@ -459,22 +498,27 @@ const Vitals = () => {
                       <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.75rem', display: 'block' }}>Blood Pressure (Sys / Dia)</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                          <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" required value={vitalsData.blood_pressure_sys} onChange={e => setVitalsData({...vitalsData, blood_pressure_sys: e.target.value})} placeholder="120" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
+                            <input type="number" required value={vitalsData.blood_pressure_sys} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_sys: e.target.value})} placeholder="120" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
                             <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>SYS</span>
                          </div>
                          <span style={{ fontSize: '1.25rem', color: '#cbd5e1', fontWeight: 300 }}>/</span>
                          <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" required value={vitalsData.blood_pressure_dia} onChange={e => setVitalsData({...vitalsData, blood_pressure_dia: e.target.value})} placeholder="80" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
+                            <input type="number" required value={vitalsData.blood_pressure_dia} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_dia: e.target.value})} placeholder="80" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
                             <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>DIA</span>
                          </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        {getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys)}</p>}
+                        {getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia)}</p>}
                       </div>
                    </div>
                    <div className="form-group" style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                       <label><Droplet size={14} /> Oxygen (SPO2)</label>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.spo2} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important' }} />
+                         <input type="number" required value={vitalsData.spo2} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>%</span>
                       </div>
+                      {getRangeError('spo2', vitalsData.spo2) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('spo2', vitalsData.spo2)}</p>}
                    </div>
                 </div>
 
