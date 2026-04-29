@@ -600,6 +600,8 @@ class RegistryReportView(viewsets.ViewSet):
                 'low': inventory_stats['low_stock'],
                 'out': inventory_stats['out_of_stock']
             },
+            'total_investigations': visit_qs.aggregate(total=Sum('lab_requests'))['total'] or visit_qs.count(), # Fallback to visit count if direct sum is complex
+            'drug_variations': inventory_items.count(),
             'trends': trends,
             'by_gender': list(patient_qs.values('gender').annotate(count=Count('gender'))),
             'top_medications': all_c[:10],

@@ -189,7 +189,7 @@ const Reports = () => {
           { label: 'Patient Volume', val: reportData?.total_registered, icon: Users, gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' },
           { label: 'Units Dispensed', val: reportData?.all_consumption?.reduce((a,c)=>a+c.total,0), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
           { label: 'Workflow Efficiency', val: `${reportData?.conversion_rate}%`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
-          { label: 'Inventory Assets', val: `₹${reportData?.inventory_value?.toLocaleString()}`, icon: IndianRupee, gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' }
+          { label: 'Clinical Drugs count', val: reportData?.drug_variations || 0, icon: Activity, gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' }
         ].map((stat, i) => (
           <motion.div 
             key={i}
@@ -309,14 +309,14 @@ const Reports = () => {
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <span style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Low Stock</span>
+                <span style={{ fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Low Stock</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                   <AlertCircle size={14} style={{ color: '#fbbf24' }} />
                   <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>{reportData?.stock_health?.low || 0}</span>
                 </div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <span style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800 }}>Depleted</span>
+                <span style={{ fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Depleted</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                   <Package size={14} style={{ color: '#ef4444' }} />
                   <span style={{ fontSize: '1.25rem', fontWeight: 900 }}>{reportData?.stock_health?.out || 0}</span>
@@ -398,7 +398,7 @@ const Reports = () => {
                   </div>
                   <div>
                     <h4 style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)' }}>{m.name}</h4>
-                    <p style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600 }}>Active Consumption</p>
+                    <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 700 }}>Active Consumption</p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

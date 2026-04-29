@@ -87,16 +87,19 @@ const AdminMasters = () => {
             ? [
                 { label: "Card No", slug: "card_no" },
                 { label: "Name", slug: "name" },
-                { label: "Gender", slug: "gender" },
-                { label: "Mobile", slug: "mobile_no" },
-                { label: "Aadhar", slug: "aadhar_no" },
+                { label: "Age / Gender", slug: "gender" },
+                { label: "Aadhar No", slug: "aadhar_no" },
+                { label: "Mobile No", slug: "mobile_no" },
+                { label: "Address", slug: "address" },
                 { label: "Designation", slug: "designation" },
               ]
             : rt.slug === "family_member"
               ? [
                   { label: "Card No", slug: "card_no" },
                   { label: "Name", slug: "name" },
-                  { label: "Gender", slug: "gender" },
+                  { label: "Age / Gender", slug: "gender" },
+                  { label: "Mobile No", slug: "mobile_no" },
+                  { label: "Aadhar No", slug: "aadhar_no" },
                   { label: "Relationship", slug: "relationship" },
                 ]
               : [],
@@ -2554,102 +2557,102 @@ const AdminMasters = () => {
                                   padding: "1.25rem 1.5rem",
                                   fontSize: "0.625rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                S.No
+                                S.NO
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Card No
+                                CARD NO
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Name
+                                NAME
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Age / Gender
+                                AGE / GENDER
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Aadhar No
+                                AADHAR NO
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Mobile No
+                                MOBILE NO
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Address
+                                ADDRESS
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                Designation
+                                DESIGNATION
                               </th>
                               {activeProjectFields.map((field) => (
                                 <th
                                   key={field.id}
                                   style={{
-                                    fontSize: "0.625rem",
+                                    fontSize: "0.75rem",
                                     fontWeight: 900,
-                                    color: "#94a3b8",
+                                    color: "#475569",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.05em",
                                   }}
                                 >
-                                  {field.field_label}
+                                  {field.field_label.toUpperCase()}
                                 </th>
                               ))}
                             </>
@@ -2658,14 +2661,14 @@ const AdminMasters = () => {
                               <th
                                 style={{
                                   padding: "1.25rem 1.5rem",
-                                  fontSize: "0.625rem",
+                                  fontSize: "0.75rem",
                                   fontWeight: 900,
-                                  color: "#94a3b8",
+                                  color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                S.No
+                                S.NO
                               </th>
                               {getCurrentProtocols()
                                 .find((p) => p.id === exploringProtocolId)
@@ -2674,14 +2677,14 @@ const AdminMasters = () => {
                                     key={f.id || f.slug}
                                     style={{
                                       padding: "1.25rem 1.5rem",
-                                      fontSize: "0.625rem",
+                                      fontSize: "0.75rem",
                                       fontWeight: 900,
-                                      color: "#94a3b8",
+                                      color: "#475569",
                                       textTransform: "uppercase",
                                       letterSpacing: "0.05em",
                                     }}
                                   >
-                                    {f.label}
+                                    {f.label.toUpperCase()}
                                   </th>
                                 ))}
                             </>
@@ -2690,14 +2693,14 @@ const AdminMasters = () => {
                             style={{
                               textAlign: "right",
                               paddingRight: "1.5rem",
-                              fontSize: "0.625rem",
+                              fontSize: "0.75rem",
                               fontWeight: 900,
-                              color: "#94a3b8",
+                              color: "#475569",
                               textTransform: "uppercase",
                               letterSpacing: "0.05em",
                             }}
                           >
-                            Governance
+                            GOVERNANCE
                           </th>
                         </tr>
                       </thead>
@@ -2745,16 +2748,16 @@ const AdminMasters = () => {
                             return (
                               <React.Fragment key={m.id}>
                                 <tr style={{ background: "#fdfdff" }}>
-                                  {["employee", "family", "health"].includes(
+                                  {["employee", "family", "health", "employee_master", "family_member"].includes(
                                     exploringProtocolId,
                                   ) ? (
                                     <>
                                       <td
                                         style={{
-                                          padding: "1.5rem 1.5rem",
+                                          padding: "1.25rem 1.5rem",
                                           fontWeight: 900,
                                           color: "#64748b",
-                                          fontSize: "0.875rem",
+                                          fontSize: "0.8125rem",
                                         }}
                                       >
                                         {sno}
@@ -2763,7 +2766,7 @@ const AdminMasters = () => {
                                         style={{
                                           fontWeight: 900,
                                           color: "var(--primary)",
-                                          fontSize: "1rem",
+                                          fontSize: "0.9375rem",
                                         }}
                                       >
                                         {m.card_no}
@@ -2772,18 +2775,19 @@ const AdminMasters = () => {
                                         style={{
                                           fontWeight: 800,
                                           color: "#1e293b",
+                                          fontSize: "0.875rem",
                                         }}
                                       >
                                         {m.name}
                                       </td>
-                                      <td style={{ fontWeight: 600 }}>
-                                        {age} / {m.gender?.[0]}
+                                      <td style={{ fontWeight: 800, color: "#1e293b", fontSize: "0.8125rem" }}>
+                                        {age !== "N/A" ? `${age} / ${m.gender?.[0] || m.gender}` : (m.gender || "--")}
                                       </td>
-                                      <td style={{ color: "#64748b" }}>
-                                        {m.aadhar_no || "N/A"}
+                                      <td style={{ color: "#475569", fontSize: '0.8125rem', fontWeight: 700 }}>
+                                        {m.aadhar_no || "--"}
                                       </td>
-                                      <td style={{ fontWeight: 600 }}>
-                                        {m.mobile_no}
+                                      <td style={{ fontWeight: 600, color: "#64748b" }}>
+                                        {m.mobile_no || "--"}
                                       </td>
                                       <td
                                         style={{
@@ -2791,13 +2795,13 @@ const AdminMasters = () => {
                                           color: "#64748b",
                                         }}
                                       >
-                                        {m.address?.substring(0, 20)}...
+                                        {m.address ? (m.address.length > 20 ? m.address.substring(0, 20) + "..." : m.address) : "--"}
                                       </td>
                                       <td
                                         style={{
-                                          fontSize: "0.75rem",
-                                          fontWeight: 700,
-                                          color: "#64748b",
+                                          fontSize: "0.8125rem",
+                                          fontWeight: 900,
+                                          color: "#1e293b",
                                         }}
                                       >
                                         {m.designation || "-"}
@@ -3014,42 +3018,46 @@ const AdminMasters = () => {
                                       <tr
                                         key={`${m.id}-${f.id}`}
                                         style={{
-                                          fontSize: "0.875rem",
+                                          fontSize: "0.8125rem",
                                           background: "white",
                                         }}
                                       >
+                                        <td style={{ padding: "1rem 1.5rem" }}></td>
                                         <td
                                           style={{
-                                            paddingLeft: "3rem",
+                                            fontWeight: 900,
                                             color: "#94a3b8",
-                                            fontWeight: 600,
+                                            fontSize: "0.8125rem",
                                           }}
                                         >
-                                          {m.card_no}/{f.card_no_suffix}
+                                          {m.card_no}{f.card_no_suffix ? (f.card_no_suffix.startsWith('/') ? f.card_no_suffix : `/${f.card_no_suffix}`) : ""}
                                         </td>
                                         <td
                                           style={{
-                                            paddingLeft: "2rem",
-                                            fontWeight: 700,
+                                            fontWeight: 800,
                                             color: "#475569",
                                           }}
                                         >
                                           {f.name}
                                         </td>
-                                        <td>-</td>
-                                        <td style={{ color: "#64748b" }}>
-                                          {fAge} / {f.gender?.[0]}
+                                        <td style={{ fontWeight: 600, color: "#64748b" }}>
+                                          {fAge} / {f.gender?.[0] || f.gender}
                                         </td>
                                         <td style={{ color: "#94a3b8" }}>
-                                          {f.aadhar_no || "-"}
+                                          {f.aadhar_no || "--"}
                                         </td>
                                         <td style={{ color: "#64748b" }}>
-                                          {f.mobile_no || m.mobile_no}
+                                          {f.mobile_no || m.mobile_no || "--"}
+                                        </td>
+                                        <td style={{ color: "#94a3b8", fontSize: '0.7rem' }}>
+                                          {f.address ? (f.address.length > 10 ? f.address.substring(0, 10) + "..." : f.address) : "--"}
                                         </td>
                                         <td
                                           style={{
                                             color: "#64748b",
-                                            fontWeight: 700,
+                                            fontWeight: 800,
+                                            textTransform: "uppercase",
+                                            fontSize: '0.7rem'
                                           }}
                                         >
                                           {f.relationship}
