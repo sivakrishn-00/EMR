@@ -648,7 +648,14 @@ const Patients = () => {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Patient Management</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>Manage registration and records of all patients</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => fetchPatients(page, viewMode, projectFilter)} 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '12px' }}
+          >
+            <Clock size={16} className={isLoading ? 'spin-anim' : ''} /> Refresh Queue
+          </button>
           <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
             <UserPlus size={20} /> Register New Patient
           </button>
@@ -880,9 +887,34 @@ const Patients = () => {
                     <td style={{ textAlign: 'right', paddingRight: '1.5rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
                         {p.current_visit ? (
-                            <div style={{ background: 'var(--background)', padding: '0.4rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Clock size={12} color="var(--text-muted)" />
-                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>In Clinic</span>
+                            <div style={{ 
+                                background: p.current_visit.status === 'PENDING_PHARMACY' ? '#faf5ff' : '#f0f9ff', 
+                                padding: '0.4rem 0.75rem', 
+                                borderRadius: '10px', 
+                                border: p.current_visit.status === 'PENDING_PHARMACY' ? '1px solid #e9d5ff' : '1px solid #bae6fd', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '0.5rem' 
+                            }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: p.current_visit.status === 'PENDING_PHARMACY' ? '#a855f7' : '#0ea5e9', animation: 'pulse 2s infinite' }}></div>
+                                <span style={{ 
+                                    fontSize: '0.625rem', 
+                                    fontWeight: 800, 
+                                    color: p.current_visit.status === 'PENDING_PHARMACY' ? '#7e22ce' : '#0369a1', 
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.025em'
+                                }}>
+                                    {p.current_visit.status === 'PENDING_PHARMACY' ? 'Awaiting Pharmacy' : 
+                                     p.current_visit.status === 'PENDING_LAB' ? 'In Laboratory' :
+                                     p.current_visit.status === 'PENDING_VITALS' ? 'In Triage' :
+                                     p.current_visit.status === 'PENDING_CONSULTATION' ? 'Initial Consult' :
+                                     p.current_visit.status === 'FINAL_CONSULTATION' ? 'Final Review' : 'In Clinic'}
+                                </span>
+                            </div>
+                        ) : viewMode === 'COMPLETED' ? (
+                            <div style={{ background: '#f0fdf4', padding: '0.4rem 0.75rem', borderRadius: '10px', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Check size={12} color="#166534" />
+                                <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Visit Closed</span>
                             </div>
                         ) : viewMode === 'SCHEDULED' ? (
                             p.upcoming_appointment?.status === 'SCHEDULED' ? (
@@ -909,10 +941,8 @@ const Patients = () => {
                                         const loading = toast.loading('Initiating Arrived Status...');
                                         try {
                                             if (p.upcoming_appointment?.id) {
-                                                // Call the official check-in action
                                                 await api.post(`clinical/appointments/${p.upcoming_appointment.id}/check_in/`);
                                             } else {
-                                                // Fallback to direct visit creation
                                                 await api.post('clinical/visits/', { patient: p.id, reason: 'Scheduled Visit', status: 'PENDING_VITALS' });
                                             }
                                             toast.success("Patient Arrived & Registered!", { id: loading });
@@ -1573,6 +1603,18 @@ const Patients = () => {
         @keyframes slideUp {
           from { transform: translateY(30px) scale(0.95); opacity: 0; }
           to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(0.95); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .spin-anim {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

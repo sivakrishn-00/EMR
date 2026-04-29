@@ -13,8 +13,10 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronRight,
+  ChevronLeft,
   Pencil,
-  FileText
+  FileText,
+  Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,6 +45,7 @@ const Clinical = () => {
   const [showLabSearch, setShowLabSearch] = useState(false);
 
   const [showHistory, setShowHistory] = useState(false);
+  const [showHistoryDashboard, setShowHistoryDashboard] = useState(false);
   const [patientHistory, setPatientHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [detailedVisit, setDetailedVisit] = useState(null);
@@ -183,16 +186,19 @@ const Clinical = () => {
     }
   };
 
-  const fetchHistory = async () => {
-    if (!selectedVisit?.patient) return;
+  const fetchHistory = async (patientId) => {
+    const targetId = patientId || selectedVisit?.patient;
+    if (!targetId) return;
+    
     setIsLoadingHistory(true);
-    setShowHistory(true);
     try {
-      // Scale Optimization: Only fetch last 5 completed encounters to prevent memory bloat
-      const res = await api.get(`clinical/visits/?patient=${selectedVisit.patient}&status=COMPLETED&page_size=5`);
-      setPatientHistory(res.data.results || res.data || []);
+      const res = await api.get(`clinical/visits/?patient=${targetId}&status=COMPLETED&page_size=5`);
+      // Strict Enforcement: Take only last 5 records
+      const history = (res.data.results || res.data || []).slice(0, 5);
+      setPatientHistory(history);
+      if (history.length > 0) setDetailedVisit(history[0]);
     } catch (err) {
-      toast.error("Cloud link slow, retrying...");
+      console.error("History pre-fetch failed");
     } finally {
       setIsLoadingHistory(false);
     }
@@ -265,6 +271,10 @@ const Clinical = () => {
                                     timing: p.timing || 'After Food'
                                 })) || []
                               });
+                              // Background Pre-fetch (Performance)
+                              fetchHistory(v.patient);
+                              // Keep dashboard hidden initially
+                              setShowHistoryDashboard(false);
                             }} 
                             style={{ 
                               background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
@@ -326,87 +336,130 @@ const Clinical = () => {
         {selectedVisit && (
         <div className="workspace-split" style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* TOP: HISTORICAL REFERENCE PANEL (Unified MNC View) */}
-          {detailedVisit && (
-            <div className="reference-panel">
-                <div className="reference-header">
+          {showHistoryDashboard && (detailedVisit || isLoadingHistory) && (
+            <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed #e2e8f0' : '1.5px solid #6366f1', marginBottom: '2rem' }}>
+                <div className="reference-header" style={{ padding: '0.75rem 1.5rem', background: '#f8fafc' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div className="dossier-icon-box">
-                            <ClipboardList size={20} color="white" />
+                        <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' }}>
+                            <History size={16} color={isLoadingHistory ? '#94a3b8' : 'white'} />
                         </div>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <h2 className="dossier-title">Historical Reference Summary</h2>
-                                <span className="dossier-badge">Date: {new Date(detailedVisit.visit_date).toLocaleDateString()}</span>
+                        <h2 className="dossier-title" style={{ fontSize: '0.9rem', color: isLoadingHistory ? '#94a3b8' : '#1e293b' }}>
+                            {isLoadingHistory ? 'Synchronizing Historical Records...' : 'Historical Reference Summary'}
+                        </h2>
+                    </div>
+                    {!isLoadingHistory && (
+                        <button onClick={() => setShowHistoryDashboard(false)} className="dossier-close" style={{ width: '30px', height: '30px' }}>
+                           <X size={16} />
+                        </button>
+                    )}
+                </div>
+
+                {isLoadingHistory ? (
+                    <div style={{ padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                            {[1,2,3].map(i => <div key={i} className="skeleton" style={{ width: '100px', height: '32px', borderRadius: '10px' }} />)}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 1fr', gap: '1.5rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {[1,2,3,4,5].map(i => <div key={i} className="skeleton" style={{ height: '40px', borderRadius: '12px' }} />)}
                             </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div className="skeleton" style={{ height: '80px', borderRadius: '20px' }} />
+                                <div className="skeleton" style={{ height: '150px', borderRadius: '16px' }} />
+                            </div>
+                            <div className="skeleton" style={{ height: '240px', borderRadius: '16px' }} />
                         </div>
                     </div>
-                    <button onClick={() => setDetailedVisit(null)} className="dossier-close">
-                       <X size={18} />
-                    </button>
-                </div>
-                <div className="reference-content">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.5rem' }}>
-                         {/* Snapshot */}
-                         <div className="snapshot-list">
-                            {[
-                                { label: 'Weight', value: `${detailedVisit.vitals?.weight_kg || '--'} kg` },
-                                { label: 'BP', value: `${detailedVisit.vitals?.blood_pressure_sys || '--'}/${detailedVisit.vitals?.blood_pressure_dia || '--'}` },
-                                { label: 'HR', value: `${detailedVisit.heart_rate || '--'} BPM` },
-                                { label: 'Temp', value: `${detailedVisit.vitals?.temperature_c || '--'} °C` },
-                                { label: 'BMI', value: `${detailedVisit.vitals?.bmi || '--'}` }
-                            ].map((item, id) => (
-                                <div key={id} className="snapshot-item" style={{ padding: '0.625rem 0.875rem' }}>
-                                    <span className="item-label" style={{ fontSize: '0.6rem' }}>{item.label}</span>
-                                    <span className="item-value" style={{ fontSize: '0.7rem' }}>{item.value}</span>
-                                </div>
+                ) : (
+                    <>
+                        {/* MNC Visit Selector Tabs */}
+                        <div style={{ background: 'white', padding: '0.5rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
+                            {patientHistory.slice(0, 5).map((h) => (
+                                <button 
+                                    key={h.id}
+                                    onClick={() => setDetailedVisit(h)}
+                                    style={{ 
+                                        padding: '0.5rem 1rem', 
+                                        borderRadius: '10px', 
+                                        border: '1px solid',
+                                        borderColor: detailedVisit.id === h.id ? '#6366f1' : '#e2e8f0',
+                                        background: detailedVisit.id === h.id ? '#eff6ff' : 'white',
+                                        color: detailedVisit.id === h.id ? '#4338ca' : '#64748b',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 800,
+                                        whiteSpace: 'nowrap',
+                                        transition: '0.2s',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <Calendar size={12} /> {new Date(h.visit_date).toLocaleDateString()}
+                                </button>
                             ))}
-                         </div>
-                         {/* Details */}
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div className="diagnosis-box" style={{ padding: '0.75rem' }}>
-                                <p className="section-label-alt" style={{ fontSize: '0.55rem' }}>PAST IMPRESSION</p>
-                                <p className="diagnosis-text" style={{ fontSize: '0.8rem' }}>{detailedVisit.consultation?.diagnosis || 'N/A'}</p>
+                        </div>
+
+                        <div className="reference-content" style={{ padding: '1.25rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 1fr', gap: '1.5rem' }}>
+                                {/* Column 1: Vitals Timeline Snapshot */}
+                                <div className="snapshot-list">
+                                    <p className="section-label-alt" style={{ color: '#6366f1', marginBottom: '10px' }}>Physical Parameters</p>
+                                    {[
+                                        { label: 'Weight', value: `${detailedVisit.vitals?.weight_kg || '--'} kg` },
+                                        { label: 'BP', value: `${detailedVisit.vitals?.blood_pressure_sys || '--'}/${detailedVisit.vitals?.blood_pressure_dia || '--'}` },
+                                        { label: 'Pulse', value: `${detailedVisit.vitals?.heart_rate || '--'} BPM` },
+                                        { label: 'Temp', value: `${detailedVisit.vitals?.temperature_c || '--'} °C` },
+                                        { label: 'BMI', value: `${detailedVisit.vitals?.bmi || '--'}` }
+                                    ].map((item, id) => (
+                                        <div key={id} className="snapshot-item" style={{ padding: '0.5rem 0.75rem', background: 'white' }}>
+                                            <span className="item-label" style={{ fontSize: '0.65rem' }}>{item.label}</span>
+                                            <span className="item-value" style={{ fontSize: '0.7rem', fontWeight: 900 }}>{item.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Column 2: Clinical Context */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div className="diagnosis-box" style={{ padding: '1rem', background: '#fffbeb', border: '1px solid #fde68a' }}>
+                                        <p className="section-label-alt" style={{ fontSize: '0.6rem', color: '#92400e' }}>HISTORICAL DIAGNOSIS</p>
+                                        <p className="diagnosis-text" style={{ fontSize: '0.85rem', color: '#78350f' }}>{detailedVisit.consultation?.diagnosis || 'No diagnosis recorded'}</p>
+                                    </div>
+                                    <div style={{ background: 'white', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0', flex: 1, overflowY: 'auto' }}>
+                                        <p style={{ fontSize: '0.65rem', fontWeight: 950, color: '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
+                                        {detailedVisit.prescriptions?.length > 0 ? detailedVisit.prescriptions.map((m, i) => (
+                                            <div key={i} style={{ marginBottom: '8px', padding: '6px 10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                                                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b' }}>{m.medication_name}</p>
+                                                <p style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
+                                            </div>
+                                        )) : <p className="empty-text">No medications prescribed</p>}
+                                    </div>
+                                </div>
+
+                                {/* Column 3: Diagnostic Insights */}
+                                <div style={{ background: 'white', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0', overflowY: 'auto', maxHeight: '350px' }}>
+                                    <p style={{ fontSize: '0.65rem', fontWeight: 950, color: '#059669', marginBottom: '10px', textTransform: 'uppercase' }}>Verified Lab Results</p>
+                                    {detailedVisit.lab_requests?.length > 0 ? detailedVisit.lab_requests.map((lr, i) => (
+                                        <div key={i} style={{ marginBottom: '1rem', padding: '10px', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
+                                            <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>{lr.test_name}</p>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                {lr.test_master_details?.sub_tests?.map(st => (
+                                                    <div key={st.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>{st.name}</span>
+                                                        <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>{lr.result?.values?.[st.name] || '--'}</span>
+                                                    </div>
+                                                ))}
+                                                {!lr.test_master_details?.sub_tests?.length && lr.result?.value && (
+                                                    <p style={{ fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>{lr.result.value}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )) : <p className="empty-text">No laboratory tests requested</p>}
+                                </div>
                             </div>
-                            <div style={{ background: 'white', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', maxHeight: '100px', overflowY: 'auto' }}>
-                                <p style={{ fontSize: '0.6rem', fontWeight: 900, color: '#6366f1', marginBottom: '4px' }}>PAST MEDS</p>
-                                {detailedVisit.prescriptions?.map((m, i) => (
-                                    <p key={i} style={{ fontSize: '0.7rem', fontWeight: 700 }}>• {m.medication_name}</p>
-                                ))}
-                            </div>
-                         </div>
-                         {/* Labs */}
-                         <div style={{ background: 'white', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', maxHeight: '200px', overflowY: 'auto' }}>
-                             <p style={{ fontSize: '0.6rem', fontWeight: 900, color: '#10b981', marginBottom: '8px' }}>HISTORICAL LABS</p>
-                             {detailedVisit.lab_requests?.map((lr, i) => (
-                                 <div key={i} style={{ marginBottom: '1.25rem', padding: '0.75rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                                     <p style={{ fontSize: '0.75rem', fontWeight: 950, color: '#1e293b', marginBottom: '6px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>{lr.test_name}</p>
-                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                         {lr.test_master_details?.sub_tests?.map(st => {
-                                             const val = lr.result?.values?.[st.name];
-                                             return (
-                                                 <div key={st.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>{st.name}</span>
-                                                         <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a' }}>{val || '--'} {st.units}</span>
-                                                     </div>
-                                                     {st.biological_range && (
-                                                         <span style={{ fontSize: '0.55rem', color: '#94a3b8', fontStyle: 'italic' }}>Range: {st.biological_range}</span>
-                                                     )}
-                                                 </div>
-                                             );
-                                         })}
-                                         {!lr.test_master_details?.sub_tests?.length && lr.result?.value && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                  <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>{lr.result.value}</span>
-                                                  <span style={{ fontSize: '0.55rem', color: '#94a3b8' }}>{lr.result.reference_range}</span>
-                                              </div>
-                                         )}
-                                     </div>
-                                 </div>
-                             ))}
-                         </div>
-                    </div>
-                </div>
+                        </div>
+                    </>
+                )}
             </div>
           )}
 
@@ -444,7 +497,7 @@ const Clinical = () => {
                      {selectedVisit?.patient_details?.total_visits > 1 && (
                         <button 
                            type="button"
-                           onClick={fetchHistory}
+                           onClick={() => setShowHistoryDashboard(true)}
                            style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#6d28d9', padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
                         >
                            <History size={13} /> VIEW HISTORY
@@ -966,6 +1019,19 @@ const Clinical = () => {
           50% { opacity: 0.7; transform: scale(0.95); }
           100% { opacity: 1; transform: scale(1); }
         }
+        @keyframes shimmer {
+          0% { background-position: -468px 0; }
+          100% { background-position: 468px 0; }
+        }
+        .skeleton {
+          background: #f6f7f8;
+          background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+          background-repeat: no-repeat;
+          background-size: 800px 104px;
+          display: inline-block;
+          position: relative;
+          animation: shimmer 1.5s infinite linear;
+        }
         textarea { border-radius: 12px !important; padding: 0.75rem !important; }
         
         /* MNC Enterprise Workspace System 🏢 */
@@ -1051,73 +1117,6 @@ const Clinical = () => {
         }
       `}</style>
 
-      {/* PATIENT HISTORY DRAWER (AUTO-SCALING COMPONENT) */}
-      {showHistory && (
-          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2000 }}>
-             <div onClick={() => setShowHistory(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(241, 245, 249, 0.8)', backdropFilter: 'blur(12px)' }} />
-             <div className="fade-in-right" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '450px', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 50px rgba(0,0,0,0.1)' }}>
-                <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                   <div>
-                      <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)' }}>Patient History</h3>
-                      <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Longitudinal Record for {selectedVisit.patient_details?.first_name}</p>
-                   </div>
-                   <button onClick={() => setShowHistory(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', color: '#64748b' }}><X size={18} /></button>
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
-                   {isLoadingHistory ? (
-                       <div style={{ textAlign: 'center', padding: '3rem' }}>
-                          <Clock size={40} className="spin" style={{ color: '#cbd5e1', marginBottom: '1rem' }} />
-                          <p style={{ fontWeight: 600, color: '#94a3b8' }}>Fetching global records...</p>
-                       </div>
-                   ) : patientHistory.length === 0 ? (
-                       <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed #f1f5f9', borderRadius: '20px' }}>
-                           <p style={{ fontWeight: 700, color: '#94a3b8' }}>No past records found for this patient.</p>
-                       </div>
-                   ) : (
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                          {patientHistory.map((h, idx) => (
-                              <div key={h.id} style={{ position: 'relative', paddingLeft: '1.5rem', borderLeft: '2px solid #e2e8f0' }}>
-                                 <div style={{ position: 'absolute', top: 0, left: '-6px', width: '10px', height: '10px', borderRadius: '50%', background: '#6366f1', border: '2px solid white' }} />
-                                 <div className="card" style={{ padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                                       <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#6366f1' }}>{new Date(h.visit_date).toLocaleDateString()}</span>
-                                       <span style={{ fontSize: '0.625rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>COMPLETED</span>
-                                    </div>
-                                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Diagnosis</p>
-                                    <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.75rem' }}>{h.consultation?.diagnosis || 'No diagnosis recorded'}</p>
-                                    
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '10px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                       <div>
-                                          <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8' }}>BP</p>
-                                          <p style={{ fontSize: '0.75rem', fontWeight: 800 }}>{h.vitals?.blood_pressure_sys || '--'}/{h.vitals?.blood_pressure_dia || '--'}</p>
-                                       </div>
-                                       <div>
-                                          <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8' }}>Meds</p>
-                                          <p style={{ fontSize: '0.75rem', fontWeight: 800 }}>{h.prescriptions?.length || 0} drugs</p>
-                                       </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => { setDetailedVisit(h); setShowHistory(false); }}
-                                        style={{ width: '100%', marginTop: '1rem', background: 'white', border: '1.2px solid #e2e8f0', borderRadius: '12px', padding: '0.625rem', fontSize: '0.6875rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', transition: '0.2s' }}
-                                        onMouseOver={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                                        onMouseOut={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-                                    >
-                                        <FileText size={14} /> VIEW FULL SUMMARY
-                                    </button>
-                                 </div>
-                              </div>
-                          ))}
-                       </div>
-                   )}
-                </div>
-                
-                <div style={{ padding: '1.5rem', background: '#f8fafc', borderTop: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 700, textAlign: 'center' }}>Limited to last 5 encounters for system performance.</p>
-                </div>
-              </div>
-           </div>
-       )}
     </div>
   );
 };

@@ -662,8 +662,18 @@ class PatientViewSet(viewsets.ModelViewSet):
         elif view_mode == 'completed':
             # Only show patients who completed their visit today
             from django.utils import timezone
-            today = timezone.localdate()
-            queryset = queryset.filter(visits__is_active=False, visits__visit_date__date=today).distinct()
+            from datetime import timedelta
+            
+            # Use a robust date range for the current local day
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            tomorrow_start = today_start + timedelta(days=1)
+            
+            # We look for patients with inactive visits that were either started or (implicitly) handled today
+            # Since we don't have a closed_at, we prioritize visits that started today and are inactive.
+            queryset = queryset.filter(
+                visits__is_active=False, 
+                visits__visit_date__range=(today_start, tomorrow_start)
+            ).distinct()
         # 'all' (Master Registry) requires no further filtering
 
         return queryset.distinct()
@@ -671,17 +681,23 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         from django.utils import timezone
+        from datetime import timedelta
         today = timezone.localdate()
         base_qs = self.get_base_queryset()
         
         # Calculate real-time counts for all columns
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_start = today_start + timedelta(days=1)
+        
         q_active = base_qs.filter(visits__is_active=True).distinct().count()
         q_scheduled = base_qs.filter(
             appointments__status__in=['SCHEDULED', 'CONFIRMED'], 
             appointments__appointment_date__gte=today_start
         ).distinct().count()
-        q_completed = base_qs.filter(visits__is_active=False, visits__visit_date__date=today).distinct().count()
+        q_completed = base_qs.filter(
+            visits__is_active=False, 
+            visits__visit_date__range=(today_start, tomorrow_start)
+        ).distinct().count()
         q_all = base_qs.distinct().count()
 
         return Response({
