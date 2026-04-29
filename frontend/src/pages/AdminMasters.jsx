@@ -1416,6 +1416,122 @@ const AdminMasters = () => {
           </div>
         ) : (
           <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "0.5rem",
+                marginBottom: "1rem",
+              }}
+            >
+              {/* Station Total Card */}
+              <div
+                className="card fade-in"
+                style={{
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(99, 102, 241, 0.15)",
+                  border: "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Users size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {projects.length}
+                </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Station Total</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
+              </div>
+
+              {/* OPD Today Card */}
+              <div
+                className="card fade-in"
+                style={{
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(16, 185, 129, 0.15)",
+                  border: "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Activity size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {totalCount.toString().padStart(2, '0')}
+                </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>OPD Today</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
+              </div>
+
+              {/* Emergency Card */}
+              <div
+                className="card fade-in"
+                style={{
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(239, 68, 68, 0.15)",
+                  border: "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <Clock size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                  {(totalFamilyCount || 0).toString().padStart(2, '0')}
+                </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Emergency</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
+              </div>
+
+              {/* Dependents Card */}
+              <div
+                className="card fade-in"
+                style={{
+                  padding: "0.75rem",
+                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                  borderRadius: "12px",
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 4px 10px rgba(245, 158, 11, 0.15)",
+                  border: "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
+                      <UserPlus size={14} color="white" />
+                   </div>
+                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
+                </div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
+                   {totalFamilyCount}
+                </h3>
+                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Dependents</p>
+                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
+              </div>
+            </div>
 
             <div
               style={{
