@@ -19,8 +19,9 @@ import {
   Check,
   Clock,
   ChevronLeft,
-  ChevronRight,
-  ShieldCheck
+  ChevronRight, 
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +40,7 @@ const Patients = () => {
   const [tabCounts, setTabCounts] = useState({ active: 0, scheduled: 0, completed: 0, all: 0 });
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [employeeMasters, setEmployeeMasters] = useState([]);
+  const [isMastersLoading, setIsMastersLoading] = useState(false);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -136,12 +138,15 @@ const Patients = () => {
   };
 
   const fetchEmployeeMasters = async () => {
+    setIsMastersLoading(true);
     try {
       // Use the newly created all-masters endpoint for non-paginated access
       const res = await api.get(`patients/employee-masters/all-masters/`);
       setEmployeeMasters(res.data);
     } catch (err) {
       console.error("Failed to fetch masters");
+    } finally {
+      setIsMastersLoading(false);
     }
   };
 
@@ -1141,7 +1146,11 @@ const Patients = () => {
                                                 maxHeight: '300px', overflowY: 'auto', zIndex: 1000,
                                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', marginTop: '8px'
                                             }}>
-                                                {employeeMasters.filter(emp => 
+                                                {isMastersLoading ? (
+                                                    <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                                        <Loader2 size={16} className="spin" /> Searching Registry...
+                                                    </div>
+                                                ) : employeeMasters.filter(emp => 
                                                     emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
                                                     emp.card_no.includes(employeeSearchTerm)
                                                 ).length === 0 ? (
@@ -1304,6 +1313,7 @@ const Patients = () => {
                                 <option value="VOTER_ID">Voter ID</option>
                                 <option value="DRIVING_LICENCE">Driving Licence</option>
                                 <option value="PASSPORT">Passport</option>
+                                <option value="CARD_NO">Card No</option>
                             </select>
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>

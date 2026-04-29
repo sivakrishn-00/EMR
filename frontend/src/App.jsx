@@ -178,6 +178,7 @@ function App() {
       <ThemedApp>
         <BrowserRouter>
         <Toaster position="top-right" 
+          containerStyle={{ zIndex: 999999 }}
           toastOptions={{
             style: {
               borderRadius: '12px',

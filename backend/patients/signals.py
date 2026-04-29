@@ -57,7 +57,11 @@ from .tasks import sync_patient_dossier_task
 def trigger_dossier_map(instance, created, **kwargs):
     """Universal Trigger to refresh the MongoDB Dossier"""
     if hasattr(instance, 'patient') and instance.patient and instance.patient.patient_id:
-        sync_patient_dossier_task.delay(instance.patient.patient_id)
+        try:
+            sync_patient_dossier_task.delay(instance.patient.patient_id)
+        except Exception as e:
+            # Prevent system crash if Redis/Celery is unreachable
+            print(f"RESILIENCE: Background dossier sync skipped due to connection failure: {e}")
 
 @receiver(post_save, sender='clinical.Visit')
 def sync_visit_to_dossier(sender, instance, created, **kwargs):
