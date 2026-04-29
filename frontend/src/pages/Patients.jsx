@@ -21,7 +21,10 @@ import {
   ChevronLeft,
   ChevronRight, 
   ShieldCheck,
-  Loader2
+  Loader2,
+  Users,
+  Database,
+  ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -73,6 +76,129 @@ const Patients = () => {
   const [isAcking, setIsAcking] = useState(false);
   const [isEnablingPortal, setIsEnablingPortal] = useState(null);
 
+  // Personnel Registry Access
+  const [showMasterModal, setShowMasterModal] = useState(false);
+  const [showFamilyModal, setShowFamilyModal] = useState(false);
+  const [masterFormData, setMasterFormData] = useState({
+    project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", additional_fields: {},
+  });
+  const [familyFormData, setFamilyFormData] = useState({
+    card_no_suffix: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", relationship: "SPOUSE", additional_fields: {},
+  });
+  const [selectedMasterId, setSelectedMasterId] = useState("");
+  const [familyMasterSearch, setFamilyMasterSearch] = useState("");
+  const [showFamilyMasterDropdown, setShowFamilyMasterDropdown] = useState(false);
+  const [masterFormAttempted, setMasterFormAttempted] = useState(false);
+  const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
+
+  const fetchNextCardNo = async (projectId) => {
+    try {
+      const res = await api.get(`patients/employee-masters/next-card-no/?project=${projectId}`);
+      if (res.data.next_card_no) {
+        setMasterFormData(prev => ({ ...prev, card_no: res.data.next_card_no }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch next card number", err);
+    }
+  };
+
+  const openMasterOnboarding = () => {
+    const apgenco = projects.find(p => p.name.includes("AP-GENCO") || p.name === "APGENCO");
+    if (apgenco) {
+      setMasterFormData(prev => ({ ...prev, project: apgenco.id }));
+      fetchNextCardNo(apgenco.id);
+    }
+    setShowMasterModal(true);
+  };
+
+  const handleMasterOnboardingSubmit = async (e) => {
+    e.preventDefault();
+    setMasterFormAttempted(true);
+    if (!masterFormData.name || !masterFormData.card_no || !masterFormData.dob || !masterFormData.mobile_no) {
+       toast.error("Please fill all required clinical fields");
+       return;
+    }
+    const loadId = toast.loading("Finalizing Master Personnel Record...");
+    try {
+      const data = new FormData();
+      Object.keys(masterFormData).forEach(key => {
+        if (key === 'additional_fields') {
+          data.append(key, JSON.stringify(masterFormData[key]));
+        } else {
+          data.append(key, masterFormData[key]);
+        }
+      });
+      await api.post('patients/employee-masters/', data);
+      toast.success("Personnel Master Onboarded Successfully!", { id: loadId });
+      setShowMasterModal(false);
+      setMasterFormAttempted(false);
+      fetchEmployeeMasters();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to onboard personnel. Check for duplicate Card ID/Aadhar.", { id: loadId });
+    }
+  };
+
+  const handleFamilyRegistrySubmit = async (e) => {
+    e.preventDefault();
+    setFamilyFormAttempted(true);
+    if (!selectedMasterId) {
+      toast.error("Please select an employee from the dropdown list first");
+      return;
+    }
+    if (!familyFormData.name || !familyFormData.dob) {
+      toast.error("Employee details incomplete: Name and DOB are required");
+      return;
+    }
+    if (!familyFormData.card_no_suffix) {
+      toast.error("System error: Next suffix not calculated. Please re-select the employee.");
+      return;
+    }
+    const loadId = toast.loading("Archiving Dependent Relation...");
+    try {
+      const payload = {
+        employee: selectedMasterId,
+        ...familyFormData,
+        additional_fields: JSON.stringify(familyFormData.additional_fields)
+      };
+      await api.post('patients/family-members/', payload);
+      toast.success("Family Member Registered!", { id: loadId });
+      setShowFamilyModal(false);
+      setFamilyFormAttempted(false);
+      setSelectedMasterId("");
+      setFamilyMasterSearch("");
+      fetchEmployeeMasters();
+    } catch (err) {
+      toast.error("Registration conflict. Verify details.", { id: loadId });
+    }
+  };
+
+  const handleSelectMasterForFamily = (master) => {
+    setSelectedMasterId(master.id);
+    setFamilyMasterSearch(`${master.card_no} - ${master.name}`);
+    setShowFamilyMasterDropdown(false);
+    
+    // Auto-calculate next suffix
+    const nextSuffix = (master.family_members?.length || 0) + 1;
+    setFamilyFormData(prev => ({ 
+      ...prev, 
+      card_no_suffix: `/${nextSuffix}` 
+    }));
+  };
+
+  const openFamilyModal = () => {
+    setFamilyMasterSearch("");
+    setSelectedMasterId("");
+    setFamilyFormData(prev => ({ 
+      ...prev, 
+      card_no_suffix: "",
+      name: "",
+      dob: "",
+      gender: "MALE",
+      relationship: "SPOUSE"
+    }));
+    setShowFamilyModal(true);
+  };
+
   useEffect(() => {
     fetchEmployeeMasters();
     fetchStats();
@@ -89,6 +215,12 @@ const Patients = () => {
       }
     } catch (err) {}
   };
+
+  useEffect(() => {
+    if (showFamilyModal) {
+      fetchEmployeeMasters();
+    }
+  }, [showFamilyModal]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -649,15 +781,16 @@ const Patients = () => {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>Manage registration and records of all patients</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => fetchPatients(page, viewMode, projectFilter)} 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '12px' }}
-          >
-            <Clock size={16} className={isLoading ? 'spin-anim' : ''} /> Refresh Queue
+          
+          <button className="btn" onClick={openMasterOnboarding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+             <ShieldCheck size={18} /> Employee Registry
           </button>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
-            <UserPlus size={20} /> Register New Patient
+          <button className="btn" onClick={openFamilyModal} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+             <Users size={18} /> Family Registry
+          </button>
+
+          <button className="btn" onClick={() => { resetForm(); setShowModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+            <UserPlus size={18} /> Register New Patient
           </button>
         </div>
       </header>
@@ -710,27 +843,6 @@ const Patients = () => {
         </button>
       </div>
 
-      {/* Premium Hub Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem', marginBottom: '3rem' }}>
-          <DashboardMetric 
-              label="Station Total" 
-              value={stats.total_registered} 
-              icon={<User size={24} />} 
-              gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
-          />
-          <DashboardMetric 
-              label="OPD Today" 
-              value={String(stats.opd_today).padStart(2, '0')} 
-              icon={<Activity size={24} />} 
-              gradient="linear-gradient(135deg, #059669 0%, #10b981 100%)"
-          />
-          <DashboardMetric 
-              label="Emergency" 
-              value={String(stats.emergency_today).padStart(2, '0')} 
-              icon={<Clock size={24} />} 
-              gradient="linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)"
-          />
-      </div>
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -1538,6 +1650,206 @@ const Patients = () => {
                 >
                   Back to Registry
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* MODAL 2: Register in Masters (Ported for AP-GENCO Access) */}
+      {showMasterModal && createPortal(
+        <div className="modal-overlay" style={{ background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", zIndex: 100000 }}>
+          <div className="card fade-in" style={{ width: "100%", maxWidth: "600px", padding: 0, borderRadius: "32px", background: "white", boxShadow: "0 20px 40px rgba(0,0,0,0.08)", border: "1px solid var(--border)" }}>
+            <div style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                  <ShieldCheck size={24} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Register in Masters</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Clinical Registry & Personnel Onboarding</p>
+                </div>
+              </div>
+              <button onClick={() => setShowMasterModal(false)} style={{ border: "none", background: "#f1f5f9", width: "36px", height: "36px", borderRadius: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={20} color="#64748b" />
+              </button>
+            </div>
+            <form onSubmit={handleMasterOnboardingSubmit} style={{ padding: "2rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+                <div className="form-group">
+                  <label>Card No *</label>
+                  <input required readOnly value={masterFormData.card_no} placeholder="Auto-generating..." className="form-control" style={{ background: '#f8fafc', cursor: 'not-allowed', color: '#64748b' }} />
+                </div>
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input required value={masterFormData.name} onChange={(e) => setMasterFormData({ ...masterFormData, name: e.target.value })} placeholder="e.g. P. BABU RAO" className="form-control" />
+                </div>
+                <div className="form-group">
+                  <label>DOB *</label>
+                  <input type="date" required max={new Date().toLocaleDateString('en-CA')} value={masterFormData.dob} onChange={(e) => setMasterFormData({ ...masterFormData, dob: e.target.value })} className="form-control" />
+                </div>
+                <div className="form-group">
+                  <label>Gender *</label>
+                  <select value={masterFormData.gender} onChange={(e) => setMasterFormData({ ...masterFormData, gender: e.target.value })} className="form-control">
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Mobile No *</label>
+                  <input required value={masterFormData.mobile_no} onChange={(e) => { const val = e.target.value.replace(/\D/g, ""); if (val.length <= 10) setMasterFormData({ ...masterFormData, mobile_no: val }); }} className="form-control" placeholder="10-digit number" />
+                </div>
+                <div className="form-group">
+                  <label>Aadhar No</label>
+                  <input value={masterFormData.aadhar_no} onChange={(e) => { const val = e.target.value.replace(/\D/g, ""); if (val.length <= 12) setMasterFormData({ ...masterFormData, aadhar_no: val }); }} className="form-control" placeholder="12-digit number" />
+                </div>
+                <div className="form-group" style={{ gridColumn: "span 2" }}>
+                  <label>Home Address</label>
+                  <textarea value={masterFormData.address} onChange={(e) => setMasterFormData({ ...masterFormData, address: e.target.value })} className="form-control" placeholder="Village/City, District, State" style={{ height: '80px', paddingTop: '12px' }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL 3: Add Family Member (Ported for AP-GENCO Access) */}
+      {showFamilyModal && createPortal(
+        <div className="modal-overlay" style={{ background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", zIndex: 100000 }}>
+          <div className="card fade-in" style={{ width: "100%", maxWidth: "600px", padding: 0, borderRadius: "32px", background: "white", boxShadow: "0 20px 40px rgba(0,0,0,0.08)", border: "1px solid var(--border)" }}>
+            <div style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                  <Users size={24} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Add Family Member</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Personal Dependants & Relations</p>
+                </div>
+              </div>
+              <button onClick={() => setShowFamilyModal(false)} style={{ border: "none", background: "#f1f5f9", width: "36px", height: "36px", borderRadius: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={20} color="#64748b" />
+              </button>
+            </div>
+            <form onSubmit={handleFamilyRegistrySubmit} style={{ padding: "2rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+                <div className="form-group" style={{ gridColumn: "span 2", position: 'relative' }}>
+                  <label>Select Employee *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="Type name or Card No..." 
+                      value={familyMasterSearch} 
+                      onFocus={() => setShowFamilyMasterDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowFamilyMasterDropdown(false), 250)}
+                      onChange={(e) => {
+                        setFamilyMasterSearch(e.target.value);
+                        setSelectedMasterId(""); 
+                        setShowFamilyMasterDropdown(true);
+                      }}
+                      style={{ 
+                        height: '52px', borderRadius: '16px', paddingRight: '40px',
+                        borderColor: selectedMasterId ? '#10b981' : 'var(--border)',
+                        background: selectedMasterId ? '#f0fdf4' : 'white',
+                        fontWeight: selectedMasterId ? 700 : 500,
+                        transition: '0.3s'
+                      }}
+                    />
+                    {selectedMasterId ? (
+                        <Check size={18} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: '#10b981' }} />
+                    ) : (
+                        <Search size={18} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    )}
+                  </div>
+                  {showFamilyMasterDropdown && (
+                    <div style={{ 
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
+                      background: 'white', borderRadius: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                      maxHeight: '220px', overflowY: 'auto', marginTop: '8px', border: '1px solid #e2e8f0'
+                    }}>
+                      {isMastersLoading ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                            <Loader2 size={24} className="spin-anim" style={{ margin: '0 auto', display: 'block' }} />
+                            <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', fontWeight: 700 }}>Synchronizing Registry...</p>
+                        </div>
+                      ) : (
+                        <>
+                          {employeeMasters
+                            .filter(m => 
+                              `${m.card_no} - ${m.name}`.toLowerCase().includes(familyMasterSearch.toLowerCase())
+                            )
+                            .map(m => (
+                              <div 
+                                key={m.id} 
+                                onClick={() => handleSelectMasterForFamily(m)}
+                                style={{ 
+                                  padding: '0.875rem 1.25rem', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', 
+                                  fontWeight: 700, fontSize: '0.875rem', color: '#1e293b',
+                                  transition: '0.2s',
+                                  background: selectedMasterId === m.id ? '#f0fdf4' : 'transparent'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#f8fafc'}
+                                onMouseLeave={(e) => e.target.style.background = selectedMasterId === m.id ? '#f0fdf4' : 'transparent'}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <Database size={14} color={selectedMasterId === m.id ? "#10b981" : "#6366f1"} />
+                                    <span>{m.card_no} - {m.name}</span>
+                                </div>
+                              </div>
+                            ))}
+                          {employeeMasters.filter(m => `${m.card_no} - ${m.name}`.toLowerCase().includes(familyMasterSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem', fontWeight: 600 }}>
+                                <Info size={20} style={{ marginBottom: '0.5rem', display: 'block', margin: '0 auto' }} />
+                                No employees matched your search
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input required value={familyFormData.name} onChange={(e) => setFamilyFormData({ ...familyFormData, name: e.target.value })} placeholder="e.g. Baby.P. SONITHA" className="form-control" />
+                </div>
+                <div className="form-group">
+                  <label>DOB *</label>
+                  <input type="date" required max={new Date().toLocaleDateString('en-CA')} value={familyFormData.dob} onChange={(e) => setFamilyFormData({ ...familyFormData, dob: e.target.value })} className="form-control" />
+                </div>
+                <div className="form-group">
+                  <label>Relationship *</label>
+                  <select value={familyFormData.relationship} onChange={(e) => setFamilyFormData({ ...familyFormData, relationship: e.target.value })} className="form-control">
+                    <option value="SPOUSE">Spouse</option>
+                    <option value="WIFE">Wife</option>
+                    <option value="HUSBAND">Husband</option>
+                    <option value="SON">Son</option>
+                    <option value="DAUGHTER">Daughter</option>
+                    <option value="FATHER">Father</option>
+                    <option value="MOTHER">Mother</option>
+                    <option value="BROTHER">Brother</option>
+                    <option value="SISTER">Sister</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Gender *</label>
+                  <select value={familyFormData.gender} onChange={(e) => setFamilyFormData({ ...familyFormData, gender: e.target.value })} className="form-control">
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowFamilyModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ background: '#4f46e5', color: 'white', padding: '0.75rem 2rem' }}>Save Family Member</button>
               </div>
             </form>
           </div>
