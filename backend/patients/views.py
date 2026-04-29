@@ -143,6 +143,7 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
     serializer_class = RegistryDataSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = LargeResultsPagination
+    filter_backends = [filters.SearchFilter]
     search_fields = ['ucode', 'name']
 
     def perform_create(self, serializer):
@@ -314,6 +315,7 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
     queryset = EmployeeMaster.objects.all().order_by('card_no')
     serializer_class = EmployeeMasterSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
     search_fields = ['card_no', 'name', 'aadhar_no', 'mobile_no']
 
     def get_queryset(self):
@@ -462,6 +464,43 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(project_id=project_id)
         
         return Response(EmployeeMasterSerializer(queryset, many=True).data)
+
+    @action(detail=False, methods=['get'], url_path='next-card-no')
+    def next_card_no(self, request):
+        project_id = request.query_params.get('project')
+        user = request.user
+        
+        # Determine target project
+        target_project_id = project_id
+        if not target_project_id and user.project:
+            target_project_id = user.project.id
+            
+        # Get all card numbers for this project (or all if no project)
+        queryset = EmployeeMaster.objects.all()
+        if target_project_id:
+            queryset = queryset.filter(project_id=target_project_id)
+            
+        card_nos = queryset.values_list('card_no', flat=True)
+        
+        # Extract numeric parts and find max
+        import re
+        max_no = 0
+        for cn in card_nos:
+            # Primary part is before any / or - suffix
+            primary_part = str(cn).split('/')[0].split('-')[0]
+            # Extract numeric sequence from primary part
+            match = re.search(r'(\d+)', primary_part)
+            if match:
+                val = int(match.group(1))
+                if val > max_no:
+                    max_no = val
+        
+        next_no = max_no + 1
+        # Format as 4-digit padded string by default, or just string
+        formatted_next = str(next_no).zfill(4)
+        
+        return Response({"next_card_no": formatted_next})
+
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     queryset = FamilyMember.objects.all()

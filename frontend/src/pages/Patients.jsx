@@ -1362,12 +1362,9 @@ const Patients = () => {
 
                 <div className="form-group">
                   <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input 
-                    type="date" required 
-                    className="form-control"
-                    style={{ height: '52px', borderRadius: '16px' }}
+                  <input type="date" required max={new Date().toLocaleDateString('en-CA')}
                     value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} 
-                  />
+                    className="form-control" style={{ height: '52px', borderRadius: '16px', borderColor: (formAttempted && !formData.dob) ? '#ef4444' : '#e2e8f0' }} />
                   {formAttempted && !formData.dob && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                 </div>
 

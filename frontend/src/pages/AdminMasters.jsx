@@ -285,18 +285,28 @@ const AdminMasters = () => {
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
 
   useEffect(() => {
-    if (activeBoard === "DIAGNOSTICS") {
-      fetchLabTests();
-      fetchLabDepartments();
-      fetchLabTestTypes();
-    } else if (activeBoard === "MACHINES") {
-      fetchLabMachines();
-    } else if (activeBoard === "STATS") {
-      fetchDashboardStats();
-    } else {
-      fetchEmployeeMasters(1);
+    if (showMasterModal && !isEditingMaster) {
+      fetchNextCardNo(selectedProject || user?.project);
     }
+  }, [showMasterModal, isEditingMaster]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeBoard === "DIAGNOSTICS") {
+        fetchLabTests();
+        fetchLabDepartments();
+        fetchLabTestTypes();
+      } else if (activeBoard === "MACHINES") {
+        fetchLabMachines();
+      } else if (activeBoard === "STATS") {
+        fetchDashboardStats();
+      } else {
+        fetchEmployeeMasters(1);
+      }
+    }, 400);
+    
     fetchProjects();
+    return () => clearTimeout(timer);
   }, [selectedProject, exploringProtocolId, searchQuery, activeBoard]);
 
   const fetchDashboardStats = async () => {
@@ -339,6 +349,17 @@ const AdminMasters = () => {
     }
   };
 
+  const fetchNextCardNo = async (projectId) => {
+    const pId = projectId || selectedProject || user?.project || "";
+    try {
+      const res = await api.get(`patients/employee-masters/next-card-no/?project=${pId}`);
+      if (res.data.next_card_no) {
+        setMasterFormData(prev => ({ ...prev, card_no: res.data.next_card_no }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch next card number", err);
+    }
+  };
 
   const handleLabTestSubmit = async (e) => {
     e.preventDefault();
@@ -596,10 +617,20 @@ const AdminMasters = () => {
       return;
     }
 
+    if (masterFormData.mobile_no && masterFormData.mobile_no.length !== 10) {
+      toast.error("Mobile number must be exactly 10 digits");
+      return;
+    }
+
     const data = new FormData();
     Object.keys(masterFormData).forEach((key) => {
-      if (masterFormData[key] !== null) {
-        data.append(key, masterFormData[key]);
+      const val = masterFormData[key];
+      if (val !== null && val !== undefined && val !== "") {
+        if (key === "additional_fields") {
+          data.append(key, JSON.stringify(val));
+        } else {
+          data.append(key, val);
+        }
       }
     });
 
@@ -634,9 +665,11 @@ const AdminMasters = () => {
       });
       fetchEmployeeMasters();
     } catch (err) {
-      toast.error(
-        isEditingMaster ? "Error updating master" : "Error creating master",
-      );
+      console.error(err.response?.data);
+      const errorMsg = err.response?.data 
+        ? Object.entries(err.response.data).map(([k, v]) => `${k}: ${v}`).join(", ")
+        : (isEditingMaster ? "Error updating master" : "Error creating master");
+      toast.error(errorMsg);
     }
   };
 
@@ -1236,7 +1269,7 @@ const AdminMasters = () => {
                     onClick={() => {
                       setIsEditingMaster(false);
                       setMasterFormData({
-                        project: user?.project || selectedProject || "",
+                        project: selectedProject || user?.project || "",
                         card_no: "",
                         name: "",
                         dob: "",
@@ -1248,6 +1281,7 @@ const AdminMasters = () => {
                         proof_image: null,
                         additional_fields: {},
                       });
+                      fetchNextCardNo(selectedProject || user?.project);
                       setShowMasterModal(true);
                     }}
                   >
@@ -2732,7 +2766,40 @@ const AdminMasters = () => {
                               </td>
                             </tr>
                           ))
-                          : employeeMasters.map((m, idx) => {
+                          : employeeMasters.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="12"
+                                style={{
+                                  padding: "8rem 2rem",
+                                  textAlign: "center",
+                                  background: "#fff",
+                                }}
+                              >
+                                <div style={{ maxWidth: "300px", margin: "0 auto" }}>
+                                  <div
+                                    style={{
+                                      width: "80px",
+                                      height: "80px",
+                                      background: "#f8fafc",
+                                      borderRadius: "30px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      margin: "0 auto 1.5rem auto",
+                                      border: "1px solid #f1f5f9",
+                                    }}
+                                  >
+                                    <Search size={32} color="#cbd5e1" />
+                                  </div>
+                                  <h3 style={{ fontWeight: 900, color: "#1e293b", marginBottom: "0.5rem", fontSize: "1.25rem" }}>No Records Found</h3>
+                                  <p style={{ color: "#64748b", fontWeight: 700, fontSize: "0.875rem", lineHeight: 1.6 }}>
+                                    We couldn't find any results matching "{searchQuery}". Try refining your search or checking another registry.
+                                  </p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : employeeMasters.map((m, idx) => {
                             const age = m.dob
                               ? new Date().getFullYear() -
                               new Date(m.dob).getFullYear()
@@ -3432,51 +3499,9 @@ const AdminMasters = () => {
                     gap: "1.25rem",
                   }}
                 >
-                  <div className="form-group" style={{ gridColumn: "span 2" }}>
-                    <label>Assign Project *</label>
-                    {(user?.project || selectedProject || masterFormData.project) ? (
-                      <div style={{ 
-                        background: '#f8fafc', 
-                        padding: '1rem 1.25rem', 
-                        borderRadius: '16px', 
-                        border: '1.5px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        color: '#1e293b',
-                        fontWeight: 800,
-                        boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
-                      }}>
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          background: 'white',
-                          borderRadius: '10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                        }}>
-                          <ShieldCheck size={20} color="#6366f1" />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                           <span style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identified Workspace</span>
-                           <span style={{ fontSize: '0.9375rem' }}>
-                               {projects.find(p => String(p.id) === String(user?.project || selectedProject || masterFormData.project))?.name || "Target Project Workspace"}
-                           </span>
-                        </div>
-                        <span style={{ 
-                          fontSize: '0.625rem', 
-                          background: '#e0e7ff', 
-                          color: '#4338ca', 
-                          padding: '4px 8px', 
-                          borderRadius: '6px', 
-                          marginLeft: 'auto',
-                          fontWeight: 900,
-                          letterSpacing: '0.05em'
-                        }}>LOCKED</span>
-                      </div>
-                    ) : (
+                  {!(user?.project || selectedProject || masterFormData.project) && (
+                    <div className="form-group" style={{ gridColumn: "span 2" }}>
+                      <label>Assign Project *</label>
                       <select
                         required
                         value={masterFormData.project}
@@ -3504,21 +3529,21 @@ const AdminMasters = () => {
                               </option>
                             ))}
                       </select>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label>Card No *</label>
                     <input
                       required
+                      readOnly
                       value={masterFormData.card_no}
-                      onChange={(e) =>
-                        setMasterFormData({
-                          ...masterFormData,
-                          card_no: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. 0001"
+                      placeholder="Auto-generating..."
                       className="form-control"
+                      style={{
+                        background: '#f8fafc',
+                        cursor: 'not-allowed',
+                        color: '#64748b'
+                      }}
                     />
                   </div>
                   <div className="form-group">
@@ -3541,6 +3566,7 @@ const AdminMasters = () => {
                     <input
                       type="date"
                       required
+                      max={new Date().toLocaleDateString('en-CA')}
                       value={masterFormData.dob}
                       onChange={(e) =>
                         setMasterFormData({
@@ -3593,26 +3619,34 @@ const AdminMasters = () => {
                     <input
                       required
                       value={masterFormData.mobile_no}
-                      onChange={(e) =>
-                        setMasterFormData({
-                          ...masterFormData,
-                          mobile_no: e.target.value,
-                        })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 10) {
+                          setMasterFormData({
+                            ...masterFormData,
+                            mobile_no: val,
+                          });
+                        }
+                      }}
                       className="form-control"
+                      placeholder="10-digit number"
                     />
                   </div>
                   <div className="form-group">
                     <label>Aadhar No</label>
                     <input
                       value={masterFormData.aadhar_no}
-                      onChange={(e) =>
-                        setMasterFormData({
-                          ...masterFormData,
-                          aadhar_no: e.target.value,
-                        })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 12) {
+                          setMasterFormData({
+                            ...masterFormData,
+                            aadhar_no: val,
+                          });
+                        }
+                      }}
                       className="form-control"
+                      placeholder="12-digit number"
                     />
                   </div>
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
@@ -3713,7 +3747,7 @@ const AdminMasters = () => {
                   >
                     {isEditingMaster
                       ? "Save Command Core Update"
-                      : "Initialize Command Registry"}
+                      : "Submit"}
                   </button>
                 </div>
               </form>
@@ -3819,6 +3853,7 @@ const AdminMasters = () => {
                     <input
                       type="date"
                       required
+                      max={new Date().toLocaleDateString('en-CA')}
                       value={familyFormData.dob}
                       onChange={(e) =>
                         setFamilyFormData({
