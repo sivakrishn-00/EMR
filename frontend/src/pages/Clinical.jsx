@@ -26,7 +26,7 @@ const Clinical = () => {
     chief_complaint: '', 
     diagnosis: '', 
     plan: '',
-    next_step: 'PENDING_PHARMACY',
+    next_step: '',
     lab_investigations: [],
     medications: []
   });
@@ -142,6 +142,14 @@ const Clinical = () => {
   const handleConsultation = async (e) => {
     e.preventDefault();
     
+    if (!consultData.next_step) {
+        toast.error("Please select a Next Workflow Action (Lab, Pharmacy, or Discharge) to proceed.", {
+            icon: '🩺',
+            style: { borderRadius: '12px', background: '#1e293b', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
+        });
+        return;
+    }
+    
     // Auto-add current drug if typed but not added
     let finalConsultData = { ...consultData };
     if (newMed.name && consultData.next_step === 'PENDING_PHARMACY') {
@@ -163,7 +171,7 @@ const Clinical = () => {
         chief_complaint: '', 
         diagnosis: '', 
         plan: '',
-        next_step: 'PENDING_PHARMACY',
+        next_step: '',
         lab_investigations: [],
         medications: []
       });
@@ -247,6 +255,7 @@ const Clinical = () => {
                                 chief_complaint: v.consultation?.chief_complaint || v.reason || '',
                                 diagnosis: v.consultation?.diagnosis || '',
                                 plan: v.consultation?.plan || '',
+                                next_step: '',
                                 lab_investigations: [], // Start fresh for new investigations
                                 medications: v.prescriptions?.map(p => ({
                                     name: p.medication_name,
@@ -801,9 +810,14 @@ const Clinical = () => {
                   </div>
                )}
 
-               <div style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                     <AlertCircle size={14} /> Select Next Workflow Action
+               <div style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem', border: !consultData.next_step ? '1.5px solid #fed7d7' : '1.5px solid transparent', transition: 'all 0.3s ease' }}>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <AlertCircle size={14} /> Select Next Workflow Action
+                     </span>
+                     {!consultData.next_step && (
+                        <span style={{ fontSize: '0.625rem', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '6px', fontWeight: 900, animation: 'pulse 2s infinite' }}>REQUIRED</span>
+                     )}
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: consultData.next_step === 'PENDING_LAB' ? '1rem' : '0' }}>
                      <button 
@@ -947,6 +961,11 @@ const Clinical = () => {
       )}
     </div>
       <style>{`
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(0.95); }
+          100% { opacity: 1; transform: scale(1); }
+        }
         textarea { border-radius: 12px !important; padding: 0.75rem !important; }
         
         /* MNC Enterprise Workspace System 🏢 */
