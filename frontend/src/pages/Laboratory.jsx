@@ -22,6 +22,7 @@ const Laboratory = () => {
   const [labRequests, setLabRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('PENDING'); // PENDING or COMPLETED
   
   // Form States
   const [resultData, setResultData] = useState({ 
@@ -174,9 +175,46 @@ const Laboratory = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Workload Queue ({labRequests.length})</h3>
-             <Beaker size={18} color="#94a3b8" />
+          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             <div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Workload Queue</h3>
+                <p style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
+             </div>
+             
+             <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px' }}>
+                <button 
+                  onClick={() => setActiveTab('PENDING')}
+                  style={{ 
+                    padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
+                    background: activeTab === 'PENDING' ? 'white' : 'transparent',
+                    color: activeTab === 'PENDING' ? '#4f46e5' : '#64748b',
+                    fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                    boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Clock size={14} /> PENDING ({labRequests.filter(r => r.status !== 'COMPLETED').length})
+                </button>
+                <button 
+                  onClick={() => setActiveTab('COMPLETED')}
+                  style={{ 
+                    padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
+                    background: activeTab === 'COMPLETED' ? 'white' : 'transparent',
+                    color: activeTab === 'COMPLETED' ? '#059669' : '#64748b',
+                    fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                    boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <CheckCircle size={14} /> COMPLETED ({labRequests.filter(r => r.status === 'COMPLETED').length})
+                </button>
+             </div>
           </div>
           
           <div className="table-responsive">
@@ -190,7 +228,9 @@ const Laboratory = () => {
                 </tr>
               </thead>
               <tbody>
-                {labRequests.map(r => (
+                {labRequests
+                  .filter(r => activeTab === 'COMPLETED' ? r.status === 'COMPLETED' : r.status !== 'COMPLETED')
+                  .map(r => (
                   <tr key={r.id} style={{ background: selectedRequest?.id === r.id ? '#f8fafc' : 'transparent' }}>
                     <td style={{ padding: '1.25rem 1.25rem' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
