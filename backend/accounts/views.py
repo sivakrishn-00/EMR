@@ -102,31 +102,31 @@ class DashboardStatsView(generics.GenericAPIView):
         else:
             is_isolated_personally = not is_admin
 
-        if not is_admin:
-            if is_isolated_personally:
-                # Role explicitly mandates ONLY seeing data they created
-                patient_qs = patient_qs.filter(registered_by=user)
-                visit_qs = visit_qs.filter(patient__registered_by=user)
-                lab_qs = lab_qs.filter(ordered_by=user)
-                pharmacy_qs = pharmacy_qs.filter(ordered_by=user)
-            elif user.project:
-                # Isolate by Project Facility (sees all project data)
-                patient_qs = patient_qs.filter(Q(project=user.project) | Q(employee_master__project=user.project))
-                visit_qs = visit_qs.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
-                lab_qs = lab_qs.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
-                pharmacy_qs = pharmacy_qs.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
-            else:
-                # Stringent fallback: Users without project only see what they created
-                patient_qs = patient_qs.filter(registered_by=user)
-                visit_qs = visit_qs.filter(patient__registered_by=user)
-                lab_qs = lab_qs.filter(ordered_by=user)
-                pharmacy_qs = pharmacy_qs.filter(ordered_by=user)
-        elif project_param:
-            # Admin filtering by project
-            patient_qs = patient_qs.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
-            visit_qs = visit_qs.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
-            lab_qs = lab_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
-            pharmacy_qs = pharmacy_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                patient_qs = patient_qs.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+                visit_qs = visit_qs.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+                lab_qs = lab_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+                pharmacy_qs = pharmacy_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        elif user.project:
+            # Strict Project Isolation for any user assigned to a project
+            patient_qs = patient_qs.filter(Q(project=user.project) | Q(employee_master__project=user.project))
+            visit_qs = visit_qs.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
+            lab_qs = lab_qs.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
+            pharmacy_qs = pharmacy_qs.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
+        elif is_admin:
+            # Global Admin (no project assigned) - Can see all or filter
+            if project_param:
+                patient_qs = patient_qs.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+                visit_qs = visit_qs.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+                lab_qs = lab_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+                pharmacy_qs = pharmacy_qs.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        else:
+            # Isolated Personnel / Users without project see only their records
+            patient_qs = patient_qs.filter(registered_by=user)
+            visit_qs = visit_qs.filter(patient__registered_by=user)
+            lab_qs = lab_qs.filter(ordered_by=user)
+            pharmacy_qs = pharmacy_qs.filter(ordered_by=user)
         
         recent_visits = visit_qs.filter(is_active=True).order_by('-visit_date')[:5]
         
@@ -141,15 +141,15 @@ class DashboardStatsView(generics.GenericAPIView):
         
         return Response({
             'total_patients': patient_qs.count(),
-            'visits_today': visit_qs.filter(visit_date__date=today).count(),
+            'pending_patients': visit_qs.filter(is_active=True).count(),
             'lab_pending': lab_qs.filter(status__in=['PENDING', 'COLLECTED']).count(),
-            'prescriptions_today': pharmacy_qs.filter(created_at__date=today).count(),
-            'emergency_today': patient_qs.filter(patient_type='EMERGENCY').count(),
+            'doctor_pending': dept_counts['Doctor'],
+            'pharmacy_pending': dept_counts['Pharmacy'],
             'recent_visits': VisitSerializer(recent_visits, many=True).data,
             'dept_flow': [
-                {'name': 'Nursing', 'value': (dept_counts['Nursing'] * 10), 'color': '#f59e0b'}, # Scale for vis
-                {'name': 'Doctor', 'value': (dept_counts['Doctor'] * 10), 'color': '#6366f1'},
-                {'name': 'Laboratory', 'value': (dept_counts['Laboratory'] * 10), 'color': '#10b981'},
-                {'name': 'Pharmacy', 'value': (dept_counts['Pharmacy'] * 10), 'color': '#ef4444'},
+                {'name': 'Nursing', 'value': min(100, dept_counts['Nursing'] * 10), 'color': '#f59e0b'},
+                {'name': 'Doctor', 'value': min(100, dept_counts['Doctor'] * 10), 'color': '#6366f1'},
+                {'name': 'Laboratory', 'value': min(100, dept_counts['Laboratory'] * 10), 'color': '#10b981'},
+                {'name': 'Pharmacy', 'value': min(100, dept_counts['Pharmacy'] * 10), 'color': '#ef4444'},
             ]
         })

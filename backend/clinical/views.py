@@ -49,15 +49,16 @@ class VisitViewSet(viewsets.ModelViewSet):
             is_isolated_personally = not is_admin
 
         from django.db.models import Q
-        if not is_admin:
-            if is_isolated_personally:
-                queryset = queryset.filter(patient__registered_by=user)
-            elif user.project:
-                queryset = queryset.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
-            else:
-                queryset = queryset.filter(patient__registered_by=user)
-        elif project_param:
-            queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        elif user.project:
+            queryset = queryset.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
+        elif is_admin:
+            if project_param:
+                queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        else:
+            queryset = queryset.filter(patient__registered_by=user)
 
         status_param = self.request.query_params.get('status')
         active_only = self.request.query_params.get('active_only')
@@ -302,16 +303,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         project_param = self.request.query_params.get('project')
         
         from django.db.models import Q
-        if not is_admin:
-            # Allow patients to see their own appointments (linked via username matching patient_id)
-            if user.role == 'PATIENT':
-                queryset = queryset.filter(patient__patient_id=user.username)
-            elif user.project:
-                queryset = queryset.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
-            else:
-                queryset = queryset.filter(patient__registered_by=user)
-        elif project_param:
-            queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        elif user.role == 'PATIENT':
+            queryset = queryset.filter(patient__patient_id=user.username)
+        elif user.project:
+            queryset = queryset.filter(Q(patient__project=user.project) | Q(patient__employee_master__project=user.project))
+        elif is_admin:
+            if project_param:
+                queryset = queryset.filter(Q(patient__project_id=project_param) | Q(patient__employee_master__project_id=project_param))
+        else:
+            queryset = queryset.filter(patient__registered_by=user)
 
         # Allow filtering by date (YYYY-MM-DD) or range
         date_param = self.request.query_params.get('date')

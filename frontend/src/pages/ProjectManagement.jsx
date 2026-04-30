@@ -14,7 +14,8 @@ const ProjectManagement = () => {
         primary_color: '#6366f1',
         secondary_color: '#a5b4fc',
         accent_color: '#f43f5e',
-        allow_appointments: true
+        allow_appointments: true,
+        use_registry_for_personnel: false
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -59,6 +60,7 @@ const ProjectManagement = () => {
             formData.append('secondary_color', projectFormData.secondary_color);
             formData.append('accent_color', projectFormData.accent_color);
             formData.append('allow_appointments', projectFormData.allow_appointments);
+            formData.append('use_registry_for_personnel', projectFormData.use_registry_for_personnel);
 
             let projectId = editingProjectId;
             if (isEditing) {
@@ -78,7 +80,7 @@ const ProjectManagement = () => {
             });
 
             toast.success(isEditing ? "Project Configuration Updated!" : "Project K Initialized & Mapped!", { id: loadId });
-            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e' });
+            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false });
             setLogoPreview(null);
             setIsEditing(false);
             setEditingProjectId(null);
@@ -99,7 +101,8 @@ const ProjectManagement = () => {
             primary_color: p.primary_color || '#6366f1',
             secondary_color: p.secondary_color || '#a5b4fc',
             accent_color: p.accent_color || '#f43f5e',
-            allow_appointments: p.allow_appointments ?? true
+            allow_appointments: p.allow_appointments ?? true,
+            use_registry_for_personnel: p.use_registry_for_personnel ?? false
         });
         setLogoPreview(p.logo ? (p.logo.startsWith('http') ? p.logo : `${MEDIA_URL}${p.logo}`) : null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -169,6 +172,11 @@ const ProjectManagement = () => {
                                                 <span style={{ fontSize: '0.675rem', fontWeight: 800, padding: '4px 10px', background: p.allow_appointments !== false ? '#eef2ff' : '#f8fafc', color: p.allow_appointments !== false ? '#4338ca' : '#94a3b8', borderRadius: '6px', textTransform: 'uppercase', border: '1px solid ' + (p.allow_appointments !== false ? '#c7d2fe' : '#e2e8f0') }}>
                                                     {p.allow_appointments !== false ? 'Appointments Enabled' : 'Appointments Disabled'}
                                                 </span>
+                                                {p.use_registry_for_personnel && (
+                                                    <span style={{ fontSize: '0.675rem', fontWeight: 800, padding: '4px 10px', background: '#fef3c7', color: '#92400e', borderRadius: '6px', textTransform: 'uppercase', border: '1px solid #fde68a' }}>
+                                                        Registry Enabled
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -337,6 +345,33 @@ const ProjectManagement = () => {
                                             </label>
                                         ))}
                                     </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label 
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '1rem', 
+                                            padding: '1.25rem', 
+                                            background: projectFormData.use_registry_for_personnel ? 'rgba(245, 158, 11, 0.03)' : '#f8fafc',
+                                            border: '1px solid ' + (projectFormData.use_registry_for_personnel ? '#f59e0b' : '#e2e8f0'),
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: '0.2s'
+                                        }}
+                                    >
+                                        <input 
+                                            type="checkbox"
+                                            style={{ width: '20px', height: '20px' }}
+                                            checked={projectFormData.use_registry_for_personnel}
+                                            onChange={e => setProjectFormData({ ...projectFormData, use_registry_for_personnel: e.target.checked })}
+                                        />
+                                        <div>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enable Personnel & Family Registry</p>
+                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Enable specialized onboarding for Staff (IE) and their family members.</p>
+                                        </div>
+                                    </label>
                                 </div>
 
                                 <div className="form-group">

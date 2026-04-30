@@ -51,15 +51,16 @@ class LabRequestViewSet(viewsets.ModelViewSet):
             is_isolated_personally = not is_admin
 
         from django.db.models import Q
-        if not is_admin:
-            if is_isolated_personally:
-                queryset = queryset.filter(ordered_by=user)
-            elif user.project:
-                queryset = queryset.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
-            else:
-                queryset = queryset.filter(ordered_by=user)
-        elif project_param:
-            queryset = queryset.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                queryset = queryset.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        elif user.project:
+            queryset = queryset.filter(Q(visit__patient__project=user.project) | Q(visit__patient__employee_master__project=user.project))
+        elif is_admin:
+            if project_param:
+                queryset = queryset.filter(Q(visit__patient__project_id=project_param) | Q(visit__patient__employee_master__project_id=project_param))
+        else:
+            queryset = queryset.filter(ordered_by=user)
 
         status_param = self.request.query_params.get('status')
         if status_param:
@@ -424,15 +425,16 @@ class LabResultViewSet(viewsets.ReadOnlyModelViewSet):
             is_isolated_personally = not is_admin
 
         from django.db.models import Q
-        if not is_admin:
-            if is_isolated_personally:
-                queryset = queryset.filter(recorded_by=user)
-            elif user.project:
-                queryset = queryset.filter(Q(lab_request__visit__patient__project=user.project) | Q(lab_request__visit__patient__employee_master__project=user.project))
-            else:
-                queryset = queryset.filter(recorded_by=user)
-        elif project_param:
-            queryset = queryset.filter(Q(lab_request__visit__patient__project_id=project_param) | Q(lab_request__visit__patient__employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                queryset = queryset.filter(Q(lab_request__visit__patient__project_id=project_param) | Q(lab_request__visit__patient__employee_master__project_id=project_param))
+        elif user.project:
+            queryset = queryset.filter(Q(lab_request__visit__patient__project=user.project) | Q(lab_request__visit__patient__employee_master__project=user.project))
+        elif is_admin:
+            if project_param:
+                queryset = queryset.filter(Q(lab_request__visit__patient__project_id=project_param) | Q(lab_request__visit__patient__employee_master__project_id=project_param))
+        else:
+            queryset = queryset.filter(recorded_by=user)
 
         return queryset
 

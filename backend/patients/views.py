@@ -516,10 +516,14 @@ class RegistryReportView(viewsets.ViewSet):
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
 
         active_project = None
-        if not is_admin:
+        if user.is_superuser:
+            if project_id:
+                active_project = Project.objects.filter(id=project_id).first()
+        elif user.project:
             active_project = user.project
-        elif project_id:
-            active_project = Project.objects.filter(id=project_id).first()
+        elif is_admin:
+            if project_id:
+                active_project = Project.objects.filter(id=project_id).first()
 
         from django.utils import timezone
         from datetime import timedelta
@@ -667,16 +671,18 @@ class PatientViewSet(viewsets.ModelViewSet):
         queryset = Patient.objects.all().order_by('-created_at')
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
-        
         project_param = self.request.query_params.get('project')
         
-        if not is_admin:
-            if user.project: 
-                queryset = queryset.filter(Q(project=user.project) | Q(employee_master__project=user.project))
-            else: 
-                queryset = queryset.filter(registered_by=user)
-        elif project_param:
-            queryset = queryset.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+        if user.is_superuser:
+            if project_param:
+                queryset = queryset.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+        elif user.project:
+            queryset = queryset.filter(Q(project=user.project) | Q(employee_master__project=user.project))
+        elif is_admin:
+            if project_param:
+                queryset = queryset.filter(Q(project_id=project_param) | Q(employee_master__project_id=project_param))
+        else:
+            queryset = queryset.filter(registered_by=user)
             
         return queryset
 

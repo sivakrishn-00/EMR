@@ -103,10 +103,10 @@ const Patients = () => {
   };
 
   const openMasterOnboarding = () => {
-    const apgenco = projects.find(p => p.name.includes("AP-GENCO") || p.name === "APGENCO");
-    if (apgenco) {
-      setMasterFormData(prev => ({ ...prev, project: apgenco.id }));
-      fetchNextCardNo(apgenco.id);
+    const currentProject = projects.find(p => p.id === (projectFilter || user?.project));
+    if (currentProject && currentProject.use_registry_for_personnel) {
+      setMasterFormData(prev => ({ ...prev, project: currentProject.id }));
+      fetchNextCardNo(currentProject.id);
     }
     setShowMasterModal(true);
   };
@@ -782,12 +782,16 @@ const Patients = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           
-          <button className="btn" onClick={openMasterOnboarding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-             <ShieldCheck size={18} /> Employee Registry
-          </button>
-          <button className="btn" onClick={openFamilyModal} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
-             <Users size={18} /> Family Registry
-          </button>
+          {projects.find(p => p.id === (projectFilter || user?.project))?.use_registry_for_personnel && (
+            <>
+              <button className="btn" onClick={openMasterOnboarding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                <ShieldCheck size={18} /> Employee Registry
+              </button>
+              <button className="btn" onClick={openFamilyModal} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                <Users size={18} /> Family Registry
+              </button>
+            </>
+          )}
 
           <button className="btn" onClick={() => { resetForm(); setShowModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
             <UserPlus size={18} /> Register New Patient
@@ -1217,7 +1221,7 @@ const Patients = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
                     <div style={{ display: 'flex', gap: '8px', background: 'var(--background)', padding: '4px', borderRadius: '12px' }}>
-                        {(!user?.project || (projects.find(p => p.id === user.project)?.category_mappings?.some(m => m.category === 'GENERAL'))) && (
+                        {(!formData.project || (projects.find(p => p.id === formData.project)?.category_mappings?.some(m => m.category === 'GENERAL')) || projects.find(p => p.id === formData.project)?.use_registry_for_personnel) && (
                         <button 
                             type="button"
                             onClick={() => setFormData({...formData, is_employee_linked: false})}
@@ -1230,7 +1234,7 @@ const Patients = () => {
                             }}
                         >General</button>
                         )}
-                        {(!user?.project || (projects.find(p => p.id === user.project)?.category_mappings?.some(m => m.category === 'EMPLOYEE' || m.category === 'FAMILY'))) && (
+                        {projects.find(p => p.id === formData.project)?.use_registry_for_personnel && (
                         <button 
                              type="button"
                              onClick={() => setFormData({...formData, is_employee_linked: true})}

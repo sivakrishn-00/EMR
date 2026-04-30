@@ -49,10 +49,10 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = React.useState({
     total_patients: 0,
-    visits_today: 0,
+    pending_patients: 0,
     lab_pending: 0,
-    prescriptions_today: 0,
-    emergency_today: 0,
+    doctor_pending: 0,
+    pharmacy_pending: 0,
     recent_visits: [],
     dept_flow: []
   });
@@ -93,10 +93,10 @@ const Dashboard = () => {
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         <StatCard title="Total Registered" value={stats.total_patients} icon={Users} gradient="linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)" />
-        <StatCard title="Visits (Current)" value={stats.visits_today} icon={Clock} gradient="linear-gradient(135deg, var(--secondary) 0%, var(--secondary) 100%)" />
+        <StatCard title="Pending Patients" value={`${stats.pending_patients || 0} Active`} icon={Clock} gradient="linear-gradient(135deg, var(--secondary) 0%, var(--secondary) 100%)" />
         <StatCard title="Laboratory" value={`${stats.lab_pending || 0} Open`} icon={FlaskConical} gradient="linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%)" />
-        <StatCard title="Pharmacy" value={`${stats.prescriptions_today || 0} Issued`} icon={Pill} gradient="linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)" />
-        <StatCard title="Emergency" value={stats.emergency_today || 0} icon={Activity} gradient="linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)" />
+        <StatCard title="Doctor Pending" value={`${stats.doctor_pending || 0} Waiting`} icon={Activity} gradient="linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)" />
+        <StatCard title="Pharmacy Pending" value={`${stats.pharmacy_pending || 0} Orders`} icon={Pill} gradient="linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)" />
       </div>
 
       <div className="main-grid" style={{ gap: '1rem' }}>

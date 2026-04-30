@@ -639,26 +639,16 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
                 {user?.username?.charAt(0).toUpperCase()}
               </div>
               <div style={{ textAlign: 'left', display: 'block' }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.1 }}>{user?.username}</p>
+                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+                  {user?.first_name ? `${user.first_name} ${user.last_name || ''}` : user?.username || 'System User'}
+                </p>
               </div>
               <ChevronDown size={14} color="#94a3b8" />
             </div>
 
             {showDropdown && (
               <div className="fade-in shadow-xl" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '220px', background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)', padding: '0.5rem', zIndex: 100 }}>
-                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem', background: 'rgba(99, 102, 241, 0.02)' }}>
-                  <div style={{ width: '42px', height: '42px', background: 'var(--primary)', color: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.2)' }}>
-                    {user?.username?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {user?.first_name ? `${user.first_name} ${user.last_name || ''}` : user?.username || 'System User'}
-                    </p>
-                  </div>
-                </div>
                 <button onClick={() => { setShowDropdown(false); navigate('/profile'); }} className="dropdown-link"><UserIcon size={16} /> My Profile</button>
-                <button className="dropdown-link"><Settings size={16} /> Preferences</button>
-                <button className="dropdown-link"><HelpCircle size={16} /> Help Support</button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }}></div>
                 <button onClick={handleLogout} className="dropdown-link logout-btn"><LogOut size={16} /> Log Out</button>
               </div>
