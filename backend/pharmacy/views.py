@@ -205,7 +205,10 @@ class ConsumptionReportView(views.APIView):
             'prescription__frequency',
             'prescription__duration',
             'prescription__visit',
-            'prescription__visit__visit_date'
+            'prescription__visit__visit_date',
+            'prescription__visit__patient__patient_id',
+            'prescription__visit__patient__first_name',
+            'prescription__visit__patient__last_name'
         )
 
         def get_clinical_units(item):
@@ -255,9 +258,15 @@ class ConsumptionReportView(views.APIView):
             units = get_clinical_units(rec)
             
             if group_key not in med_groups:
+                p_first = rec['prescription__visit__patient__first_name'] or ""
+                p_last = rec['prescription__visit__patient__last_name'] or ""
+                full_name = f"{p_first} {p_last}".strip()
+                
                 med_groups[group_key] = {
                     "visit_id": visit_id,
                     "visit_date": date.strftime('%Y-%m-%d') if date else 'N/A',
+                    "patient_id": rec['prescription__visit__patient__patient_id'] or "N/A",
+                    "patient_name": full_name or "N/A",
                     "items": [],
                     "total_visit_units": 0
                 }
@@ -292,6 +301,8 @@ class ConsumptionReportView(views.APIView):
             final_items.append({
                 "visit_id": data['visit_id'],
                 "visit_date": data['visit_date'],
+                "patient_id": data['patient_id'],
+                "patient_name": data['patient_name'],
                 "medications": processed_items,
                 "total_visit_units": data['total_visit_units']
             })

@@ -219,7 +219,7 @@ const Reports = () => {
         [] // Spacer
       ];
 
-      const headers = ["Visit Date", "Visit ID", "Medication Name", "Quantity (Units)", "Unit Price (₹)", "Total Cost (₹)", "Project"];
+      const headers = ["Visit Date", "Visit ID", "Patient ID", "Patient Name", "Medication Name", "Quantity (Units)", "Unit Price (₹)", "Total Cost (₹)", "Project"];
       const rows = [...metaRows, headers];
       
       consumptionData.items.forEach(visit => {
@@ -228,6 +228,8 @@ const Reports = () => {
           rows.push([
             visit.visit_date,
             `V-${visit.visit_id}`,
+            `"${visit.patient_id || 'N/A'}"`,
+            `"${visit.patient_name || 'N/A'}"`,
             `"${med.name}"`,
             med.quantity,
             med.unit_price.toFixed(2),
@@ -240,6 +242,8 @@ const Reports = () => {
         rows.push([
           `SUBTOTAL VISIT (${visit.visit_date})`,
           `V-${visit.visit_id}`,
+          `"${visit.patient_id || 'N/A'}"`,
+          `"${visit.patient_name || 'N/A'}"`,
           "",
           "",
           "",
@@ -252,6 +256,8 @@ const Reports = () => {
       // Add Grand Total Row
       rows.push([
         "GRAND TOTAL EXPENDITURE",
+        "",
+        "",
         "",
         "",
         consumptionData.grand_total_units,
@@ -874,16 +880,21 @@ const Reports = () => {
                           border: '1px solid #e2e8f0',
                           borderLeft: '5px solid #0f172a'
                       }}>
-                          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <CalendarDays size={14} style={{ color: '#64748b' }} />
                               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
-                                  Visit Date: {new Date(visit.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  {new Date(visit.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fff', padding: '2px 10px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
                                 <ShieldCheck size={12} style={{ color: '#0f172a' }} />
                                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#0f172a' }}>REF: V-{visit.visit_id}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #e2e8f0', paddingLeft: '1.5rem' }}>
+                                <User size={14} style={{ color: '#6366f1' }} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>{visit.patient_name}</span>
+                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{visit.patient_id}</span>
                             </div>
                           </div>
                           <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>{visit.medications.length} Line Items</span>
