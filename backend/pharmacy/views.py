@@ -232,16 +232,39 @@ class ConsumptionReportView(views.APIView):
                 return per_day or 1
 
         # Fetch prices
+        # Robust Registry Discovery: Find the pharmacy inventory for this project
         prices = {}
-        try:
-            clean_project_id = clean_project or project_id
-            if clean_project_id and clean_project_id != 'all':
-                pharmacy_registry = RegistryType.objects.get(project_id=clean_project_id, slug='pharmacy_drugs')
-                price_list = RegistryData.objects.filter(registry_type=pharmacy_registry).values('name', 'cost')
-                for p in price_list:
-                    prices[p['name'].strip().upper()] = float(p['cost'])
-        except Exception:
-            pass
+        clean_project_id = clean_project or project_id
+        if clean_project_id and clean_project_id != 'all':
+            try:
+                from patients.models import RegistryType, RegistryData
+                from django.db.models import Q
+                
+                # 1. Look for the most likely pharmacy registry in this project
+                # Matches by 'Pill' icon, slug containing 'pharmacy', or name containing 'pharmacy'
+                pharmacy_registry = RegistryType.objects.filter(
+                    project_id=clean_project_id
+                ).filter(
+                    Q(icon='Pill') | 
+                    Q(slug__icontains='pharmacy') | 
+                    Q(name__icontains='pharmacy')
+                ).first()
+                
+                if pharmacy_registry:
+                    price_list = RegistryData.objects.filter(registry_type=pharmacy_registry).values('name', 'cost')
+                    for p in price_list:
+                        prices[p['name'].strip().upper()] = float(p['cost'])
+                else:
+                    # 2. Fallback to any global/other pharmacy registry if project-specific is missing
+                    global_registry = RegistryType.objects.filter(
+                        Q(slug__icontains='pharmacy') | Q(name__icontains='pharmacy')
+                    ).first()
+                    if global_registry:
+                        price_list = RegistryData.objects.filter(registry_type=global_registry).values('name', 'cost')
+                        for p in price_list:
+                            prices[p['name'].strip().upper()] = float(p['cost'])
+            except Exception as e:
+                print(f"Audit Price Discovery Error: {str(e)}")
 
         # Perform Visit-Wise Aggregation (Granular Visit Separation)
         med_groups = {}
