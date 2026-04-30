@@ -88,12 +88,18 @@ const Pharmacy = () => {
   const handleDispenseVisit = async (visitId) => {
     const loadingToast = toast.loading('Finalizing dispensing for all items...');
     try {
-        // Find all prescription IDs for this visit
         const visitGroup = prescriptions.find(p => p.visit_id === visitId);
-        const ids = visitGroup.items.map(item => item.id);
         
-        // Dispense each one (or ideally handle in one batch, but following existing model)
-        await Promise.all(ids.map(id => api.post(`pharmacy/prescriptions/${id}/dispense/`, dispenseData)));
+        // Dispense each medication with its correctly calculated dose count
+        const dispensePromises = visitGroup.items.map(item => {
+            const calculatedQty = getDoseCount(item.frequency, item.duration) || 1;
+            return api.post(`pharmacy/prescriptions/${item.id}/dispense/`, {
+                ...dispenseData,
+                quantity: calculatedQty
+            });
+        });
+
+        await Promise.all(dispensePromises);
         
         toast.success("Visit complete! Patient discharged.", { id: loadingToast });
         setSelectedPresc(null);

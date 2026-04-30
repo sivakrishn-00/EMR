@@ -10,6 +10,7 @@ const SYSTEM_MODULES = [
     { id: '/consultations', name: 'Consult Desk', icon: 'ShieldPlus' },
     { id: '/lab', name: 'Laboratory', icon: 'Microscope' },
     { id: '/pharmacy', name: 'Pharmacy', icon: 'Pill' },
+    { id: '/reports', name: 'Analytics Hub', icon: 'BarChart3' },
     { id: '/users', name: 'System Users', icon: 'UserCircle' },
     { id: '/audit', name: 'Audit Logs', icon: 'History' },
     { id: '/admin-masters', name: 'Admin Masters', icon: 'Settings' },

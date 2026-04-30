@@ -15,7 +15,8 @@ const ProjectManagement = () => {
         secondary_color: '#a5b4fc',
         accent_color: '#f43f5e',
         allow_appointments: true,
-        use_registry_for_personnel: false
+        use_registry_for_personnel: false,
+        vitals_mandatory: true
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -61,6 +62,7 @@ const ProjectManagement = () => {
             formData.append('accent_color', projectFormData.accent_color);
             formData.append('allow_appointments', projectFormData.allow_appointments);
             formData.append('use_registry_for_personnel', projectFormData.use_registry_for_personnel);
+            formData.append('vitals_mandatory', projectFormData.vitals_mandatory);
 
             let projectId = editingProjectId;
             if (isEditing) {
@@ -80,7 +82,7 @@ const ProjectManagement = () => {
             });
 
             toast.success(isEditing ? "Project Configuration Updated!" : "Project K Initialized & Mapped!", { id: loadId });
-            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false });
+            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true });
             setLogoPreview(null);
             setIsEditing(false);
             setEditingProjectId(null);
@@ -102,7 +104,8 @@ const ProjectManagement = () => {
             secondary_color: p.secondary_color || '#a5b4fc',
             accent_color: p.accent_color || '#f43f5e',
             allow_appointments: p.allow_appointments ?? true,
-            use_registry_for_personnel: p.use_registry_for_personnel ?? false
+            use_registry_for_personnel: p.use_registry_for_personnel ?? false,
+            vitals_mandatory: p.vitals_mandatory ?? true
         });
         setLogoPreview(p.logo ? (p.logo.startsWith('http') ? p.logo : `${MEDIA_URL}${p.logo}`) : null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -216,7 +219,7 @@ const ProjectManagement = () => {
                             <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>{isEditing ? 'Update Configuration' : 'Initialize New Project'}</h2>
                             {isEditing && (
                                 <button 
-                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [] }); setLogoPreview(null); }}
+                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true }); setLogoPreview(null); }}
                                     style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                                 >
                                     CANCEL EDIT
@@ -397,6 +400,33 @@ const ProjectManagement = () => {
                                         <div>
                                             <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enable Patient Self-Service Appointments</p>
                                             <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Allow patients in this project to book consultations and tests from their portal.</p>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="form-group">
+                                    <label 
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '1rem', 
+                                            padding: '1.25rem', 
+                                            background: projectFormData.vitals_mandatory ? 'rgba(239, 68, 68, 0.03)' : '#f8fafc',
+                                            border: '1px solid ' + (projectFormData.vitals_mandatory ? '#ef4444' : '#e2e8f0'),
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: '0.2s'
+                                        }}
+                                    >
+                                        <input 
+                                            type="checkbox"
+                                            style={{ width: '20px', height: '20px' }}
+                                            checked={projectFormData.vitals_mandatory}
+                                            onChange={e => setProjectFormData({ ...projectFormData, vitals_mandatory: e.target.checked })}
+                                        />
+                                        <div>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enforce Mandatory Vitals</p>
+                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>When enabled, Temp and Weight are required for every triage assessment.</p>
                                         </div>
                                     </label>
                                 </div>

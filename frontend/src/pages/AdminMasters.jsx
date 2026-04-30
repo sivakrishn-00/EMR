@@ -2640,7 +2640,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                AADHAR NO
+                                AADHAR/CARD NO
                               </th>
                               <th
                                 style={{

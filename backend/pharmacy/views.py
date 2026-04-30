@@ -1,6 +1,10 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, views
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Sum, F, Q, Count, DecimalField, ExpressionWrapper
+from django.utils import timezone
+from datetime import timedelta, datetime
+from patients.models import RegistryData, RegistryType, EmployeeMaster
 from .models import Prescription, DispensingRecord
 from .serializers import PrescriptionSerializer, DispensingRecordSerializer
 from accounts.models import Notification
@@ -120,3 +124,187 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(dispensed_by=user)
 
         return queryset
+
+class ConsumptionReportView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        project_id = request.query_params.get('project') or (user.project.id if user.project else None)
+        employee_id = request.query_params.get('employee')
+        range_type = request.query_params.get('range', 'month') # week, month, year, all
+        
+        # 1. Base Queryset for Dispensing
+        queryset = DispensingRecord.objects.select_related(
+            'prescription', 
+            'prescription__visit', 
+            'prescription__visit__patient',
+            'prescription__visit__patient__employee_master'
+        )
+        
+        # 2. Project Isolation (Critical for Scale)
+        # Handle "all" project context from UI
+        clean_project = None if project_id == 'all' else project_id
+
+        if not user.is_superuser:
+            if not clean_project:
+                # If "all" is selected by a non-superuser, only show their project
+                clean_project = user.project.id if user.project else None
+            
+            if clean_project:
+                queryset = queryset.filter(
+                    Q(prescription__visit__patient__project_id=clean_project) | 
+                    Q(prescription__visit__patient__employee_master__project_id=clean_project)
+                )
+            else:
+                return Response({"error": "Project context required"}, status=400)
+        elif clean_project:
+            queryset = queryset.filter(
+                Q(prescription__visit__patient__project_id=clean_project) | 
+                Q(prescription__visit__patient__employee_master__project_id=clean_project)
+            )
+
+        # 3. Employee Specific Filter
+        if employee_id:
+            queryset = queryset.filter(
+                Q(prescription__visit__patient__employee_master_id=employee_id) |
+                Q(prescription__visit__patient__id_proof_number=employee_id) # Fallback for card matching
+            )
+
+        # Ensure unique records to prevent Sum inflation from joins
+        queryset = queryset.distinct()
+
+        # 4. Temporal Filtering (Optimized)
+        now = timezone.now()
+        if range_type == 'week':
+            queryset = queryset.filter(dispensed_at__gte=now - timedelta(days=7))
+        elif range_type == 'month':
+            queryset = queryset.filter(dispensed_at__gte=now - timedelta(days=30))
+        elif range_type == 'year':
+            queryset = queryset.filter(dispensed_at__gte=now - timedelta(days=365))
+        elif range_type == 'custom':
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            if start_date and end_date:
+                try:
+                    s_dt = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+                    e_dt = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d')) + timedelta(days=1)
+                    queryset = queryset.filter(dispensed_at__range=(s_dt, e_dt))
+                except Exception:
+                    pass
+
+        # 5. Aggregation Engine (MNC Standard: Clinical Dose Calculation Strategy)
+        # We fetch records and calculate units based on prescription logic to ensure 100% accuracy
+        matching_ids = queryset.values_list('id', flat=True)
+        clean_agg_queryset = DispensingRecord.objects.filter(id__in=matching_ids).select_related('prescription', 'prescription__visit')
+        
+        clean_agg_records = clean_agg_queryset.values(
+            'id', 
+            'quantity',
+            'prescription__medication_name',
+            'prescription__frequency',
+            'prescription__duration',
+            'prescription__visit',
+            'prescription__visit__visit_date'
+        )
+
+        def get_clinical_units(item):
+            if item['quantity'] > 1:
+                return item['quantity']
+            
+            freq = item['prescription__frequency'] or ""
+            dur = item['prescription__duration'] or "0"
+            
+            per_day = 0
+            if '-' in freq:
+                try:
+                    per_day = sum([int(v) for v in freq.split('-') if v.strip().isdigit()])
+                except Exception:
+                    per_day = 1
+            else:
+                mapping = { 'OD': 1, 'BD': 2, 'TDS': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1 }
+                per_day = mapping.get(freq.upper(), 1)
+            
+            try:
+                dur_val = int(''.join(filter(str.isdigit, str(dur))) or 0)
+                return per_day * dur_val
+            except Exception:
+                return per_day or 1
+
+        # Fetch prices
+        prices = {}
+        try:
+            clean_project_id = clean_project or project_id
+            if clean_project_id and clean_project_id != 'all':
+                pharmacy_registry = RegistryType.objects.get(project_id=clean_project_id, slug='pharmacy_drugs')
+                price_list = RegistryData.objects.filter(registry_type=pharmacy_registry).values('name', 'cost')
+                for p in price_list:
+                    prices[p['name'].strip().upper()] = float(p['cost'])
+        except Exception:
+            pass
+
+        # Perform Visit-Wise Aggregation (Granular Visit Separation)
+        med_groups = {}
+        for rec in clean_agg_records:
+            name = rec['prescription__medication_name']
+            date = rec['prescription__visit__visit_date']
+            visit_id = rec['prescription__visit']
+            
+            # Key by Visit ID for precise separation of multiple visits on same day
+            group_key = f"visit_{visit_id}"
+            units = get_clinical_units(rec)
+            
+            if group_key not in med_groups:
+                med_groups[group_key] = {
+                    "visit_id": visit_id,
+                    "visit_date": date.strftime('%Y-%m-%d') if date else 'N/A',
+                    "items": [],
+                    "total_visit_units": 0
+                }
+            
+            med_groups[group_key]["items"].append({
+                "name": name,
+                "clean_name": name.strip().upper(),
+                "units": units
+            })
+            med_groups[group_key]["total_visit_units"] += units
+
+        final_items = []
+        grand_total_cost = 0
+        grand_total_units = 0
+
+        for key, data in med_groups.items():
+            # Process items in this visit to calculate costs
+            processed_items = []
+            for item in data['items']:
+                unit_price = prices.get(item['clean_name'], 0)
+                total_price = item['units'] * unit_price
+                
+                processed_items.append({
+                    "name": item['name'],
+                    "quantity": item['units'],
+                    "unit_price": unit_price,
+                    "total_cost": round(total_price, 2)
+                })
+                grand_total_cost += total_price
+                grand_total_units += item['units']
+
+            final_items.append({
+                "visit_id": data['visit_id'],
+                "visit_date": data['visit_date'],
+                "medications": processed_items,
+                "total_visit_units": data['total_visit_units']
+            })
+
+        final_items.sort(key=lambda x: (x['visit_date'], x['visit_id']), reverse=True)
+
+        return Response({
+            "project_id": project_id,
+            "range": range_type,
+            "items": final_items,
+            "total_visits": clean_agg_queryset.aggregate(v=Count('prescription__visit', distinct=True))['v'] or 0,
+            "total_patients": clean_agg_queryset.aggregate(p=Count('prescription__visit__patient', distinct=True))['p'] or 0,
+            "grand_total_cost": round(grand_total_cost, 2),
+            "grand_total_units": grand_total_units,
+            "generated_at": now.isoformat()
+        })

@@ -175,19 +175,20 @@ const Dashboard = () => {
 
           <div style={{ 
             marginTop: '2.5rem', 
-            padding: '1.25rem', 
-            background: 'var(--surface)', 
-            borderRadius: '16px',
-            color: 'var(--text-main)',
-            border: '1px solid var(--border)',
+            padding: '1.5rem', 
+            background: 'var(--sidebar-bg)', 
+            borderRadius: '24px',
+            color: 'white',
+            border: 'none',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
           }}>
-            <div style={{ position: 'absolute', top: 0, right: 0, padding: '0.5rem', opacity: 0.1 }}>
-                <TrendingUp size={60} />
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', padding: '0.5rem', opacity: 0.15, transform: 'rotate(-10deg)' }}>
+                <TrendingUp size={80} />
             </div>
-            <p style={{ fontSize: '0.6rem', fontWeight: 800, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Data Integrity Assurance</p>
-            <p style={{ marginTop: '0.5rem', fontWeight: 600, fontSize: '0.8125rem', lineHeight: 1.5 }}>The metrics displayed are aggregated from real-time facility transactions and clinical entries.</p>
+            <p style={{ fontSize: '0.625rem', fontWeight: 900, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.75rem' }}>Data Integrity Assurance</p>
+            <p style={{ fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.6, position: 'relative', zIndex: 1 }}>The metrics displayed are aggregated from real-time facility transactions and clinical entries.</p>
           </div>
         </div>
       </div>

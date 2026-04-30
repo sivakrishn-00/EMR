@@ -75,6 +75,11 @@ const Patients = () => {
   const [ackForm, setAckForm] = useState({ date: '', startTime: '', endTime: '' });
   const [isAcking, setIsAcking] = useState(false);
   const [isEnablingPortal, setIsEnablingPortal] = useState(null);
+  
+  // Download Report Settings
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadVisitCount, setDownloadVisitCount] = useState(5);
+  const [selectedPatientForDownload, setSelectedPatientForDownload] = useState(null);
 
   // Personnel Registry Access
   const [showMasterModal, setShowMasterModal] = useState(false);
@@ -370,7 +375,16 @@ const Patients = () => {
     setFormAttempted(false);
   };
 
-  const downloadMasterReport = async (patient) => {
+  const initiateDownload = (patient) => {
+    setSelectedPatientForDownload(patient);
+    // Default to the total number of visits they have, but at least 1
+    const totalV = patient.total_visits || 1;
+    setDownloadVisitCount(totalV > 5 ? 5 : totalV); 
+    setShowDownloadModal(true);
+  };
+
+  const downloadMasterReport = async (patient, limit = 5) => {
+    setShowDownloadModal(false);
     const loading = toast.loading(`clinical report for ${patient.first_name}...`);
     try {
       if (!window.html2pdf) {
@@ -383,7 +397,12 @@ const Patients = () => {
       }
 
       const res = await api.get(`patients/patients/${patient.id}/full_report/`);
-      const { visits, patient: patientData } = res.data;
+      let { visits, patient: patientData } = res.data;
+      
+      // Limit visits to the requested count
+      if (visits && visits.length > limit) {
+          visits = visits.slice(0, limit);
+      }
       const institutionName = (patientData.project_name || "Bavya Health Service").toUpperCase();
       const themeColor = "#0d9488"; // Premium Aqua Deep Teal
 
@@ -425,7 +444,7 @@ const Patients = () => {
                 </div>
                 <div>
                   ${renderHistoryItem('Patient ID', patientData.patient_id, "90px")}
-                  ${renderHistoryItem('Aadhar No', patientData.id_proof_number || '--', "90px")}
+                  ${renderHistoryItem('AADHAR/CARD NO', patientData.id_proof_number || '--', "120px")}
                 </div>
               </div>
             </div>
@@ -761,6 +780,66 @@ const Patients = () => {
     );
   };
 
+  const renderDownloadModal = () => {
+    if (!showDownloadModal || !selectedPatientForDownload) return null;
+    return createPortal(
+      <div className="modal-overlay">
+        <div className="modal-content" style={{ maxWidth: '450px', borderRadius: '28px', padding: '0', overflow: 'hidden' }}>
+          <div style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f0fdfa 100%)', padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'white', color: '#0d9488', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+              <Download size={24} />
+            </div>
+            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Export Scope</h2>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>{selectedPatientForDownload.first_name}'s Medical Dossier</p>
+          </div>
+
+          <div style={{ padding: '1.5rem 2.5rem 2rem' }}>
+            <div className="form-group" style={{ marginBottom: '1.75rem' }}>
+              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Include Recent Visits Count</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max={selectedPatientForDownload.total_visits || 100}
+                  className="form-control" 
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '52px', fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: 'var(--primary)' }}
+                  value={downloadVisitCount}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    const maxV = selectedPatientForDownload.total_visits || 100;
+                    setDownloadVisitCount(val > maxV ? maxV : val);
+                  }}
+                />
+              </div>
+              <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.75rem', fontWeight: 600 }}>
+                Patient has <span style={{ color: 'var(--primary)' }}>{selectedPatientForDownload.total_visits || 'multiple'}</span> total records.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button 
+                onClick={() => downloadMasterReport(selectedPatientForDownload, downloadVisitCount)}
+                className="btn btn-primary" 
+                style={{ padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: '#0d9488', border: 'none', boxShadow: '0 10px 15px -3px rgba(13, 148, 136, 0.3)', width: '100%', color: 'white' }}
+              >
+                GENERATE CLINICAL PDF
+              </button>
+              <button 
+                type="button" 
+                className="btn" 
+                onClick={() => setShowDownloadModal(false)}
+                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', width: '100%', fontSize: '0.875rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   const filteredPatients = (patients || []).filter(p => {
     const searchLow = searchQuery.toLowerCase();
     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
@@ -775,6 +854,7 @@ const Patients = () => {
   return (
     <div className="fade-in">
       {renderAckModal()}
+      {renderDownloadModal()}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Patient Management</h1>
@@ -1086,7 +1166,7 @@ const Patients = () => {
                             <button 
                                 className="btn btn-secondary" 
                                 style={{ padding: '0.4rem 0.6rem', border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '10px' }}
-                                onClick={() => downloadMasterReport(p)}
+                                onClick={() => initiateDownload(p)}
                                 title="Download Case Summary PDF"
                             >
                                 <Download size={16} color="var(--primary)" />

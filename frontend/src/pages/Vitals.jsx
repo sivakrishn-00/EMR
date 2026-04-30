@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { 
   Activity, 
   Search, 
@@ -31,6 +32,7 @@ const RANGES = {
 };
 
 const Vitals = () => {
+  const { user } = useAuth();
   const [activeVisits, setActiveVisits] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +40,7 @@ const Vitals = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [vitalsData, setVitalsData] = useState({
     temperature_c: '', 
+    temp_unit: 'C',
     blood_pressure_sys: '', 
     blood_pressure_dia: '', 
     heart_rate: '', 
@@ -82,10 +85,31 @@ const Vitals = () => {
     known_others: ''
   });
   const [formAttempted, setFormAttempted] = useState(false);
+  const [projectConfig, setProjectConfig] = useState({ vitals_mandatory: true });
 
   useEffect(() => {
     fetchActiveVisits();
   }, []);
+
+  useEffect(() => {
+    if (user?.project) {
+        fetchProjectConfig();
+        
+        // Re-fetch when tab gets focus (user switched back from Admin tab)
+        const onFocus = () => fetchProjectConfig();
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }
+  }, [user]);
+
+  const fetchProjectConfig = async () => {
+    try {
+        const res = await api.get(`patients/projects/${user.project}/`);
+        setProjectConfig(res.data);
+    } catch (err) {
+        console.error("Failed to fetch project config");
+    }
+  };
 
   const fetchActiveVisits = async (pageNum = 1) => {
     setIsLoading(true);
@@ -111,10 +135,17 @@ const Vitals = () => {
     setFormAttempted(true);
     const loadingToast = toast.loading('Recording vitals...');
     try {
+      // Normalize temperature to Celsius for backend storage
+      let finalTemp = vitalsData.temperature_c;
+      if (vitalsData.temp_unit === 'F' && finalTemp) {
+        finalTemp = ((parseFloat(finalTemp) - 32) * 5/9).toFixed(1);
+      }
+
       const cleanedData = Object.fromEntries(
         Object.entries(vitalsData).map(([key, value]) => {
           if (value === '' || value === undefined) return [key, null];
-          if (['temperature_c', 'blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm', 'bmi'].includes(key)) {
+          if (key === 'temperature_c') return [key, isNaN(parseFloat(finalTemp)) ? null : parseFloat(finalTemp)];
+          if (['blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm', 'bmi'].includes(key)) {
             const num = Number(value);
             return [key, isNaN(num) ? null : num];
           }
@@ -122,17 +153,49 @@ const Vitals = () => {
         })
       );
       
-      // Final Biometric Validation
-      if (cleanedData.weight_kg > 650 || cleanedData.weight_kg < 0.1) {
-          toast.error("Invalid weight detected. Range: 0.1kg - 650kg", { id: loadingToast });
-          setFormAttempted(true);
-          return;
-      }
-      if (cleanedData.height_cm > 300 || cleanedData.height_cm < 20) {
-          toast.error("Invalid height detected. Range: 20cm - 300cm (approx 10ft)", { id: loadingToast });
-          setFormAttempted(true);
-          return;
-      }
+    if (projectConfig.vitals_mandatory) {
+        const mandatoryFields = [
+            { key: 'weight_kg', label: 'Weight', min: 0.1, max: 650 },
+            { key: 'height_ft', label: 'Height (Ft)', min: 1, max: 8 },
+            { key: 'temperature_c', label: 'Temperature', min: 34, max: 43 },
+            { key: 'heart_rate', label: 'Pulse', min: 30, max: 220 },
+            { key: 'respiratory_rate', label: 'Resp Rate', min: 6, max: 60 },
+            { key: 'blood_pressure_sys', label: 'BP (Sys)', min: 70, max: 220 },
+            { key: 'blood_pressure_dia', label: 'BP (Dia)', min: 40, max: 130 },
+            { key: 'spo2', label: 'SPO2', min: 50, max: 100 }
+        ];
+
+        for (const field of mandatoryFields) {
+            if (!cleanedData[field.key]) {
+                toast.error(`${field.label} is required`, { id: loadingToast });
+                setFormAttempted(true);
+                return;
+            }
+            if (cleanedData[field.key] < field.min || cleanedData[field.key] > field.max) {
+                toast.error(`${field.label} out of valid range`, { id: loadingToast });
+                setFormAttempted(true);
+                return;
+            }
+        }
+    } else {
+        // If optional, still check range IF value is provided
+        const fieldsToCheck = [
+            { key: 'weight_kg', min: 0.1, max: 650 },
+            { key: 'temperature_c', min: 34, max: 43 },
+            { key: 'heart_rate', min: 30, max: 220 },
+            { key: 'respiratory_rate', min: 6, max: 60 },
+            { key: 'blood_pressure_sys', min: 70, max: 220 },
+            { key: 'blood_pressure_dia', min: 40, max: 130 },
+            { key: 'spo2', min: 50, max: 100 }
+        ];
+
+        for (const field of fieldsToCheck) {
+            if (cleanedData[field.key] && (cleanedData[field.key] < field.min || cleanedData[field.key] > field.max)) {
+                toast.error(`Invalid ${field.key.replace('_', ' ')} detected`, { id: loadingToast });
+                return;
+            }
+        }
+    }
 
       await api.post(`clinical/visits/${selectedVisit.id}/record_vitals/`, cleanedData);
       toast.success("Vitals captured! Patient moved to consultation.", { id: loadingToast });
@@ -147,7 +210,7 @@ const Vitals = () => {
 
   const resetForm = () => {
     setVitalsData({ 
-        temperature_c: '', blood_pressure_sys: '', blood_pressure_dia: '', 
+        temperature_c: '', temp_unit: 'C', blood_pressure_sys: '', blood_pressure_dia: '', 
         heart_rate: '', respiratory_rate: '', spo2: '', 
         weight_kg: '', height_cm: '', height_ft: '', height_in: '', bmi: '', symptoms: '', notes: '',
         smoking: 'NO', alcohol: 'NO', physical_activity: 'NO', food_habit: 'VEG', allergy_food: 'NO', allergy_drug: 'NO',
@@ -205,6 +268,17 @@ const Vitals = () => {
     if (!value || isNaN(value)) return null;
     const val = parseFloat(value);
     
+    // Temperature Specific Validation
+    if (field === 'temperature_c') {
+      const unit = vitalsData.temp_unit || 'C';
+      const min = unit === 'C' ? 34 : 93.2;
+      const max = unit === 'C' ? 43 : 109.4;
+      if (val < min || val > max) {
+        return `Warning: Unusual Temp range (${min}-${max} °${unit})`;
+      }
+      return null;
+    }
+
     // BP Logic check: DIA must be < SYS
     if (field === 'blood_pressure_dia' && vitalsData.blood_pressure_sys) {
         if (val >= parseFloat(vitalsData.blood_pressure_sys)) {
@@ -273,6 +347,7 @@ const Vitals = () => {
                               if (v.vitals) {
                                   setVitalsData({
                                       temperature_c: v.vitals.temperature_c || '',
+                                      temp_unit: 'C',
                                       blood_pressure_sys: v.vitals.blood_pressure_sys || '',
                                       blood_pressure_dia: v.vitals.blood_pressure_dia || '',
                                       heart_rate: v.vitals.heart_rate || '',
@@ -380,7 +455,7 @@ const Vitals = () => {
             <div className="card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '0.5rem' }}>
                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                    <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                    <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2) ' }}>
                        <Activity size={24} color="white" />
                     </div>
                     <div>
@@ -400,6 +475,10 @@ const Vitals = () => {
                     <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aadhar/Card No</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.id_proof_number || 'N/A'}</p>
+                 </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
@@ -416,30 +495,30 @@ const Vitals = () => {
             <form onSubmit={handleSaveVitals}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics & BMI</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
-                   <div className="form-group">
-                      <label><Scale size={14} /> Weight <span style={{ color: '#ef4444' }}>*</span></label>
-                      <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.01" min="0.1" max="650" required value={vitalsData.weight_kg} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
-                      </div>
+                    <div className="form-group">
+                       <label><Scale size={14} /> Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ position: 'relative' }}>
+                          <input type="number" step="0.01" min="0.1" max="650" value={vitalsData.weight_kg} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && projectConfig.vitals_mandatory && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
+                       </div>
                       {getRangeError('weight_kg', vitalsData.weight_kg) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('weight_kg', vitalsData.weight_kg)}</p>}
-                      {formAttempted && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                      {formAttempted && projectConfig.vitals_mandatory && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
                    
-                   <div className="form-group">
-                      <label>Height (Feet/Inches) <span style={{ color: '#ef4444' }}>*</span></label>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                         <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" step="1" min="0" max="8" required value={vitalsData.height_ft} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({height_ft: e.target.value})} placeholder="Ft" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_ft > 8 || !vitalsData.height_ft)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
-                            <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>FT</span>
-                         </div>
+                    <div className="form-group">
+                       <label>Height (Feet/Inches) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div style={{ position: 'relative', flex: 1 }}>
+                             <input type="number" step="1" min="0" max="8" value={vitalsData.height_ft} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({height_ft: e.target.value})} placeholder="Ft" style={{ paddingRight: '2rem !important', border: (formAttempted && projectConfig.vitals_mandatory && (vitalsData.height_ft > 8 || !vitalsData.height_ft)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                             <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>FT</span>
+                          </div>
                          <div style={{ position: 'relative', flex: 1 }}>
                             <input type="number" step="1" min="0" max="11" value={vitalsData.height_in} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({height_in: e.target.value})} placeholder="In" style={{ paddingRight: '2rem !important', border: (formAttempted && (vitalsData.height_in > 11)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                             <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>IN</span>
                          </div>
                       </div>
                       {(vitalsData.height_ft > 7) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Warning: Unusual Height Range</p>}
-                      {formAttempted && !vitalsData.height_ft && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                      {formAttempted && projectConfig.vitals_mandatory && !vitalsData.height_ft && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
 
                    <div className="form-group" style={{ background: 'var(--background)', padding: '0.875rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -467,59 +546,99 @@ const Vitals = () => {
                 <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Vital Signs</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                    <div className="form-group">
-                      <label><Thermometer size={14} /> Temperature <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <label style={{ margin: 0 }}><Thermometer size={14} /> Temperature {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                        <div style={{ display: 'flex', gap: '2px', background: '#f1f5f9', padding: '2px', borderRadius: '6px' }}>
+                          {['C', 'F'].map(u => (
+                            <button
+                              key={u}
+                              type="button"
+                              onClick={() => {
+                                const currentUnit = vitalsData.temp_unit || 'C';
+                                if (currentUnit === u) return;
+                                
+                                let newVal = vitalsData.temperature_c;
+                                if (newVal) {
+                                  if (u === 'F') {
+                                    newVal = ((parseFloat(newVal) * 9/5) + 32).toFixed(1);
+                                  } else {
+                                    newVal = ((parseFloat(newVal) - 32) * 5/9).toFixed(1);
+                                  }
+                                }
+                                setVitalsData({ ...vitalsData, temperature_c: newVal, temp_unit: u });
+                              }}
+                              style={{
+                                border: 'none',
+                                padding: '2px 8px',
+                                fontSize: '0.625rem',
+                                fontWeight: 800,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                background: (vitalsData.temp_unit || 'C') === u ? '#6366f1' : 'transparent',
+                                color: (vitalsData.temp_unit || 'C') === u ? 'white' : '#64748b',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              °{u}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div style={{ position: 'relative' }}>
-                         <input type="number" step="0.1" required value={vitalsData.temperature_c} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder="36.5" style={{ paddingRight: '2.5rem !important', border: (formAttempted && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>°C</span>
+                         <input type="number" step="0.1" value={vitalsData.temperature_c} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder={ (vitalsData.temp_unit || 'C') === 'F' ? '98.6' : '36.5' } style={{ paddingRight: '2.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>°{vitalsData.temp_unit || 'C'}</span>
                       </div>
                       {getRangeError('temperature_c', vitalsData.temperature_c) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('temperature_c', vitalsData.temperature_c)}</p>}
-                      {formAttempted && !vitalsData.temperature_c && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                      {formAttempted && projectConfig.vitals_mandatory && !vitalsData.temperature_c && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
-                   <div className="form-group">
-                      <label><Heart size={14} /> Pulse</label>
-                      <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.heart_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>BPM</span>
-                      </div>
-                      {getRangeError('heart_rate', vitalsData.heart_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('heart_rate', vitalsData.heart_rate)}</p>}
-                   </div>
-                   <div className="form-group">
-                      <label><Wind size={14} /> Resp Rate</label>
-                      <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.respiratory_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>B/M</span>
-                      </div>
-                      {getRangeError('respiratory_rate', vitalsData.respiratory_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('respiratory_rate', vitalsData.respiratory_rate)}</p>}
-                   </div>
+                    <div className="form-group">
+                       <label><Heart size={14} /> Pulse {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ position: 'relative' }}>
+                          <input type="number" value={vitalsData.heart_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.heart_rate) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>BPM</span>
+                       </div>
+                       {getRangeError('heart_rate', vitalsData.heart_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('heart_rate', vitalsData.heart_rate)}</p>}
+                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.heart_rate && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                    </div>
+                    <div className="form-group">
+                       <label><Wind size={14} /> Resp Rate {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ position: 'relative' }}>
+                          <input type="number" value={vitalsData.respiratory_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.respiratory_rate) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>B/M</span>
+                       </div>
+                       {getRangeError('respiratory_rate', vitalsData.respiratory_rate) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('respiratory_rate', vitalsData.respiratory_rate)}</p>}
+                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.respiratory_rate && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                    </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.75rem', display: 'block' }}>Blood Pressure (Sys / Dia)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                         <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" required value={vitalsData.blood_pressure_sys} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_sys: e.target.value})} placeholder="120" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
-                            <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>SYS</span>
-                         </div>
-                         <span style={{ fontSize: '1.25rem', color: '#cbd5e1', fontWeight: 300 }}>/</span>
-                         <div style={{ position: 'relative', flex: 1 }}>
-                            <input type="number" required value={vitalsData.blood_pressure_dia} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_dia: e.target.value})} placeholder="80" style={{ textAlign: 'center', paddingRight: '2rem !important' }} />
-                            <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>DIA</span>
-                         </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '1rem' }}>
-                        {getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys)}</p>}
-                        {getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia)}</p>}
-                      </div>
-                   </div>
-                   <div className="form-group" style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                      <label><Droplet size={14} /> Oxygen (SPO2)</label>
-                      <div style={{ position: 'relative' }}>
-                         <input type="number" required value={vitalsData.spo2} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important' }} />
-                         <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>%</span>
-                      </div>
-                      {getRangeError('spo2', vitalsData.spo2) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('spo2', vitalsData.spo2)}</p>}
-                   </div>
+                    <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                       <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.75rem', display: 'block' }}>Blood Pressure (Sys / Dia) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ position: 'relative', flex: 1 }}>
+                             <input type="number" value={vitalsData.blood_pressure_sys} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_sys: e.target.value})} placeholder="120" style={{ textAlign: 'center', paddingRight: '2rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.blood_pressure_sys) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                             <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>SYS</span>
+                          </div>
+                          <span style={{ fontSize: '1.25rem', color: '#cbd5e1', fontWeight: 300 }}>/</span>
+                          <div style={{ position: 'relative', flex: 1 }}>
+                             <input type="number" value={vitalsData.blood_pressure_dia} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, blood_pressure_dia: e.target.value})} placeholder="80" style={{ textAlign: 'center', paddingRight: '2rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.blood_pressure_dia) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                             <span style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.625rem', fontWeight: 800, color: '#cbd5e1' }}>DIA</span>
+                          </div>
+                       </div>
+                       <div style={{ display: 'flex', gap: '1rem' }}>
+                         {getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_sys', vitalsData.blood_pressure_sys)}</p>}
+                         {getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia) && <p style={{ color: '#ef4444', fontSize: '8px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('blood_pressure_dia', vitalsData.blood_pressure_dia)}</p>}
+                       </div>
+                    </div>
+                    <div className="form-group" style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                       <label><Droplet size={14} /> Oxygen (SPO2) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div style={{ position: 'relative' }}>
+                          <input type="number" value={vitalsData.spo2} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.spo2) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
+                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>%</span>
+                       </div>
+                       {getRangeError('spo2', vitalsData.spo2) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>{getRangeError('spo2', vitalsData.spo2)}</p>}
+                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.spo2 && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
+                    </div>
                 </div>
 
                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Observations</p>

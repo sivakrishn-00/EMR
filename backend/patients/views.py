@@ -315,6 +315,7 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
     queryset = EmployeeMaster.objects.all().order_by('card_no')
     serializer_class = EmployeeMasterSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LargeResultsPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['card_no', 'name', 'aadhar_no', 'mobile_no']
 
@@ -613,11 +614,35 @@ class RegistryReportView(viewsets.ViewSet):
             processed_prescription_ids.add(dr.prescription_id)
 
         # Process Prescriptions (Secondary Priority - fallback if no explicit records)
-        # We count all 'DISPENSED' prescriptions as at least 1 unit if not tracked via DispensingRecord
+        # We calculate actual clinical units based on MNC-standard frequency parsing
+        def get_dose_qty(rec):
+            try:
+                # If it's a DispensingRecord with quantity > 1, use that as source of truth
+                if hasattr(rec, 'quantity') and rec.quantity > 1:
+                    return rec.quantity
+                
+                # Otherwise, derive from prescription metadata
+                p = rec if isinstance(rec, Prescription) else rec.prescription
+                freq = str(p.frequency or "").upper()
+                dur = str(p.duration or "0")
+                
+                per_day = 0
+                if '-' in freq:
+                    try:
+                        per_day = sum([int(v) for v in freq.split('-') if v.strip().isdigit()])
+                    except: per_day = 1
+                else:
+                    mapping = { 'OD': 1, 'BD': 2, 'BID': 2, 'TDS': 3, 'TID': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1 }
+                    per_day = mapping.get(freq, 1)
+                
+                dur_val = int(''.join(filter(str.isdigit, dur)) or 0)
+                return per_day * dur_val
+            except: return 1
+
         for p in prescriptions:
             if p.id not in processed_prescription_ids and p.status in ['DISPENSED', 'PARTIALLY_DISPENSED']:
-                # If no records, we assume a standard issue of 1 unit per prescription duration/cycle
-                add_to_series(timezone.localtime(p.created_at).date(), 1, p.medication_name)
+                qty = get_dose_qty(p)
+                add_to_series(timezone.localtime(p.created_at).date(), qty, p.medication_name)
 
         trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])
 
@@ -625,6 +650,31 @@ class RegistryReportView(viewsets.ViewSet):
         total_v = visit_qs.count()
         completed_v = visit_qs.filter(status__in=['COMPLETED', 'PENDING_PHARMACY']).count()
         conversion_rate = round((completed_v / total_v * 100) if total_v > 0 else 0, 1)
+
+        # 1b. Total Historical Consumption (All Time)
+        total_units_sum = 0
+        all_time_dispensed = DispensingRecord.objects.all()
+        all_time_prescriptions = Prescription.objects.filter(status__in=['DISPENSED', 'PARTIALLY_DISPENSED'])
+        
+        if active_project:
+            all_time_dispensed = all_time_dispensed.filter(
+                Q(prescription__visit__patient__project=active_project) | 
+                Q(prescription__visit__patient__employee_master__project=active_project)
+            )
+            all_time_prescriptions = all_time_prescriptions.filter(
+                Q(visit__patient__project=active_project) | 
+                Q(visit__patient__employee_master__project=active_project)
+            )
+
+        # Sum Dispensed Records
+        for dr in all_time_dispensed:
+            total_units_sum += get_dose_qty(dr)
+        
+        # Add prescriptions that don't have dispensed records yet (calculated fallback)
+        all_time_processed_pids = set(all_time_dispensed.values_list('prescription_id', flat=True))
+        for p in all_time_prescriptions:
+            if p.id not in all_time_processed_pids:
+                total_units_sum += get_dose_qty(p)
 
         # 3. Inventory Health
         inventory_stats = inventory_items.aggregate(
@@ -637,18 +687,19 @@ class RegistryReportView(viewsets.ViewSet):
 
         return Response({
             'total_registered': patient_qs.count(),
+            'total_units_all_time': total_units_sum,
             'conversion_rate': conversion_rate,
             'inventory_value': inventory_stats['total_value'] or 0,
             'stock_health': {
                 'low': inventory_stats['low_stock'],
                 'out': inventory_stats['out_of_stock']
             },
-            'total_investigations': visit_qs.aggregate(total=Sum('lab_requests'))['total'] or visit_qs.count(), # Fallback to visit count if direct sum is complex
+            'total_investigations': visit_qs.aggregate(total=Sum('lab_requests'))['total'] or visit_qs.count(),
             'drug_variations': inventory_items.count(),
             'trends': trends,
             'by_gender': list(patient_qs.values('gender').annotate(count=Count('gender'))),
             'top_medications': all_c[:10],
-            'all_consumption': all_c, # For accurate Full Export
+            'all_consumption': all_c,
             'project_name': active_project.name if active_project else "All Projects"
         })
 

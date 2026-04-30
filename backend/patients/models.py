@@ -16,6 +16,7 @@ class Project(models.Model):
     accent_color = models.CharField(max_length=20, default='#f43f5e')
     use_registry_for_personnel = models.BooleanField(default=False, help_text="Prioritize polymorphic registry for Staff/Family")
     allow_appointments = models.BooleanField(default=True)
+    vitals_mandatory = models.BooleanField(default=True, help_text="Enforce mandatory collection of core vitals (Temp/Weight)")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
