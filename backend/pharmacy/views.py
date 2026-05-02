@@ -9,6 +9,8 @@ from .models import Prescription, DispensingRecord
 from .serializers import PrescriptionSerializer, DispensingRecordSerializer
 from accounts.models import Notification
 from accounts.utils import log_action
+from .reports import generate_consumption_pdf_report
+from django.http import HttpResponse
 
 def notify_team(project, roles, title, message):
     from accounts.models import User
@@ -309,7 +311,8 @@ class ConsumptionReportView(views.APIView):
 
         final_items.sort(key=lambda x: (x['visit_date'], x['visit_id']), reverse=True)
 
-        return Response({
+        # 6. Response Router (JSON or PDF)
+        report_data = {
             "project_id": project_id,
             "range": range_type,
             "items": final_items,
@@ -318,4 +321,12 @@ class ConsumptionReportView(views.APIView):
             "grand_total_cost": round(grand_total_cost, 2),
             "grand_total_units": grand_total_units,
             "generated_at": now.isoformat()
-        })
+        }
+
+        if request.query_params.get('format') == 'pdf':
+            pdf_buffer = generate_consumption_pdf_report(report_data)
+            response = HttpResponse(pdf_buffer, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Consumption_Report_{project_id}_{now.strftime("%Y%m%d")}.pdf"'
+            return response
+
+        return Response(report_data)

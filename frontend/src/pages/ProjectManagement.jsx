@@ -11,7 +11,7 @@ const ProjectManagement = () => {
         description: '',
         logo: null,
         categories: [],
-        primary_color: '#6366f1',
+        primary_color: '#1e3a8a',
         secondary_color: '#a5b4fc',
         accent_color: '#f43f5e',
         allow_appointments: true,
@@ -266,7 +266,17 @@ const ProjectManagement = () => {
                                     />
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                                    <label style={{ fontWeight: 700, margin: 0 }}>Project Theme Colors</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setProjectFormData({ ...projectFormData, primary_color: '#1e3a8a', secondary_color: '#a5b4fc', accent_color: '#f43f5e' })}
+                                        style={{ background: 'rgba(30, 58, 138, 0.05)', border: '1px solid #1e3a8a', color: '#1e3a8a', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}
+                                    >
+                                        RESTORE ELITE DEFAULT
+                                    </button>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                                     <div className="form-group">
                                         <label style={{ fontWeight: 700 }}>Primary UI</label>
                                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

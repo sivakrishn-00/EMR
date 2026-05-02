@@ -714,8 +714,10 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         from accounts.permissions import IsStaffUser
-        if self.action in ['my_full_report', 'download_report']:
+        # Actions accessible to Patients (Self-service)
+        if self.action in ['my_full_report', 'download_report_self']:
             return [permissions.IsAuthenticated()]
+        # Actions restricted to Staff/Admin
         return [permissions.IsAuthenticated(), IsStaffUser()]
 
     def get_base_queryset(self):
@@ -884,17 +886,28 @@ class PatientViewSet(viewsets.ModelViewSet):
             "system_status": "SQL_COLD_RETRIEVAL"
         })
 
+    @action(detail=True, methods=['get'], url_path='download_report')
+    def download_report_detail(self, request, pk=None):
+        patient = self.get_object()
+        visit_date = request.query_params.get('date')
+        
+        pdf_buffer = generate_patient_pdf_report(patient.patient_id, visit_date)
+        
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        filename = f"Clinical_Report_{patient.patient_id}_{visit_date or 'full'}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
     @action(detail=False, methods=['get'], url_path='download_report')
-    def download_report(self, request):
+    def download_report_self(self, request):
         user = request.user
-        # Patient ID is the username
         patient_id = user.username
         visit_date = request.query_params.get('date')
         
         pdf_buffer = generate_patient_pdf_report(patient_id, visit_date)
         
         response = HttpResponse(pdf_buffer, content_type='application/pdf')
-        filename = f"Clinical_Report_{patient_id}_{visit_date or 'latest'}.pdf"
+        filename = f"My_Clinical_Report_{patient_id}_{visit_date or 'latest'}.pdf"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 

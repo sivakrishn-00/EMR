@@ -11,7 +11,7 @@ class Project(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     logo = models.ImageField(upload_to='project_logos/', blank=True, null=True)
-    primary_color = models.CharField(max_length=20, default='#6366f1')
+    primary_color = models.CharField(max_length=20, default='#1e3a8a')
     secondary_color = models.CharField(max_length=20, default='#a5b4fc')
     accent_color = models.CharField(max_length=20, default='#f43f5e')
     use_registry_for_personnel = models.BooleanField(default=False, help_text="Prioritize polymorphic registry for Staff/Family")
