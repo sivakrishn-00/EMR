@@ -45,18 +45,25 @@ const Pharmacy = () => {
   const fetchPharmacyInventory = async () => {
     setIsInventoryLoading(true);
     try {
+      // 🚀 PROJECT CONTEXT: Check if we are in a project or global
       const projectId = user?.project?.id || user?.project;
       
-      // Strict: Only fetch data that is categorized as CLINICAL_DRUGS or PHARMACY
       const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory${projectId ? `&project=${projectId}` : ''}`;
         
       const res = await api.get(endpoint);
       const data = res.data.results || res.data;
       
-      console.log(`[Pharmacy Debug] Project: ${projectId} | Items Fetched: ${data.length}`);
+      console.log(`[Pharmacy Debug] --- INVENTORY SYNC REPORT ---`);
+      console.log(`[Pharmacy Debug] Current User Project ID: ${projectId || 'GLOBAL (ALL PROJECTS)'}`);
+      console.log(`[Pharmacy Debug] Total Medicines Found: ${data.length}`);
+      
       if (data.length > 0) {
-          // Log the name and the slug to see exactly what we got
-          console.log(`[Pharmacy Debug] First 5 entries:`, data.slice(0, 5).map(d => `${d.name} (Type:${d.registry_type_slug})`));
+          console.log(`[Pharmacy Debug] MEDICINE LIST:`);
+          data.slice(0, 20).forEach((d, i) => {
+              console.log(`${i+1}. ${d.name} | SLUG: ${d.registry_type_slug || 'UNKNOWN'} | PROJECT: ${d.registry_type_project || 'GLOBAL'}`);
+          });
+      } else {
+          console.log(`[Pharmacy Debug] ⚠️ WARNING: No medicines found with tags [pharmacy, pharmacy_drugs, pharmacy_inventory]`);
       }
       
       setPharmacyInventory(data);

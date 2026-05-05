@@ -304,17 +304,25 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         """
         queryset = RegistryData.objects.all().select_related('registry_type').order_by('id')
         
-        # Protocol Isolation: Filter by Registry ID or Slug
+        # Advanced Clinical Filtering: Support multiple slugs and type-categories
         registry_type = self.request.query_params.get('registry_type')
-        if registry_type and registry_type != 'null' and registry_type != 'undefined':
-            # Handle both primary key (numeric ID) and technical slug (textual ID)
+        slugs = self.request.query_params.get('registry_type__slug')
+        categories = self.request.query_params.get('type_category')
+
+        if slugs:
+            slug_list = [s.strip() for s in slugs.split(',') if s.strip()]
+            queryset = queryset.filter(registry_type__slug__in=slug_list)
+        elif registry_type and registry_type != 'null' and registry_type != 'undefined':
             if str(registry_type).isdigit():
                 queryset = queryset.filter(registry_type_id=int(registry_type))
             else:
                 queryset = queryset.filter(registry_type__slug=registry_type)
-        elif not self.request.query_params.get('all', False):
-            # If no protocol is specified and 'all' is not set, we return an empty set
-            # to prevent cross-registry data leakage (Personnel board security)
+        
+        if categories:
+            cat_list = [c.strip() for c in categories.split(',') if c.strip()]
+            queryset = queryset.filter(registry_type__type_category__in=cat_list)
+        elif not slugs and not registry_type and not self.request.query_params.get('all', False):
+            # Security: If no protocol/filter is specified, return nothing
             queryset = queryset.none()
 
         # Project Isolation: Filter by associated project
