@@ -55,23 +55,23 @@ const Pharmacy = () => {
   const getInventoryStock = (medName, projectId) => {
     if (!medName || !pharmacyInventory.length) return "0 items";
     
-    // Set for debugging access in console
-    window.inventoryData = pharmacyInventory;
-    
     const search = medName.trim().toLowerCase();
     
+    // DEBUG: Log the search and the first few items to see if they match
+    console.log(`[Pharmacy Debug] Searching for: "${search}" in Project: ${projectId}`);
+    
     const item = pharmacyInventory.find(d => {
-      // Project Match: Exact match OR item is 'Global' (null project)
       const regProj = d.registry_type_project;
       const isProjectMatch = !regProj || String(regProj) === String(projectId);
       
-      if (!isProjectMatch) return false;
-
-      const dName = d.name.toLowerCase();
-      const nameMatch = dName === search; // Exact match as you requested
-      const aliasMatch = d.aliases?.toLowerCase().split(',').some(a => a.trim() === search);
-
-      return nameMatch || aliasMatch;
+      const dName = d.name.trim().toLowerCase();
+      const match = dName === search;
+      
+      if (match) {
+        console.log(`[Pharmacy Debug] MATCH FOUND: ${d.name} (Project: ${regProj})`);
+      }
+      
+      return isProjectMatch && match;
     });
 
     return item ? `${item.quantity} items` : "0 items";
