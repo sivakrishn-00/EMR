@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Pill, Search, X, CheckCircle, Package, ArrowRight, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Pharmacy = () => {
+  const { user } = useAuth();
   const [prescriptions, setPrescriptions] = useState([]);
   const [selectedPresc, setSelectedPresc] = useState(null);
   const [dispenseData, setDispenseData] = useState({ quantity: 1, remarks: '' });
@@ -38,13 +40,25 @@ const Pharmacy = () => {
   useEffect(() => {
     fetchPrescriptions();
     fetchPharmacyInventory();
-  }, []);
+  }, [user]);
 
   const fetchPharmacyInventory = async () => {
     setIsInventoryLoading(true);
     try {
-      const res = await api.get('patients/registry-data/?all=true&page_size=1000');
-      setPharmacyInventory(res.data.results || res.data);
+      const projectId = user?.project?.id || user?.project;
+      const endpoint = projectId 
+        ? `patients/registry-data/?all=true&page_size=2000&project=${projectId}&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory`
+        : `patients/registry-data/?all=true&page_size=2000&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory`;
+        
+      const res = await api.get(endpoint);
+      const data = res.data.results || res.data;
+      
+      console.log(`[Pharmacy Debug] Project: ${projectId} | Items Fetched: ${data.length}`);
+      if (data.length > 0) {
+          console.log(`[Pharmacy Debug] Sample names:`, data.slice(0, 10).map(d => d.name));
+      }
+      
+      setPharmacyInventory(data);
     } catch (err) {
       console.error("Stock sync offline:", err);
     } finally {
