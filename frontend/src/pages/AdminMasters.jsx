@@ -5264,7 +5264,8 @@ const AdminMasters = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showNewProtocolModal && createPortal(
@@ -6147,6 +6148,35 @@ const AdminMasters = () => {
             <div style={{ display: 'flex', gap: '12px' }}>
                <button onClick={() => setShowDeleteModal(false)} className="btn btn-secondary" style={{ flex: 1, height: '48px', borderRadius: '14px' }}>Cancel</button>
                <button onClick={handleConfirmDelete} className="btn btn-primary" style={{ flex: 1, height: '48px', borderRadius: '14px', background: '#dc2626' }}>Delete Record</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {confirmModal?.isOpen && createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1112000 }}>
+          <div className="fade-in" style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+            <div style={{ width: '64px', height: '64px', background: '#fff1f2', color: '#e11d48', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+              <AlertCircle size={32} />
+            </div>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginBottom: '0.75rem' }}>{confirmModal.title}</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9375rem', fontWeight: 500, lineHeight: 1.6, marginBottom: '2rem' }}>{confirmModal.message}</p>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ flex: 1, height: '52px', borderRadius: '16px' }}
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, height: '52px', borderRadius: '16px', background: '#e11d48', color: 'white', border: 'none' }}
+                onClick={confirmModal.onConfirm}
+              >
+                Confirm Delete
+              </button>
             </div>
           </div>
         </div>,
