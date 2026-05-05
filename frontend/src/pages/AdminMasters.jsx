@@ -1181,6 +1181,17 @@ const AdminMasters = () => {
     });
   };
 
+  const handleSetupPharmacy = async (projectId) => {
+    try {
+      const loadId = toast.loading("Initializing Project Pharmacy...");
+      await api.post(`patients/projects/${projectId}/setup-pharmacy/`);
+      toast.success("Pharmacy Registry Provisioned Successfully", { id: loadId });
+      fetchProjects(); // Refresh to show the new registry
+    } catch (err) {
+      toast.error("Failed to initialize pharmacy");
+    }
+  };
+
   const stats = getStats();
 
   const downloadFailedRecords = () => {
@@ -1255,7 +1266,23 @@ const AdminMasters = () => {
             {viewMode === "DATA" && (
               <>
                 <button
-                  className="btn btn-secondary"
+                  className="btn"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                    color: "white",
+                    border: "none",
+                    fontWeight: 800,
+                    boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 6px 15px rgba(124, 58, 237, 0.3)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(124, 58, 237, 0.2)";
+                  }}
                   onClick={() => {
                     setViewMode("PROJECTS");
                     setSelectedProject("");
@@ -1263,9 +1290,14 @@ const AdminMasters = () => {
                 >
                   Back to Project List
                 </button>
-                {projects.find((p) => String(p.id) === String(selectedProject))?.category_mappings?.some((m) => m.category === "EMPLOYEE") && (
+                {activeBoard === "PROTOCOLS" && projects.find((p) => String(p.id) === String(selectedProject))?.category_mappings?.some((m) => m.category === "EMPLOYEE") && (
                   <button
                     className="btn btn-primary"
+                    style={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                      border: "none",
+                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
+                    }}
                     onClick={() => {
                       setIsEditingMaster(false);
                       setMasterFormData({
@@ -1380,6 +1412,44 @@ const AdminMasters = () => {
                       Open Workspace <Plus size={12} />
                     </span>
                   </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      marginTop: "12px",
+                      paddingTop: "12px",
+                      borderTop: "1px solid var(--border)",
+                    }}
+                  >
+                    {p.registry_types?.some(rt => rt.slug === 'pharmacy' || rt.icon === 'Pill') ? (
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase' }}>
+                          <ShieldCheck size={14} /> Pharmacy Enabled
+                       </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSetupPharmacy(p.id);
+                        }}
+                        style={{
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          color: "white",
+                          border: "none",
+                          padding: "0.5rem 1rem",
+                          borderRadius: "10px",
+                          fontSize: "0.65rem",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          boxShadow: "0 4px 10px rgba(16, 185, 129, 0.2)",
+                        }}
+                      >
+                        <Pill size={14} /> Setup Pharmacy
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
@@ -1416,127 +1486,13 @@ const AdminMasters = () => {
           </div>
         ) : (
           <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: "0.5rem",
-                marginBottom: "1rem",
-              }}
-            >
-              {/* Station Total Card */}
-              <div
-                className="card fade-in"
-                style={{
-                  padding: "0.75rem",
-                  background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-                  borderRadius: "12px",
-                  color: "white",
-                  position: "relative",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 10px rgba(99, 102, 241, 0.15)",
-                  border: "none",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
-                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
-                      <Users size={14} color="white" />
-                   </div>
-                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
-                </div>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
-                  {projects.length}
-                </h3>
-                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Station Total</p>
-                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
-              </div>
-
-              {/* OPD Today Card */}
-              <div
-                className="card fade-in"
-                style={{
-                  padding: "0.75rem",
-                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                  borderRadius: "12px",
-                  color: "white",
-                  position: "relative",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 10px rgba(16, 185, 129, 0.15)",
-                  border: "none",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
-                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
-                      <Activity size={14} color="white" />
-                   </div>
-                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
-                </div>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
-                  {totalCount.toString().padStart(2, '0')}
-                </h3>
-                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>OPD Today</p>
-                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
-              </div>
-
-              {/* Emergency Card */}
-              <div
-                className="card fade-in"
-                style={{
-                  padding: "0.75rem",
-                  background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
-                  borderRadius: "12px",
-                  color: "white",
-                  position: "relative",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 10px rgba(239, 68, 68, 0.15)",
-                  border: "none",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
-                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
-                      <Clock size={14} color="white" />
-                   </div>
-                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
-                </div>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
-                  {(totalFamilyCount || 0).toString().padStart(2, '0')}
-                </h3>
-                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Emergency</p>
-                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
-              </div>
-
-              {/* Dependents Card */}
-              <div
-                className="card fade-in"
-                style={{
-                  padding: "0.75rem",
-                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                  borderRadius: "12px",
-                  color: "white",
-                  position: "relative",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 10px rgba(245, 158, 11, 0.15)",
-                  border: "none",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
-                   <div style={{ padding: "0.25rem", background: "rgba(255, 255, 255, 0.2)", borderRadius: "6px", backdropFilter: "blur(4px)" }}>
-                      <UserPlus size={14} color="white" />
-                   </div>
-                   <div style={{ fontSize: "0.5rem", fontWeight: 900, background: "rgba(255, 255, 255, 0.2)", padding: "2px 5px", borderRadius: "4px", letterSpacing: "0.05em" }}>LIVE</div>
-                </div>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, marginBottom: "0px" }}>
-                   {totalFamilyCount}
-                </h3>
-                <p style={{ fontSize: "0.5rem", fontWeight: 800, opacity: 0.9, textTransform: "uppercase", letterSpacing: "0.025em" }}>Dependents</p>
-                <div style={{ position: "absolute", bottom: "-8px", right: "-8px", width: "40px", height: "40px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "50%" }} />
-              </div>
-            </div>
+            {/* Statistics cards removed at user request */}
 
             <div
               style={{
                 display: "flex",
                 gap: "0.5rem",
+                marginTop: "1.5rem",
                 marginBottom: "1.5rem",
                 background: "var(--surface)",
                 padding: "0.5rem",
@@ -1545,17 +1501,18 @@ const AdminMasters = () => {
                 width: "fit-content",
               }}
             >
-              <button
+               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "PROTOCOLS" ? "var(--background)" : "transparent",
-                  color: activeBoard === "PROTOCOLS" ? "var(--primary)" : "var(--text-muted)",
-                  boxShadow: activeBoard === "PROTOCOLS" ? "var(--shadow-sm)" : "none",
+                  background: activeBoard === "PROTOCOLS" ? "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" : "transparent",
+                  color: activeBoard === "PROTOCOLS" ? "white" : "var(--text-muted)",
+                  boxShadow: activeBoard === "PROTOCOLS" ? "0 4px 12px rgba(99, 102, 241, 0.2)" : "none",
                   fontSize: "0.75rem",
                   padding: "0 1.25rem",
                   height: "40px",
                   borderRadius: "14px",
                   transition: "all 0.2s",
+                  fontWeight: activeBoard === "PROTOCOLS" ? 800 : 500
                 }}
                 onClick={() => setActiveBoard("PROTOCOLS")}
               >
@@ -1565,14 +1522,15 @@ const AdminMasters = () => {
               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "DIAGNOSTICS" ? "var(--background)" : "transparent",
-                  color: activeBoard === "DIAGNOSTICS" ? "var(--primary)" : "var(--text-muted)",
-                  boxShadow: activeBoard === "DIAGNOSTICS" ? "var(--shadow-sm)" : "none",
+                  background: activeBoard === "DIAGNOSTICS" ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "transparent",
+                  color: activeBoard === "DIAGNOSTICS" ? "white" : "var(--text-muted)",
+                  boxShadow: activeBoard === "DIAGNOSTICS" ? "0 4px 12px rgba(16, 185, 129, 0.2)" : "none",
                   fontSize: "0.75rem",
                   padding: "0 1.25rem",
                   height: "40px",
                   borderRadius: "14px",
                   transition: "all 0.2s",
+                  fontWeight: activeBoard === "DIAGNOSTICS" ? 800 : 500
                 }}
                 onClick={() => {
                   setActiveBoard("DIAGNOSTICS");
@@ -1585,14 +1543,15 @@ const AdminMasters = () => {
               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "MACHINES" ? "var(--background)" : "transparent",
-                  color: activeBoard === "MACHINES" ? "var(--primary)" : "var(--text-muted)",
-                  boxShadow: activeBoard === "MACHINES" ? "var(--shadow-sm)" : "none",
+                  background: activeBoard === "MACHINES" ? "linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)" : "transparent",
+                  color: activeBoard === "MACHINES" ? "white" : "var(--text-muted)",
+                  boxShadow: activeBoard === "MACHINES" ? "0 4px 12px rgba(168, 85, 247, 0.2)" : "none",
                   fontSize: "0.75rem",
                   padding: "0 1.25rem",
                   height: "40px",
                   borderRadius: "14px",
                   transition: "all 0.2s",
+                  fontWeight: activeBoard === "MACHINES" ? 800 : 500
                 }}
                 onClick={() => {
                   setActiveBoard("MACHINES");
@@ -1602,46 +1561,40 @@ const AdminMasters = () => {
                 <Radio size={16} /> Sync Bridge
               </button>
 
+              {activeBoard === "PROTOCOLS" && (
+                <>
+                  <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
 
-              <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
-
-              <button
-                className="btn"
-                style={{
-                  background: "transparent",
-                  color: "#64748b",
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
-                }}
-                onClick={handleExport}
-              >
-                <Download size={16} /> Export CSV
-              </button>
-
-              <button
-                className="btn btn-primary"
-                style={{
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
-                  background: "#1e293b",
-                }}
-                onClick={() => {
-                  setIsEditingProtocol(false);
-                  setNewProtocolData({
-                    name: "",
-                    description: "",
-                    coverage: "",
-                    fields: [],
-                  });
-                  setShowNewProtocolModal(true);
-                }}
-              >
-                <Plus size={16} /> New Registry Type
-              </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0 1.25rem",
+                      height: "40px",
+                      borderRadius: "14px",
+                      background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                      border: "none",
+                      fontWeight: 800,
+                      boxShadow: "0 4px 12px rgba(15, 23, 42, 0.2)",
+                      transition: "all 0.3s"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                    onClick={() => {
+                      setIsEditingProtocol(false);
+                      setNewProtocolData({
+                        name: "",
+                        description: "",
+                        coverage: "",
+                        fields: [],
+                      });
+                      setShowNewProtocolModal(true);
+                    }}
+                  >
+                    <Plus size={16} /> New Registry Type
+                  </button>
+                </>
+              )}
             </div>
 
             {activeBoard === "STATS" ? (
@@ -2691,37 +2644,45 @@ const AdminMasters = () => {
                               ))}
                             </>
                           ) : (
-                            <>
-                              <th
-                                style={{
-                                  padding: "1.25rem 1.5rem",
-                                  fontSize: "0.75rem",
-                                  fontWeight: 900,
-                                  color: "#475569",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                }}
-                              >
-                                S.NO
-                              </th>
-                              {getCurrentProtocols()
-                                .find((p) => p.id === exploringProtocolId)
-                                ?.fields?.map((f) => (
-                                  <th
-                                    key={f.id || f.slug}
-                                    style={{
-                                      padding: "1.25rem 1.5rem",
-                                      fontSize: "0.75rem",
-                                      fontWeight: 900,
-                                      color: "#475569",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.05em",
-                                    }}
-                                  >
-                                    {f.label.toUpperCase()}
-                                  </th>
-                                ))}
-                            </>
+                             <>
+                               <th
+                                 style={{
+                                   padding: "1.25rem 1.5rem",
+                                   fontSize: "0.75rem",
+                                   fontWeight: 900,
+                                   color: "#475569",
+                                   textTransform: "uppercase",
+                                   letterSpacing: "0.05em",
+                                 }}
+                               >
+                                 S.NO
+                               </th>
+                               {exploringProtocolId?.toLowerCase().includes("pharmacy") ? (
+                                 <>
+                                   {["ITEM CODE", "ITEM NAME", "DESCRIPTION", "ITEM GROUP", "QTY", "COST"].map(h => (
+                                      <th key={h} style={{ padding: "1.25rem 1.5rem", fontSize: "0.75rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                                   ))}
+                                 </>
+                               ) : (
+                                 getCurrentProtocols()
+                                   .find((p) => p.id === exploringProtocolId)
+                                   ?.fields?.map((f) => (
+                                     <th
+                                       key={f.id || f.slug}
+                                       style={{
+                                         padding: "1.25rem 1.5rem",
+                                         fontSize: "0.75rem",
+                                         fontWeight: 900,
+                                         color: "#475569",
+                                         textTransform: "uppercase",
+                                         letterSpacing: "0.05em",
+                                       }}
+                                     >
+                                       {f.label.toUpperCase()}
+                                     </th>
+                                   ))
+                               )}
+                             </>
                           )}
                           <th
                             style={{
@@ -2875,45 +2836,56 @@ const AdminMasters = () => {
                                       </td>
                                     </>
                                   ) : (
-                                    <>
-                                      <td
-                                        style={{
-                                          padding: "1.5rem 1.5rem",
-                                          fontWeight: 900,
-                                          color: "#64748b",
-                                          fontSize: "0.875rem",
-                                        }}
-                                      >
-                                        {sno}
-                                      </td>
-                                      {(
-                                        getCurrentProtocols().find(
-                                          (p) => p.id === exploringProtocolId,
-                                        )?.fields || []
-                                      ).map((f) => (
+                                      <>
                                         <td
-                                          key={f.id || f.slug}
                                           style={{
                                             padding: "1.5rem 1.5rem",
-                                            fontWeight: 700,
-                                            color: "#4b5563",
+                                            fontWeight: 900,
+                                            color: "#64748b",
                                             fontSize: "0.875rem",
                                           }}
                                         >
-                                          {String(
-                                            m.additional_fields?.[f.slug] ||
-                                            m.additional_fields?.[
-                                            f.slug.toLowerCase()
-                                            ] ||
-                                            m.additional_fields?.[
-                                            f.slug.toUpperCase()
-                                            ] ||
-                                            m[f.slug.toLowerCase()] ||
-                                            "--",
-                                          )}
+                                          {sno}
                                         </td>
-                                      ))}
-                                    </>
+                                        {exploringProtocolId?.toLowerCase().includes("pharmacy") ? (
+                                           <>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.ucode || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.name || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.description || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.category || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.quantity || 0}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.cost || 0.00}</td>
+                                           </>
+                                        ) : (
+                                          (
+                                            getCurrentProtocols().find(
+                                              (p) => p.id === exploringProtocolId,
+                                            )?.fields || []
+                                          ).map((f) => (
+                                            <td
+                                              key={f.id || f.slug}
+                                              style={{
+                                                padding: "1.5rem 1.5rem",
+                                                fontWeight: 700,
+                                                color: "#4b5563",
+                                                fontSize: "0.875rem",
+                                              }}
+                                            >
+                                              {String(
+                                                m.additional_fields?.[f.slug] ||
+                                                m.additional_fields?.[
+                                                f.slug.toLowerCase()
+                                                ] ||
+                                                m.additional_fields?.[
+                                                f.slug.toUpperCase()
+                                                ] ||
+                                                m[f.slug.toLowerCase()] ||
+                                                "--",
+                                              )}
+                                            </td>
+                                          ))
+                                        )}
+                                      </>
                                   )}
                                   {exploringProtocolId === "employee_master" &&
                                     activeProjectFields.map((field) => (

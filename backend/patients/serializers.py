@@ -30,6 +30,7 @@ class RegistryFieldSerializer(serializers.ModelSerializer):
 
 class RegistryDataSerializer(serializers.ModelSerializer):
     family_members = serializers.SerializerMethodField()
+    registry_type_project = serializers.IntegerField(source='registry_type.project.id', read_only=True)
     
     class Meta:
         model = RegistryData

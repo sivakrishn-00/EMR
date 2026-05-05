@@ -40,7 +40,7 @@ const Vitals = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [vitalsData, setVitalsData] = useState({
     temperature_c: '', 
-    temp_unit: 'C',
+    temp_unit: 'F',
     blood_pressure_sys: '', 
     blood_pressure_dia: '', 
     heart_rate: '', 
@@ -85,7 +85,8 @@ const Vitals = () => {
     known_others: ''
   });
   const [formAttempted, setFormAttempted] = useState(false);
-  const [projectConfig, setProjectConfig] = useState({ vitals_mandatory: true });
+  const [projectConfig, setProjectConfig] = useState({ vitals_mandatory: false });
+  const [showVitalsSection, setShowVitalsSection] = useState(true);
 
   useEffect(() => {
     fetchActiveVisits();
@@ -210,7 +211,7 @@ const Vitals = () => {
 
   const resetForm = () => {
     setVitalsData({ 
-        temperature_c: '', temp_unit: 'C', blood_pressure_sys: '', blood_pressure_dia: '', 
+        temperature_c: '', temp_unit: 'F', blood_pressure_sys: '', blood_pressure_dia: '', 
         heart_rate: '', respiratory_rate: '', spo2: '', 
         weight_kg: '', height_cm: '', height_ft: '', height_in: '', bmi: '', symptoms: '', notes: '',
         smoking: 'NO', alcohol: 'NO', physical_activity: 'NO', food_habit: 'VEG', allergy_food: 'NO', allergy_drug: 'NO',
@@ -463,9 +464,18 @@ const Vitals = () => {
                        <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
-                    <X size={20} />
-                 </button>
+                 <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setShowVitalsSection(!showVitalsSection)} 
+                      style={{ border: '1px solid #e2e8f0', background: 'white', padding: '0.5rem 0.875rem', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      {showVitalsSection ? 'HIDE VITALS' : 'SHOW VITALS'}
+                    </button>
+                    <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
+                       <X size={20} />
+                    </button>
+                 </div>
               </div>
               
               {/* Patient Profile Summary */}
@@ -493,7 +503,9 @@ const Vitals = () => {
               </div>
 
             <form onSubmit={handleSaveVitals}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics & BMI</p>
+                {showVitalsSection && (
+                  <div className="fade-in">
+                    <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics & BMI</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
                     <div className="form-group">
                        <label><Scale size={14} /> Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
@@ -640,6 +652,8 @@ const Vitals = () => {
                        {formAttempted && projectConfig.vitals_mandatory && !vitalsData.spo2 && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                 </div>
+              </div>
+            )}
 
                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Observations</p>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>

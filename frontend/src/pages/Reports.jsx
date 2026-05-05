@@ -19,7 +19,9 @@ import {
   Printer,
   User,
   ShieldCheck,
-  Building2
+  Building2,
+  Upload as UploadIcon,
+  X
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -144,6 +146,10 @@ const Reports = () => {
     }
   };
 
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkData, setBulkData] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     if (scrollHeight - scrollTop <= clientHeight + 50 && hasMoreEmployees && !isSearching) {
@@ -195,6 +201,68 @@ const Reports = () => {
     window.print();
   };
 
+  const handleBulkUpload = async () => {
+    if (!bulkData.trim()) {
+      toast.error("Please provide data to upload");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const rows = bulkData.trim().split('\n').filter(row => row.trim());
+      const records = rows.map(row => {
+        const parts = row.split(',').map(p => p.trim());
+        return {
+          date: parts[0],
+          card_no: parts[1],
+          medication_name: parts[2],
+          quantity: parts[3],
+          price: parts[4] || null // Optional historical price
+        };
+      });
+
+      const response = await api.post('pharmacy/dispensing/bulk_historical_upload/', { records });
+      
+      if (response.data.status === 'success') {
+        if (response.data.created > 0) {
+          toast.success(`Successfully imported ${response.data.created} records!`);
+        }
+        
+        if (response.data.errors && response.data.errors.length > 0) {
+          // Show the first few errors to help the user debug
+          response.data.errors.slice(0, 3).forEach(err => toast.error(err));
+          if (response.data.errors.length > 3) {
+            toast.error(`...and ${response.data.errors.length - 3} more issues.`);
+          }
+        }
+        
+        if (response.data.created > 0) {
+          setShowBulkModal(false);
+          setBulkData('');
+          fetchConsumption();
+        }
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || "Bulk upload failed. Please check your data format.";
+      toast.error(errorMsg);
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setBulkData(event.target.result);
+        toast.success("File loaded! Please review and click 'Start Import'.");
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleEmployeeSelect = (empId, name) => {
     setSelectedEmployee(empId);
     setSearchTerm(name);
@@ -203,98 +271,35 @@ const Reports = () => {
 
   const filteredEmployees = employeeList || [];
 
-  const exportToCSV = () => {
+  const exportToXLSX = async () => {
     if (activeTab === 'PERSONNEL') {
-      if (!consumptionData?.items) {
-        toast.error("No consumption data to export");
-        return;
+      try {
+        let url = `pharmacy/audit-export/?project=${selectedProject}&employee=${selectedEmployee}&range=${timeRange}&export_format=xlsx`;
+        if (timeRange === 'custom') {
+          url += `&start_date=${startDate}&end_date=${endDate}`;
+        }
+        
+        const response = await api.get(url, { responseType: 'blob' });
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `Consumption_Audit_${selectedProject}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Professional Audit Report (XLSX) generated successfully");
+      } catch (err) {
+        toast.error("Excel generation failed. Please try again.");
+        console.error(err);
       }
-      
-      const metaRows = [
-        ["OFFICIAL PERSONNEL CONSUMPTION AUDIT REPORT"],
-        ["PROJECT", currentProjectName],
-        ["DATE RANGE", getRangeString().toUpperCase()],
-        ["AUDIT SCOPE", selectedEmployee ? `INDIVIDUAL: ${searchTerm}` : "FULL PROJECT REGISTRY"],
-        ["GENERATED AT", new Date().toLocaleString()],
-        [] // Spacer
-      ];
-
-      const headers = ["Visit Date", "Visit ID", "Patient ID", "Patient Name", "Medication Name", "Quantity (Units)", "Unit Price (₹)", "Total Cost (₹)", "Project"];
-      const rows = [...metaRows, headers];
-      
-      consumptionData.items.forEach(visit => {
-        let visitTotal = 0;
-        visit.medications.forEach(med => {
-          rows.push([
-            visit.visit_date,
-            `V-${visit.visit_id}`,
-            `"${visit.patient_id || 'N/A'}"`,
-            `"${visit.patient_name || 'N/A'}"`,
-            `"${med.name}"`,
-            med.quantity,
-            med.unit_price.toFixed(2),
-            med.total_cost.toFixed(2),
-            `"${currentProjectName}"`
-          ]);
-          visitTotal += med.total_cost;
-        });
-        // Add Visit Total Row
-        rows.push([
-          `SUBTOTAL VISIT (${visit.visit_date})`,
-          `V-${visit.visit_id}`,
-          `"${visit.patient_id || 'N/A'}"`,
-          `"${visit.patient_name || 'N/A'}"`,
-          "",
-          "",
-          "",
-          visitTotal.toFixed(2),
-          ""
-        ]);
-        rows.push([]); // Empty spacer row
-      });
-
-      // Add Grand Total Row
-      rows.push([
-        "GRAND TOTAL EXPENDITURE",
-        "",
-        "",
-        "",
-        "",
-        consumptionData.grand_total_units,
-        "",
-        consumptionData.grand_total_cost.toFixed(2),
-        `"${currentProjectName}"`
-      ]);
-
-      let csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-        + rows.map(e => e.join(",")).join("\n");
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Personnel_Audit_${selectedProject}_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`Exported complete audit record`);
       return;
     }
 
     const dataToExport = reportData?.all_consumption || reportData?.top_medications;
     if (!dataToExport) return;
-    
     const headers = ["Medication Name", "Total Consumption (Units)", "Project Scope", "Report Date"];
-    const rows = dataToExport.map(m => [
-      `"${m.name}"`, 
-      m.total, 
-      `"${reportData.project_name}"`, 
-      new Date().toLocaleDateString()
-    ]);
-    
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-      + headers.join(",") + "\n" 
-      + rows.map(e => e.join(",")).join("\n");
-
+    const rows = dataToExport.map(m => [`"${m.name}"`, m.total, `"${reportData.project_name}"`, new Date().toLocaleDateString()]);
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -302,7 +307,6 @@ const Reports = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`Exported ${dataToExport.length} entries`);
   };
 
   const currentProjectName = projects.find(p => p.id === parseInt(selectedProject))?.name || 'Global Enterprise';
@@ -699,7 +703,7 @@ const Reports = () => {
                     {filteredEmployees.map(emp => (
                       <div key={emp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '4px', marginBottom: '4px' }}>
                         <div 
-                          onClick={() => handleEmployeeSelect(emp.id, `${emp.card_no} - ${emp.name}`)}
+                          onClick={() => handleEmployeeSelect(emp.card_no, `${emp.card_no} - ${emp.name}`)}
                           style={{ 
                             padding: '10px 12px', 
                             borderRadius: '10px', 
@@ -718,7 +722,7 @@ const Reports = () => {
                         {emp.family_members?.map(f => (
                           <div 
                             key={`${emp.id}-${f.id}`}
-                            onClick={() => handleEmployeeSelect(emp.id, `${emp.card_no}${f.card_no_suffix} - ${f.name}`)}
+                            onClick={() => handleEmployeeSelect(`${emp.card_no}${f.card_no_suffix}`, `${emp.card_no}${f.card_no_suffix} - ${f.name}`)}
                             style={{ 
                               padding: '6px 12px 6px 2.5rem', 
                               borderRadius: '8px', 
@@ -794,7 +798,25 @@ const Reports = () => {
 
 
               <button 
-                onClick={exportToCSV}
+                onClick={() => setShowBulkModal(true)}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f8fafc',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <UploadIcon size={16} /> Bulk Import History
+              </button>
+              <button 
+                onClick={exportToXLSX}
                 style={{
                   padding: '10px 20px',
                   background: 'var(--text-main)',
@@ -810,7 +832,7 @@ const Reports = () => {
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
                 }}
               >
-                <Download size={16} /> Export CSV
+                <Download size={16} /> Export Excel
               </button>
             </div>
           </div>
@@ -1004,6 +1026,83 @@ const Reports = () => {
         }
         .print-only-block, .print-only-inline { display: none; }
       `}</style>
+      {/* Bulk Upload Modal */}
+      {showBulkModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white', width: '600px', borderRadius: '24px',
+            padding: '2rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e3a8a' }}>Bulk Historical Consumption Import</h2>
+              <button onClick={() => setShowBulkModal(false)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X /></button>
+            </div>
+            
+            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              Paste your 3-month history below or <strong>upload a CSV file</strong>. Format: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>YYYY-MM-DD, CardNo, DrugName, Quantity, [UnitPrice]</code>. 
+              <br/><span style={{ color: '#10b981' }}>Tip: Including [UnitPrice] ensures accurate historical financial auditing.</span>
+            </p>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <input 
+                type="file" 
+                accept=".csv" 
+                onChange={handleFileChange}
+                id="bulk-file-upload"
+                style={{ display: 'none' }}
+              />
+              <label 
+                htmlFor="bulk-file-upload"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 16px', background: '#eff6ff', color: '#1e3a8a',
+                  borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700,
+                  cursor: 'pointer', border: '1px dashed #1e3a8a'
+                }}
+              >
+                <UploadIcon size={14} /> Choose CSV File
+              </label>
+            </div>
+
+            <textarea 
+              value={bulkData}
+              onChange={(e) => setBulkData(e.target.value)}
+              placeholder="2024-04-01, 0001, Amaryl 1mg, 10, 2.50&#10;2024-04-05, 0002, Dolo 650, 5, 1.80"
+              style={{
+                width: '100%', height: '250px', padding: '1rem', borderRadius: '12px',
+                border: '1px solid #e2e8f0', fontFamily: 'monospace', fontSize: '0.875rem',
+                marginBottom: '1.5rem', resize: 'none'
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                onClick={handleBulkUpload}
+                disabled={isUploading}
+                style={{
+                  flex: 1, padding: '12px', background: '#1e3a8a', color: 'white',
+                  border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer'
+                }}
+              >
+                {isUploading ? 'Processing...' : 'Start Import'}
+              </button>
+              <button 
+                onClick={() => setShowBulkModal(false)}
+                style={{
+                  padding: '12px 24px', background: '#f1f5f9', color: '#64748b',
+                  border: 'none', borderRadius: '12px', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

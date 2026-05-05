@@ -154,56 +154,12 @@ class VisitViewSet(viewsets.ModelViewSet):
                         presc = Prescription.objects.create(
                             visit=visit,
                             medication_name=med_name,
-                            dosage=dosage,
                             frequency=freq,
                             duration=duration,
                             ordered_by=request.user,
                             status='PENDING'
                         )
 
-                        # --- Stock Deduction Logic ---
-                        if project_obj and med_name:
-                            try:
-                                # 1. Calculate required quantity
-                                per_day = 0
-                                if '-' in freq:
-                                    per_day = sum(int(x) for x in freq.split('-') if x.strip().isdigit())
-                                else:
-                                    map_shorthand = {'OD': 1, 'BD': 2, 'TDS': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1}
-                                    per_day = map_shorthand.get(freq.strip().upper(), 1)
-                                
-                                days_str = str(duration).split(' ')[0] # Handle "5 days" or "5"
-                                days = int(''.join(filter(str.isdigit, days_str))) if any(c.isdigit() for c in days_str) else 1
-                                total_needed = per_day * days
-
-                                # 2. Find and update the Pharmacy Master Registry for this Project (Dynamic Lookup)
-                                from django.db.models import Q
-                                pharma_type = RegistryType.objects.filter(
-                                    project=project_obj
-                                ).filter(
-                                    Q(icon='Pill') | Q(slug__icontains='pharmacy') | Q(name__icontains='pharmacy')
-                                ).first()
-                                
-                                registry_slug = pharma_type.slug if pharma_type else 'pharmacy-drugs'
-
-                                inv_item = RegistryData.objects.select_for_update().filter(
-                                    registry_type__slug=registry_slug,
-                                    registry_type__project=project_obj,
-                                    name__iexact=med_name.strip()
-                                ).first()
-
-                                if inv_item:
-                                    old_qty = inv_item.quantity
-                                    inv_item.quantity = max(0, inv_item.quantity - total_needed)
-                                    inv_item.save()
-                                    # Structured log for reporting: [CONSUMPTION] DrugName | Quantity | ProjectID
-                                    log_action(request.user, 'Inventory', 'Stock Deduction', 
-                                              f"[CONSUMPTION] {med_name} | {total_needed} units | Project:{project_obj.id} (Visit #{visit.id})")
-                                else:
-                                    log_action(request.user, 'Inventory', 'Stock Warning', 
-                                              f"Drug '{med_name}' not found in Project '{project_obj.name}' pharmacy registry.")
-                            except Exception as e:
-                                print(f"Inventory matching error: {str(e)}")
                     
                     log_action(request.user, 'Pharmacy', 'Prescription Created', f"Prescribed {len(medications)} meds for patient {visit.patient}")
 

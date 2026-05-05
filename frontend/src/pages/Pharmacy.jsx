@@ -11,8 +11,17 @@ const Pharmacy = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const getDoseCount = (freq, dur) => {
+  const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
+
+    // MNC Standard Logic: Only Tablets and Capsules follow frequency-based multiplication
+    const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(itemGroup?.toUpperCase()) || !itemGroup;
+
+    if (!isDayBased) {
+        // For Syrups, Ointments, Liquids, etc., the 'Duration' field is treated as 'Total Units/Bottles'
+        return parseInt(dur) || 1;
+    }
+
     let perDay = 0;
     if (freq.includes('-')) {
         perDay = freq.split('-').reduce((sum, val) => sum + (parseInt(val) || 0), 0);
@@ -43,12 +52,15 @@ const Pharmacy = () => {
     }
   };
 
-  const getInventoryStock = (medName) => {
+  const getInventoryStock = (medName, projectId) => {
     if (!medName) return 0;
     if (isInventoryLoading && pharmacyInventory.length === 0) return "Syncing...";
 
+    // Filter by name and ensure we only look at the inventory for the specific project
     const item = pharmacyInventory.find(
-      (d) => d.name.trim().toLowerCase() === medName.trim().toLowerCase(),
+      (d) => 
+        d.name.trim().toLowerCase() === medName.trim().toLowerCase() && 
+        String(d.registry_type_project) === String(projectId)
     );
     return item ? `${item.quantity} items` : "0 items";
   };
@@ -68,6 +80,7 @@ const Pharmacy = () => {
                 visit_id: curr.visit_id,
                 patient_name: curr.patient_name,
                 uhid: curr.uhid,
+                project_id: curr.project_id,
                 items: []
             };
         }
@@ -92,7 +105,10 @@ const Pharmacy = () => {
         
         // Dispense each medication with its correctly calculated dose count
         const dispensePromises = visitGroup.items.map(item => {
-            const calculatedQty = getDoseCount(item.frequency, item.duration) || 1;
+            const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group;
+            const calculatedQty = isDayBased 
+                ? getDoseCount(item.frequency, item.duration, item.item_group) 
+                : (item.total_units || 1);
             return api.post(`pharmacy/prescriptions/${item.id}/dispense/`, {
                 ...dispenseData,
                 quantity: calculatedQty
@@ -215,13 +231,17 @@ const Pharmacy = () => {
                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                            <div>
                                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                   {item.dosage} | {item.frequency} | {item.duration} days
-                                   <span style={{ background: 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>Dose: {getDoseCount(item.frequency, item.duration)}</span>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                   {item.frequency} | {item.duration} days
+                                   <span style={{ background: 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                                       Total: {(['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group) 
+                                               ? getDoseCount(item.frequency, item.duration, item.item_group) 
+                                               : (item.total_units || 1)} units
+                                   </span>
                                    <span style={{ 
                                        marginLeft: 'auto',
-                                       color: (typeof getInventoryStock(item.medication_name) === 'string' && getInventoryStock(item.medication_name).includes('Sync')) ? '#64748b' : 
-                                              (parseInt(getInventoryStock(item.medication_name)) >= getDoseCount(item.frequency, item.duration) ? '#10b981' : '#ef4444'), 
+                                       color: (typeof getInventoryStock(item.medication_name, item.project_id) === 'string' && getInventoryStock(item.medication_name, item.project_id).includes('Sync')) ? '#64748b' : 
+                                              (parseInt(getInventoryStock(item.medication_name, item.project_id)) >= ((['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group) ? getDoseCount(item.frequency, item.duration, item.item_group) : (item.total_units || 1)) ? '#10b981' : '#ef4444'), 
                                        fontWeight: 800,
                                        fontSize: '0.6875rem',
                                        background: 'var(--surface)',
@@ -229,7 +249,7 @@ const Pharmacy = () => {
                                        borderRadius: '6px',
                                        border: '1px solid #e9d5ff'
                                    }}>
-                                       In Stock: {getInventoryStock(item.medication_name)}
+                                       In Stock: {getInventoryStock(item.medication_name, item.project_id)}
                                    </span>
                                </p>
                            </div>

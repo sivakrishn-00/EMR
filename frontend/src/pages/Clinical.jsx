@@ -35,13 +35,16 @@ const Clinical = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
+  const [newMed, setNewMed] = useState({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
   const [totalInventoryCount, setTotalInventoryCount] = useState(0);
   
   const [labMasters, setLabMasters] = useState([]);
   const [registryTypes, setRegistryTypes] = useState([]);
   const [searchLab, setSearchLab] = useState("");
+  const [drugSearch, setDrugSearch] = useState("");
+  const [showDrugDropdown, setShowDrugDropdown] = useState(false);
   const [showLabSearch, setShowLabSearch] = useState(false);
 
   const [showHistory, setShowHistory] = useState(false);
@@ -106,16 +109,25 @@ const Clinical = () => {
     }
   };
 
-  const getDoseCount = (freq, dur) => {
+  const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
+
+    // MNC Standard Logic: Only Tablets and Capsules follow frequency-based multiplication
+    const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(itemGroup?.toUpperCase()) || !itemGroup;
+
+    if (!isDayBased) {
+        // For Syrups, Ointments, Liquids, etc., the 'Duration' field is treated as 'Total Units/Bottles'
+        return parseInt(dur) || 1;
+    }
+
     let perDay = 0;
     if (freq.includes('-')) {
-        perDay = freq.split('-').reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+        perDay = freq.split('-').reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
     } else {
         const map = { 'OD': 1, 'BD': 2, 'TDS': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1 };
         perDay = map[freq] || 1;
     }
-    return perDay * (parseInt(dur) || 0);
+    return Math.ceil(perDay * (parseInt(dur) || 0));
   };
 
   useEffect(() => {
@@ -179,7 +191,9 @@ const Clinical = () => {
         medications: []
       });
       setSearchLab("");
-      setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
+      setNewMed({ name: '', frequency: '1-0-1', duration: '', timing: 'After Food', item_code: '', item_group: '' });
+      setSelectedGroup("");
+      setDrugSearch("");
       fetchVisitsToSee();
     } catch (err) {
       toast.error("Error saving consultation", { id: loadingToast });
@@ -265,7 +279,6 @@ const Clinical = () => {
                                 lab_investigations: [], // Start fresh for new investigations
                                 medications: v.prescriptions?.map(p => ({
                                     name: p.medication_name,
-                                    dosage: p.dosage,
                                     frequency: p.frequency,
                                     duration: p.duration,
                                     timing: p.timing || 'After Food'
@@ -712,42 +725,93 @@ const Clinical = () => {
                         Total Available: {totalInventoryCount} Drug Variations 
                       </span>
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {/* ITEM GROUP DROPDOWN */}
+                      <select
+                        value={selectedGroup}
+                        onChange={e => {
+                          setSelectedGroup(e.target.value);
+                          setNewMed({...newMed, name: '', item_code: '', item_group: e.target.value});
+                        }}
+                        style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 700 }}
+                      >
+                        <option value="">SELECT GROUP</option>
+                        {[...new Set(pharmacyInventory.map(d => d.category || d.item_group || 'General'))].sort().map(g => (
+                          <option key={g} value={g}>{g.toUpperCase()}</option>
+                        ))}
+                      </select>
+
                       <div style={{ position: 'relative' }}>
-                        <input 
-                          list="drug-inventory"
-                          placeholder="Drug Name" 
-                          value={newMed.name} 
-                          onChange={e => {
-                            const val = e.target.value;
-                            setNewMed({...newMed, name: val});
-                          }} 
-                          style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', marginBottom: '4px' }} 
-                        />
-                        <datalist id="drug-inventory">
-                          {pharmacyInventory.map(d => (
-                            <option key={d.id} value={d.name}>{d.name} (Stock: {d.quantity})</option>
-                          ))}
-                        </datalist>
+                        <div style={{ position: 'relative' }}>
+                            <input 
+                              placeholder="SEARCH DRUG..." 
+                              value={drugSearch || newMed.name} 
+                              onFocus={() => setShowDrugDropdown(true)}
+                              onChange={e => {
+                                setDrugSearch(e.target.value);
+                                setShowDrugDropdown(true);
+                                if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
+                              }} 
+                              style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: '#1e293b' }} 
+                            />
+                            <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                <Search size={14} color="#94a3b8" />
+                            </div>
+                        </div>
+
+                        {showDrugDropdown && (
+                            <div style={{ position: 'absolute', top: '40px', left: 0, right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 1000, maxHeight: '250px', overflowY: 'auto' }}>
+                                {pharmacyInventory
+                                    .filter(d => !selectedGroup || (d.category || d.item_group) === selectedGroup)
+                                    .filter(d => !drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()) || (d.ucode && d.ucode.toLowerCase().includes(drugSearch.toLowerCase())))
+                                    .map(d => (
+                                        <div 
+                                            key={d.id} 
+                                            onClick={() => {
+                                                setNewMed({
+                                                    ...newMed, 
+                                                    name: d.name, 
+                                                    item_code: d.ucode || d.item_code || '',
+                                                    item_group: d.category || d.item_group || ''
+                                                });
+                                                setDrugSearch(d.name);
+                                                setShowDrugDropdown(false);
+                                            }}
+                                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                                        >
+                                            <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>{d.name}</p>
+                                            <p style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 700 }}>
+                                                CODE: {d.ucode || 'N/A'} | STOCK: {d.quantity || 0}
+                                            </p>
+                                        </div>
+                                    ))}
+                                {pharmacyInventory.filter(d => (!selectedGroup || (d.category || d.item_group) === selectedGroup) && (!drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()))).length === 0 && (
+                                    <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
+                                        No matching drugs found in this group
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         {/* Dynamic Stock Indicator */}
                         {newMed.name && (() => {
-                            const drug = pharmacyInventory.find(d => d.name.toLowerCase() === newMed.name.toLowerCase());
+                            const drug = pharmacyInventory.find(d => d.name === newMed.name);
                             if (!drug) return null;
                             const alreadyAdded = consultData.medications
-                                .filter(m => m.name.toLowerCase() === newMed.name.toLowerCase())
-                                .reduce((sum, m) => sum + getDoseCount(m.frequency, m.duration), 0);
-                            const remaining = drug.quantity - alreadyAdded;
+                                .filter(m => m.name === newMed.name)
+                                .reduce((sum, m) => sum + getDoseCount(m.frequency, m.duration, m.item_group), 0);
+                            const remaining = (drug.quantity || drug.balance_qty || 0) - alreadyAdded;
                             const color = remaining > 10 ? '#166534' : remaining > 0 ? '#b45309' : '#ef4444';
                             const bg = remaining > 10 ? '#dcfce7' : remaining > 0 ? '#fef3c7' : '#fee2e2';
                             return (
-                                <div style={{ fontSize: '9px', fontWeight: 900, color: color, background: bg, padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                                    REMAINING STOCK: {remaining} UNITS
+                                <div style={{ position: 'absolute', top: '-18px', right: 0, fontSize: '9px', fontWeight: 900, color: color, background: bg, padding: '2px 6px', borderRadius: '4px', border: `1px solid ${color}40` }}>
+                                    STOCK: {remaining} {drug.stock_uom || 'UNITS'} | CODE: {drug.ucode || drug.item_code || 'N/A'}
                                 </div>
                             );
                         })()}
                       </div>
-                       <input placeholder="Dosage" value={newMed.dosage} onChange={e => setNewMed({...newMed, dosage: e.target.value})} style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem' }} />
                        <select 
                           value={newMed.frequency} 
                           onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
@@ -777,14 +841,51 @@ const Clinical = () => {
                            <option value="After Food">After Food</option>
                            <option value="Empty Stomach">Empty Stomach</option>
                         </select>
-                       <input placeholder="Days" type="number" value={newMed.duration} onChange={e => setNewMed({...newMed, duration: e.target.value})} style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem' }} />
+                        <input 
+                           placeholder="Days" 
+                           type="number" 
+                           min="1"
+                           value={newMed.duration} 
+                           onChange={e => {
+                               const val = e.target.value;
+                               if (val !== "" && parseInt(val) < 0) return; 
+                               setNewMed({...newMed, duration: val});
+                           }} 
+                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '90px', fontWeight: 800, color: '#0f172a', border: '2px solid var(--border)', padding: '0 8px' }} 
+                       />
+
+                       {/* Extra Units Field for Non-Tablets */}
+                       {(!['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) && newMed.item_group) && (
+                           <input 
+                               placeholder="Units" 
+                               type="number" 
+                               min="1"
+                               value={newMed.total_units} 
+                               onChange={e => {
+                                   const val = e.target.value;
+                                   if (val !== "" && parseInt(val) < 0) return; 
+                                   setNewMed({...newMed, total_units: val});
+                               }} 
+                               style={{ background: '#fff1f2', height: '36px', fontSize: '0.75rem', width: '85px', fontWeight: 800, color: '#be185d', border: '2px solid #fce7f3', padding: '0 8px', marginLeft: '4px' }} 
+                           />
+                       )}
                        <button type="button" onClick={() => {
                           if (!newMed.name || !newMed.duration) {
                               toast.error("Please provide both Drug Name and Number of Days");
                               return;
                           }
-                          setConsultData({...consultData, medications: [...consultData.medications, newMed]});
-                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food' });
+                          
+                          // For Tablets, total_units is calculated. For others, it's explicitly provided.
+                          const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
+                            ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
+                            : (parseInt(newMed.total_units) || 1);
+
+                          setConsultData({
+                              ...consultData, 
+                              medications: [...consultData.medications, { ...newMed, total_units: finalUnits }]
+                          });
+                          setNewMed({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
+                          setDrugSearch("");
                        }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
                     </div>
 
@@ -800,16 +901,18 @@ const Clinical = () => {
                                         <div style={{ flex: 1 }}>
                                             <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)', marginBottom: '4px' }}>{m.name}</p>
                                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>| {m.frequency} | {m.timing} | {m.duration} days</span>
+                                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                                    | {m.frequency} | {m.timing} | {m.duration} days
+                                                </span>
                                                 
                                                 <span style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '3px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900, boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)' }}>
-                                                    Dose: {getDoseCount(m.frequency, m.duration)}
+                                                    Dispense: {m.total_units} units
                                                 </span>
 
                                                 {(() => {
                                                     const drug = pharmacyInventory.find(d => d.name.toLowerCase() === m.name.toLowerCase());
                                                     if (drug) {
-                                                        const isLow = drug.quantity < getDoseCount(m.frequency, m.duration);
+                                                        const isLow = drug.quantity < m.total_units;
                                                         return (
                                                             <span style={{ 
                                                                 background: isLow ? '#fef2f2' : '#f0fdf4', 

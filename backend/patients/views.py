@@ -105,6 +105,149 @@ class ProjectViewSet(viewsets.ModelViewSet):
         log_action(request.user, 'Governance', 'Sync Mappings', f"Synchronized mappings and provisioned default registries for project {project.name}")
         return Response({"status": "Mappings synchronized and registries provisioned."})
 
+    @action(detail=True, methods=['post'], url_path='setup-pharmacy')
+    def setup_pharmacy(self, request, pk=None):
+        project = self.get_object()
+        
+        # 1. Provision Pharmacy Registry Type
+        rt, created = RegistryType.objects.get_or_create(
+            project=project,
+            slug='pharmacy',
+            defaults={
+                'name': 'Pharmacy Inventory',
+                'type_category': 'PHARMACY',
+                'description': f'Auto-deductive medical inventory for {project.name}',
+                'coverage': 'PROJECT SPECIFIC',
+                'icon': 'Pill',
+                'color': '#10b981'
+            }
+        )
+        
+        # 2. Define standard Pharmacy Schema
+        standard_fields = [
+            {'label': 'ITEM CODE', 'slug': 'item_code', 'data_type': 'VARCHAR', 'order': 0},
+            {'label': 'ITEM NAME', 'slug': 'item_name', 'data_type': 'VARCHAR', 'order': 1},
+            {'label': 'DESCRIPTION', 'slug': 'description', 'data_type': 'VARCHAR', 'order': 2},
+            {'label': 'ITEM GROUP', 'slug': 'item_group', 'data_type': 'VARCHAR', 'order': 3},
+            {'label': 'QTY', 'slug': 'qty', 'data_type': 'INT', 'order': 4},
+            {'label': 'COST', 'slug': 'cost', 'data_type': 'VARCHAR', 'order': 5},
+        ]
+        
+        created_count = 0
+        for f_data in standard_fields:
+            _, f_created = RegistryField.objects.get_or_create(
+                registry_type=rt,
+                slug=f_data['slug'],
+                defaults={
+                    'label': f_data['label'],
+                    'data_type': f_data['data_type'],
+                    'order': f_data['order']
+                }
+            )
+            if f_created: created_count += 1
+            
+        log_action(request.user, 'Governance', 'Setup Pharmacy', f"Initialized pharmacy registry for project {project.name}")
+        return Response({
+            "status": "Pharmacy registry initialized",
+            "registry_id": rt.id,
+            "fields_created": created_count
+        })
+
+    @action(detail=True, methods=['post'], url_path='bulk-link-employees')
+    def bulk_link_employees(self, request, pk=None):
+        project = self.get_object()
+        card_numbers = request.data.get('card_numbers', [])
+        
+        if not card_numbers:
+            return Response({"error": "No card numbers provided"}, status=400)
+            
+        linked_count = 0
+        errors = []
+        
+        from .models import EmployeeMaster, FamilyMember, Patient
+        
+        for idx, card_no_input in enumerate(card_numbers):
+            try:
+                card_no_input = str(card_no_input).strip()
+                if not card_no_input: continue
+                
+                if '/' in card_no_input:
+                    # 1. Family Member Granular Case (e.g. 2254/1)
+                    parts = card_no_input.split('/')
+                    parent_card = parts[0]
+                    suffix = '/' + parts[1]
+                    
+                    member = FamilyMember.objects.filter(employee__card_no=parent_card, card_no_suffix=suffix).first()
+                    if not member:
+                        errors.append(f"Dependent {card_no_input} not found in Master Registry.")
+                        continue
+                    
+                    employee = member.employee
+                    # Sync parent project link if needed (Metadata sync)
+                    if employee.project != project:
+                        employee.project = project
+                        employee.save()
+                        
+                    # Create/Update Patient Profile for the SPECIFIC Family Member
+                    Patient.objects.update_or_create(
+                        card_no=card_no_input,
+                        project=project,
+                        defaults={
+                            'first_name': member.name.split(' ')[0],
+                            'last_name': " ".join(member.name.split(' ')[1:]) if " " in member.name else "",
+                            'dob': member.dob,
+                            'gender': member.gender,
+                            'phone': member.mobile_no or employee.mobile_no,
+                            'address': employee.address,
+                            'id_proof_type': 'EMPLOYEE_CARD',
+                            'id_proof_number': card_no_input,
+                            'is_employee_linked': True,
+                            'employee_master': employee,
+                            'family_member': member,
+                            'relationship': member.relationship
+                        }
+                    )
+                    linked_count += 1
+                else:
+                    # 2. Primary Employee Case (e.g. 2254)
+                    employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                    if not employee:
+                        errors.append(f"Card {card_no_input} not found in Global Master List.")
+                        continue
+                    
+                    # Link to this project (Metadata)
+                    employee.project = project
+                    employee.save()
+                    
+                    # Create/Update Patient Profile for Primary Employee ONLY
+                    Patient.objects.update_or_create(
+                        card_no=card_no_input,
+                        project=project,
+                        defaults={
+                            'first_name': employee.name.split(' ')[0],
+                            'last_name': " ".join(employee.name.split(' ')[1:]) if " " in employee.name else "",
+                            'dob': employee.dob,
+                            'gender': employee.gender,
+                            'phone': employee.mobile_no,
+                            'address': employee.address,
+                            'id_proof_type': 'EMPLOYEE_CARD',
+                            'id_proof_number': card_no_input,
+                            'is_employee_linked': True,
+                            'employee_master': employee,
+                            'relationship': 'PRIMARY CARD HOLDER'
+                        }
+                    )
+                    linked_count += 1
+                
+            except Exception as e:
+                errors.append(f"Error linking {card_no_input}: {str(e)}")
+                
+        return Response({
+            "status": "success",
+            "linked": linked_count,
+            "errors": errors
+        })
+
 class RegistryTypeViewSet(viewsets.ModelViewSet):
     serializer_class = RegistryTypeSerializer
     permission_classes = [permissions.IsAuthenticated]

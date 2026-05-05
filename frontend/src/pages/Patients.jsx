@@ -95,6 +95,9 @@ const Patients = () => {
   const [showFamilyMasterDropdown, setShowFamilyMasterDropdown] = useState(false);
   const [masterFormAttempted, setMasterFormAttempted] = useState(false);
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
+  const [showBulkEnrollModal, setShowBulkEnrollModal] = useState(false);
+  const [bulkEnrollData, setBulkEnrollData] = useState('');
+  const [isBulkEnrolling, setIsBulkEnrolling] = useState(false);
 
   const fetchNextCardNo = async (projectId) => {
     try {
@@ -140,6 +143,43 @@ const Patients = () => {
       fetchEmployeeMasters();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to onboard personnel. Check for duplicate Card ID/Aadhar.", { id: loadId });
+    }
+  };
+
+  const handleBulkEnrollSubmit = async () => {
+    const cardNumbers = bulkEnrollData.split(/[\n,]+/).map(c => c.trim()).filter(c => c);
+    if (cardNumbers.length === 0) {
+      toast.error("Please provide Card Numbers to enroll");
+      return;
+    }
+
+    const currentProjectId = projectFilter || user?.project;
+    if (!currentProjectId) {
+      toast.error("Please select a project filter first");
+      return;
+    }
+
+    setIsBulkEnrolling(true);
+    const loadId = toast.loading(`Enrolling ${cardNumbers.length} personnel...`);
+    try {
+      const res = await api.post(`patients/projects/${currentProjectId}/bulk-link-employees/`, {
+        card_numbers: cardNumbers
+      });
+      
+      if (res.data.status === 'success') {
+        toast.success(`Activated ${res.data.linked} personnel records!`, { id: loadId });
+        if (res.data.errors.length > 0) {
+          toast.error(`${res.data.errors.length} cards were not found in Global Master.`);
+        }
+        setShowBulkEnrollModal(false);
+        setBulkEnrollData('');
+        fetchEmployeeMasters();
+        fetchPatients();
+      }
+    } catch (err) {
+      toast.error("Bulk enrollment failed. Check connection.", { id: loadId });
+    } finally {
+      setIsBulkEnrolling(false);
     }
   };
 
@@ -205,10 +245,20 @@ const Patients = () => {
   };
 
   useEffect(() => {
-    fetchEmployeeMasters();
-    fetchStats();
     fetchProjects();
+    fetchPatients();
+    fetchEmployeeMasters();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'employee') {
+      // Small delay to ensure projects are loaded for the project-aware onboarding
+      setTimeout(() => {
+        openMasterOnboarding();
+      }, 500);
+    }
+  }, [projects]);
 
   const fetchProjects = async () => {
     try {
@@ -779,7 +829,20 @@ const Patients = () => {
                         <div>
                           <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-main)' }}>
                             {p.first_name || 'Anonymous'} {p.last_name || ''}
-                            {p.is_employee_linked && <span style={{ marginLeft: '8px', fontSize: '0.625rem', background: '#dcfce7', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>EMP LINKED</span>}
+                            {p.is_employee_linked && (
+                            <span style={{ 
+                                marginLeft: '8px', 
+                                fontSize: '0.625rem', 
+                                background: p.relationship === 'PRIMARY CARD HOLDER' ? '#dcfce7' : '#eff6ff', 
+                                color: p.relationship === 'PRIMARY CARD HOLDER' ? '#166534' : '#1e40af', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                fontWeight: 800,
+                                textTransform: 'uppercase'
+                            }}>
+                                {p.relationship === 'PRIMARY CARD HOLDER' ? 'PRIMARY' : 'DEPENDENT'}
+                            </span>
+                          )}
                           </p>
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             ID: <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{p.patient_id}</span> {p.is_employee_linked && ` | Card: ${p.card_no}`}
@@ -1101,7 +1164,7 @@ const Patients = () => {
                             }}
                         >General</button>
                         )}
-                        {projects.find(p => p.id === formData.project)?.use_registry_for_personnel && (
+                        {(user?.role === 'ADMIN' || !formData.project || projects.find(p => p.id === formData.project)?.use_registry_for_personnel) && (
                         <button 
                              type="button"
                              onClick={() => setFormData({...formData, is_employee_linked: true})}
@@ -1580,9 +1643,12 @@ const Patients = () => {
                   <textarea value={masterFormData.address} onChange={(e) => setMasterFormData({ ...masterFormData, address: e.target.value })} className="form-control" placeholder="Village/City, District, State" style={{ height: '80px', paddingTop: '12px' }} />
                 </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginTop: "2rem" }}>
+                <button type="button" className="btn" onClick={() => { setShowMasterModal(false); setShowBulkEnrollModal(true); }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: 'var(--primary)', fontWeight: 800, borderRadius: '14px', padding: '0.75rem 1.5rem' }}>BULK LINK FROM MASTER</button>
+                <div style={{ display: "flex", gap: "1rem" }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" style={{ background: '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
+                </div>
               </div>
             </form>
           </div>
@@ -1797,6 +1863,82 @@ const Patients = () => {
           to { transform: rotate(360deg); }
         }
       `}</style>
+      {/* Bulk Enrollment Modal */}
+      {showBulkEnrollModal && createPortal(
+        <div className="modal-overlay" style={{ zIndex: 100001 }}>
+          <div className="modal-content" style={{ maxWidth: '500px', borderRadius: '32px' }}>
+            <div style={{ padding: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', borderRadius: '12px' }}>
+                  <ShieldCheck size={24} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>Bulk Activation</h2>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Link existing Master records & their families to this project</p>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
+                    Paste Card Numbers
+                  </label>
+                  <label style={{ 
+                    cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', 
+                    background: 'rgba(99, 102, 241, 0.05)', padding: '4px 10px', borderRadius: '8px',
+                    display: 'flex', alignItems: 'center', gap: '4px'
+                  }}>
+                    <Download size={12} /> Upload CSV
+                    <input 
+                      type="file" 
+                      accept=".csv,.txt" 
+                      style={{ display: 'none' }} 
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const text = event.target.result;
+                            const numbers = text.split(/[\n,]+/).map(c => c.trim()).filter(c => c);
+                            setBulkEnrollData(numbers.join('\n'));
+                            toast.success(`Extracted ${numbers.length} card numbers from file!`);
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <textarea 
+                  className="form-control" 
+                  rows="8"
+                  placeholder="e.g.&#10;2254&#10;2255&#10;2256"
+                  style={{ background: '#f8fafc', borderRadius: '16px', fontSize: '1rem', padding: '1rem', fontFamily: 'monospace' }}
+                  value={bulkEnrollData}
+                  onChange={(e) => setBulkEnrollData(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button 
+                  className="btn btn-primary"
+                  disabled={isBulkEnrolling}
+                  onClick={handleBulkEnrollSubmit}
+                  style={{ padding: '1rem', borderRadius: '14px', fontWeight: 900, background: 'var(--primary)', border: 'none', color: 'white' }}
+                >
+                  {isBulkEnrolling ? 'ACTIVATING...' : 'ACTIVATE & SYNC RECORDS'}
+                </button>
+                <button 
+                  className="btn" 
+                  onClick={() => setShowBulkEnrollModal(false)}
+                  style={{ padding: '0.75rem', fontWeight: 800, color: '#64748b' }}
+                >Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

@@ -11,7 +11,6 @@ class Prescription(models.Model):
     )
     visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name='prescriptions')
     medication_name = models.CharField(max_length=200)
-    dosage = models.CharField(max_length=100)
     frequency = models.CharField(max_length=100)
     duration = models.CharField(max_length=100)
     ordered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medications_ordered')
@@ -26,6 +25,8 @@ class DispensingRecord(models.Model):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name='dispensing_history')
     dispensed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medications_dispensed')
     quantity = models.IntegerField()
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    total_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     dispensed_at = models.DateTimeField(auto_now_add=True)
     remarks = models.TextField(blank=True, null=True)
 

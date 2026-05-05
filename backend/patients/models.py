@@ -211,6 +211,7 @@ class RegistryData(models.Model):
     registry_type = models.ForeignKey(RegistryType, on_delete=models.CASCADE, related_name='items')
     ucode = models.CharField(max_length=50, help_text="Common code/ID for item")
     name = models.CharField(max_length=255)
+    aliases = models.TextField(blank=True, null=True, help_text="Comma-separated synonyms or search tags (e.g. Amaryl, Glimepiride)")
     category = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     quantity = models.IntegerField(default=0)

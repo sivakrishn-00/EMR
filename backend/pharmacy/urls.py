@@ -7,6 +7,7 @@ router.register(r'prescriptions', PrescriptionViewSet, basename='prescription')
 router.register(r'dispensing', DispensingRecordViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('audit-export/', ConsumptionReportView.as_view(), name='audit-export'),
     path('consumption-report/', ConsumptionReportView.as_view(), name='consumption-report'),
+    path('', include(router.urls)),
 ]
