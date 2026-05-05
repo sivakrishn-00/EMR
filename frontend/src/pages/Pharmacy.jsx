@@ -46,16 +46,17 @@ const Pharmacy = () => {
     setIsInventoryLoading(true);
     try {
       const projectId = user?.project?.id || user?.project;
-      const endpoint = projectId 
-        ? `patients/registry-data/?all=true&page_size=2000&project=${projectId}&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory`
-        : `patients/registry-data/?all=true&page_size=2000&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory`;
+      
+      // Strict: Only fetch data that is categorized as CLINICAL_DRUGS or PHARMACY
+      const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory${projectId ? `&project=${projectId}` : ''}`;
         
       const res = await api.get(endpoint);
       const data = res.data.results || res.data;
       
       console.log(`[Pharmacy Debug] Project: ${projectId} | Items Fetched: ${data.length}`);
       if (data.length > 0) {
-          console.log(`[Pharmacy Debug] Sample names:`, data.slice(0, 10).map(d => d.name));
+          // Log the name and the slug to see exactly what we got
+          console.log(`[Pharmacy Debug] First 5 entries:`, data.slice(0, 5).map(d => `${d.name} (Type:${d.registry_type_slug})`));
       }
       
       setPharmacyInventory(data);
