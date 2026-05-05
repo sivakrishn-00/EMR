@@ -56,12 +56,20 @@ const Pharmacy = () => {
     if (!medName) return 0;
     if (isInventoryLoading && pharmacyInventory.length === 0) return "Syncing...";
 
-    // Filter by name and ensure we only look at the inventory for the specific project
-    const item = pharmacyInventory.find(
-      (d) => 
-        d.name.trim().toLowerCase() === medName.trim().toLowerCase() && 
-        String(d.registry_type_project) === String(projectId)
-    );
+    const cleanName = medName.trim().toLowerCase();
+    
+    // Triple-Layer Search: Match by exact Name, Code (ucode), or Alias
+    const item = pharmacyInventory.find((d) => {
+      const isProjectMatch = String(d.registry_type_project) === String(projectId);
+      if (!isProjectMatch) return false;
+
+      const nameMatch = d.name.trim().toLowerCase() === cleanName;
+      const codeMatch = d.ucode.trim().toLowerCase() === cleanName;
+      const aliasMatch = d.aliases?.toLowerCase().split(',').some(alias => alias.trim() === cleanName);
+
+      return nameMatch || codeMatch || aliasMatch;
+    });
+
     return item ? `${item.quantity} items` : "0 items";
   };
 
