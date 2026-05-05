@@ -1043,7 +1043,7 @@ const AdminMasters = () => {
           const payload =
             isStandard || isProject1Personnel
               ? { records: batch }
-              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode };
+              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode, project: bulkProject };
           const res = await api.post(endpoint, payload);
 
           totalSuccess += res.data.success || 0;
@@ -2448,9 +2448,11 @@ const AdminMasters = () => {
                       <button
                         className="btn btn-primary"
                         onClick={() => {
+                          const currentProtocol = getCurrentProtocols().find(p => p.id === exploringProtocolId);
                           setBulkProject(selectedProject);
                           setExploringProtocolId(exploringProtocolId);
-                          setBulkType("HEALTH");
+                          // Use the technical dbId for the server request to ensure it finds the right table
+                          setBulkType(currentProtocol?.dbId || exploringProtocolId); 
                           setBulkStep("UPLOAD");
                           setBulkMode("INCREMENT");
                           setShowBulkModal(true);

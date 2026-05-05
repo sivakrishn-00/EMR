@@ -374,14 +374,20 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         
         # Support slug-based lookup if registry_type_id is not numeric
         active_type_id = None
+        project_id = request.data.get('project')
+        
         if str(registry_type_id).isdigit():
             active_type_id = int(registry_type_id)
         else:
-            rt = RegistryType.objects.filter(slug=registry_type_id).first()
+            rt_qs = RegistryType.objects.filter(slug=registry_type_id)
+            if project_id:
+                rt_qs = rt_qs.filter(project_id=project_id)
+            
+            rt = rt_qs.first()
             if rt:
                 active_type_id = rt.id
             else:
-                return Response({"error": f"Registry type with slug '{registry_type_id}' not found"}, status=404)
+                return Response({"error": f"Registry type '{registry_type_id}' not found for this project"}, status=404)
 
         # Fetch active schema for this registry type
         from .models import RegistryField
