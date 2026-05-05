@@ -53,21 +53,25 @@ const Pharmacy = () => {
   };
 
   const getInventoryStock = (medName, projectId) => {
-    if (!medName) return 0;
-    if (isInventoryLoading && pharmacyInventory.length === 0) return "Syncing...";
-
-    const cleanName = medName.trim().toLowerCase();
+    if (!medName || !pharmacyInventory.length) return "0 items";
     
-    // Triple-Layer Search: Match by exact Name, Code (ucode), or Alias
-    const item = pharmacyInventory.find((d) => {
-      const isProjectMatch = String(d.registry_type_project) === String(projectId);
+    // Set for debugging access in console
+    window.inventoryData = pharmacyInventory;
+    
+    const search = medName.trim().toLowerCase();
+    
+    const item = pharmacyInventory.find(d => {
+      // Project Match: Exact match OR item is 'Global' (null project)
+      const regProj = d.registry_type_project;
+      const isProjectMatch = !regProj || String(regProj) === String(projectId);
+      
       if (!isProjectMatch) return false;
 
-      const nameMatch = d.name.trim().toLowerCase() === cleanName;
-      const codeMatch = d.ucode.trim().toLowerCase() === cleanName;
-      const aliasMatch = d.aliases?.toLowerCase().split(',').some(alias => alias.trim() === cleanName);
+      const dName = d.name.toLowerCase();
+      const nameMatch = dName === search; // Exact match as you requested
+      const aliasMatch = d.aliases?.toLowerCase().split(',').some(a => a.trim() === search);
 
-      return nameMatch || codeMatch || aliasMatch;
+      return nameMatch || aliasMatch;
     });
 
     return item ? `${item.quantity} items` : "0 items";
