@@ -19,3 +19,4 @@ pymongo
 twilio
 python-dotenv
 reportlab
+openpyxl
