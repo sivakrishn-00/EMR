@@ -45,28 +45,11 @@ const Pharmacy = () => {
   const fetchPharmacyInventory = async () => {
     setIsInventoryLoading(true);
     try {
-      // 🚀 PROJECT CONTEXT: Check if we are in a project or global
       const projectId = user?.project?.id || user?.project;
-      
       const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory${projectId ? `&project=${projectId}` : ''}`;
         
       const res = await api.get(endpoint);
-      const data = res.data.results || res.data;
-      
-      console.log(`[Pharmacy Debug] --- INVENTORY SYNC REPORT ---`);
-      console.log(`[Pharmacy Debug] Current User Project ID: ${projectId || 'GLOBAL (ALL PROJECTS)'}`);
-      console.log(`[Pharmacy Debug] Total Medicines Found: ${data.length}`);
-      
-      if (data.length > 0) {
-          console.log(`[Pharmacy Debug] MEDICINE LIST:`);
-          data.slice(0, 20).forEach((d, i) => {
-              console.log(`${i+1}. ${d.name} | SLUG: ${d.registry_type_slug || 'UNKNOWN'} | PROJECT: ${d.registry_type_project || 'GLOBAL'}`);
-          });
-      } else {
-          console.log(`[Pharmacy Debug] ⚠️ WARNING: No medicines found with tags [pharmacy, pharmacy_drugs, pharmacy_inventory]`);
-      }
-      
-      setPharmacyInventory(data);
+      setPharmacyInventory(res.data.results || res.data);
     } catch (err) {
       console.error("Stock sync offline:", err);
     } finally {
@@ -79,19 +62,12 @@ const Pharmacy = () => {
     
     const search = medName.trim().toLowerCase();
     
-    // DEBUG: Log the search and the first few items to see if they match
-    console.log(`[Pharmacy Debug] Searching for: "${search}" in Project: ${projectId}`);
-    
     const item = pharmacyInventory.find(d => {
       const regProj = d.registry_type_project;
       const isProjectMatch = !regProj || String(regProj) === String(projectId);
       
       const dName = d.name.trim().toLowerCase();
       const match = dName === search;
-      
-      if (match) {
-        console.log(`[Pharmacy Debug] MATCH FOUND: ${d.name} (Project: ${regProj})`);
-      }
       
       return isProjectMatch && match;
     });
