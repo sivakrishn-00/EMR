@@ -257,6 +257,32 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
                                 
                                 if drug_item:
                                     drug_name_in_report = drug_item.name
+                                else:
+                                    # Auto-create the medication in the master registry!
+                                    raw_price = item.get('price') or item.get('unit_price')
+                                    try:
+                                        init_price = float(raw_price) if raw_price else 0.0
+                                    except Exception:
+                                        init_price = 0.0
+                                    
+                                    search_term = med_name.strip()
+                                    drug_item, created = RegistryData.objects.get_or_create(
+                                        registry_type=pharmacy_registry,
+                                        ucode=search_term.upper(),
+                                        defaults={
+                                            'name': search_term,
+                                            'cost': init_price,
+                                            'quantity': 0,
+                                            'category': 'Historical Import',
+                                            'description': 'Auto-created during bulk historical import'
+                                        }
+                                    )
+                                    if not created:
+                                        if drug_item.cost == 0 and init_price > 0:
+                                            drug_item.cost = init_price
+                                            drug_item.save(update_fields=['cost'])
+                                    
+                                    drug_name_in_report = drug_item.name
                         except Exception as e:
                             print(f"Historical Price Lookup Error: {e}")
                         
