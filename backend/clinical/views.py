@@ -150,12 +150,14 @@ class VisitViewSet(viewsets.ModelViewSet):
                         dosage = med.get('dosage', 'As directed')
                         freq = med.get('frequency', '1-0-1')
                         duration = med.get('duration', '5 days')
+                        tot_units = int(med.get('total_units', 1))
                         
                         presc = Prescription.objects.create(
                             visit=visit,
                             medication_name=med_name,
                             frequency=freq,
                             duration=duration,
+                            total_units=tot_units,
                             ordered_by=request.user,
                             status='PENDING'
                         )

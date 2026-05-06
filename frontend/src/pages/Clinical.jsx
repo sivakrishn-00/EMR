@@ -168,13 +168,47 @@ const Clinical = () => {
     // Auto-add current drug if typed but not added
     let finalConsultData = { ...consultData };
     if (newMed.name && consultData.next_step === 'PENDING_PHARMACY') {
-        finalConsultData.medications = [...consultData.medications, newMed];
+        const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
+          ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
+          : (parseInt(newMed.total_units) || 1);
+        finalConsultData.medications = [...consultData.medications, { ...newMed, total_units: finalUnits }];
     }
 
     // Validation
     if (finalConsultData.next_step === 'PENDING_PHARMACY' && finalConsultData.medications.length === 0) {
         toast.error("Please add at least one medication for Pharmacy transfer.");
         return;
+    }
+
+    // Stock validation: ensure each prescribed medicine is in stock and has sufficient units if any are prescribed
+    if (finalConsultData.medications.length > 0) {
+        for (const med of finalConsultData.medications) {
+            const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === med.name.toLowerCase());
+            if (!drugObj) {
+                toast.error(`"${med.name}" is not registered in the project's pharmacy registry.`);
+                return;
+            }
+            
+            const available = drugObj.quantity || drugObj.balance_qty || 0;
+            if (available <= 0) {
+                toast.error(`"${med.name}" is completely out of stock!`);
+                return;
+            }
+
+            // Sum up total units requested for this specific drug in the prescription
+            const sameMeds = finalConsultData.medications.filter(m => m.name.toLowerCase() === med.name.toLowerCase());
+            const totalRequired = sameMeds.reduce((sum, m) => {
+                const units = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(m.item_group?.toUpperCase()) 
+                    ? getDoseCount(m.frequency, m.duration, m.item_group)
+                    : (parseInt(m.total_units) || 1);
+                return sum + units;
+            }, 0);
+
+            if (totalRequired > available) {
+                toast.error(`Insufficient stock! Total needed for "${med.name}" is ${totalRequired} units, but only ${available} units are available.`);
+                return;
+            }
+        }
     }
 
     const loadingToast = toast.loading('Finalizing consultation...');
@@ -281,6 +315,7 @@ const Clinical = () => {
                                     name: p.medication_name,
                                     frequency: p.frequency,
                                     duration: p.duration,
+                                    total_units: p.total_units || 1,
                                     timing: p.timing || 'After Food'
                                 })) || []
                               });
@@ -876,9 +911,35 @@ const Clinical = () => {
                           }
                           
                           // For Tablets, total_units is calculated. For others, it's explicitly provided.
-                          const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
-                            ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
-                            : (parseInt(newMed.total_units) || 1);
+                           const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
+                             ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
+                             : (parseInt(newMed.total_units) || 1);
+
+                           // Stock validation: Check if medication is in stock and we have enough available balance!
+                           const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === newMed.name.toLowerCase());
+                          if (drugObj) {
+                              const alreadyAdded = consultData.medications
+                                  .filter(m => m.name.toLowerCase() === newMed.name.toLowerCase())
+                                  .reduce((sum, m) => {
+                                      const units = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(m.item_group?.toUpperCase()) 
+                                          ? getDoseCount(m.frequency, m.duration, m.item_group)
+                                          : (parseInt(m.total_units) || 1);
+                                      return sum + units;
+                                  }, 0);
+                              const remaining = (drugObj.quantity || drugObj.balance_qty || 0) - alreadyAdded;
+                              
+                              if (remaining <= 0) {
+                                  toast.error(`"${newMed.name}" is completely out of stock!`);
+                                  return;
+                              }
+                              if (finalUnits > remaining) {
+                                  toast.error(`Insufficient stock! Only ${remaining} units of "${newMed.name}" are available, but you requested ${finalUnits} units.`);
+                                  return;
+                              }
+                          } else {
+                              toast.error(`"${newMed.name}" is not registered in the project's pharmacy registry.`);
+                              return;
+                          }
 
                           setConsultData({
                               ...consultData, 

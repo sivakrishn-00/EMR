@@ -13,6 +13,7 @@ class Prescription(models.Model):
     medication_name = models.CharField(max_length=200)
     frequency = models.CharField(max_length=100)
     duration = models.CharField(max_length=100)
+    total_units = models.IntegerField(default=1)
     ordered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medications_ordered')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     remarks = models.TextField(blank=True, null=True)

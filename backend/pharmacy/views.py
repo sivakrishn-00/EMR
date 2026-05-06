@@ -311,6 +311,7 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
                         medication_name=med_name,
                         frequency='N/A',
                         duration='N/A',
+                        total_units=qty,
                         status='DISPENSED',
                         remarks='Bulk Historical Import',
                         ordered_by=request.user
