@@ -22,8 +22,25 @@ class Prescription(models.Model):
     def __str__(self):
         return f"{self.medication_name} for {self.visit.patient}"
 
+class DrugBatch(models.Model):
+    registry_item = models.ForeignKey('patients.RegistryData', on_delete=models.CASCADE, related_name='batches')
+    batch_number = models.CharField(max_length=100)
+    mfg_date = models.DateField()
+    expiry_date = models.DateField()
+    initial_qty = models.IntegerField(default=0)
+    quantity = models.IntegerField(default=0)  # Current stock in this batch
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['expiry_date']
+
+    def __str__(self):
+        return f"Batch {self.batch_number} of {self.registry_item.name} (Exp: {self.expiry_date})"
+
 class DispensingRecord(models.Model):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name='dispensing_history')
+    batch = models.ForeignKey(DrugBatch, on_delete=models.SET_NULL, null=True, blank=True, related_name='dispensings')
     dispensed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medications_dispensed')
     quantity = models.IntegerField()
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)

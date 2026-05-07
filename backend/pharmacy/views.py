@@ -104,16 +104,81 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                         ).first()
 
                         if drug_item:
-                            # 4. Atomic Deduction
+                            # 4. FEFO Batch-Level Deduction & Split-Batch Transaction Generator
                             qty_to_deduct = serializer.instance.quantity
-                            drug_item.quantity = F('quantity') - qty_to_deduct
-                            drug_item.save(update_fields=['quantity'])
-
-                            # 5. Lock Project-Specific Price for the Audit Trail
-                            current_unit_cost = drug_item.cost or 0
-                            serializer.instance.unit_cost = current_unit_cost
-                            serializer.instance.total_cost = current_unit_cost * qty_to_deduct
-                            serializer.instance.save(update_fields=['unit_cost', 'total_cost'])
+                            chunks = []
+                            
+                            from .models import DrugBatch
+                            active_batches = DrugBatch.objects.filter(registry_item=drug_item, quantity__gt=0).order_by('expiry_date')
+                            
+                            if active_batches.exists():
+                                remaining = qty_to_deduct
+                                for b in active_batches:
+                                    batch_cost = b.unit_cost or drug_item.cost or 0
+                                    
+                                    if b.quantity >= remaining:
+                                        chunks.append({
+                                            'batch': b,
+                                            'qty': remaining,
+                                            'cost': float(batch_cost)
+                                        })
+                                        b.quantity -= remaining
+                                        b.save()
+                                        remaining = 0
+                                        break
+                                    else:
+                                        if b.quantity > 0:
+                                            chunks.append({
+                                                'batch': b,
+                                                'qty': b.quantity,
+                                                'cost': float(batch_cost)
+                                            })
+                                            remaining -= b.quantity
+                                            b.quantity = 0
+                                            b.save()
+                                
+                                # Fallback: if we need more than we have in active batches, charge the remaining at master price
+                                if remaining > 0:
+                                    chunks.append({
+                                        'batch': None,
+                                        'qty': remaining,
+                                        'cost': float(drug_item.cost or 0.0)
+                                    })
+                                
+                                # Process database records based on split chunks
+                                if chunks:
+                                    # Update the original record with the first chunk's details
+                                    first_chunk = chunks[0]
+                                    serializer.instance.batch = first_chunk['batch']
+                                    serializer.instance.quantity = first_chunk['qty']
+                                    serializer.instance.unit_cost = first_chunk['cost']
+                                    serializer.instance.total_cost = float(first_chunk['qty']) * float(first_chunk['cost'])
+                                    serializer.instance.save()
+                                    
+                                    # Create new individual records for the other chunks
+                                    for chunk in chunks[1:]:
+                                        DispensingRecord.objects.create(
+                                            prescription=prescription,
+                                            dispensed_by=request.user,
+                                            batch=chunk['batch'],
+                                            quantity=chunk['qty'],
+                                            unit_cost=chunk['cost'],
+                                            total_cost=float(chunk['qty']) * float(chunk['cost']),
+                                            dispensed_at=serializer.instance.dispensed_at
+                                        )
+                                
+                                # Synchronize parent quantity with sum of batches
+                                total_batch_stock = DrugBatch.objects.filter(registry_item=drug_item).aggregate(total=Sum('quantity'))['total'] or 0
+                                drug_item.quantity = total_batch_stock
+                                drug_item.save(update_fields=['quantity'])
+                            else:
+                                # Legacy/Fallback: direct deduction if no batches exist
+                                serializer.instance.unit_cost = float(drug_item.cost or 0.0)
+                                serializer.instance.total_cost = float(qty_to_deduct) * float(drug_item.cost or 0.0)
+                                serializer.instance.save()
+                                
+                                drug_item.quantity = F('quantity') - qty_to_deduct
+                                drug_item.save(update_fields=['quantity'])
                         else:
                             print(f"[PHARMACY LOG] Drug '{search_name}' not found in Registry for Project {p_project.name}")
                     else:
@@ -472,15 +537,12 @@ class ConsumptionReportView(views.APIView):
             dur = item['prescription__duration'] or "0"
             name = item['prescription__medication_name'] or ""
 
-            # Check if it's a unit-based medication group
-            unit_groups = ['SYRUP', 'OINTMENT', 'CREAM', 'GEL', 'INJECTION', 'DROP', 'LOTION']
-            is_unit_based = any(g in name.upper() for g in unit_groups)
+            # Only multiply duration (days) for tablets/capsules/pills. Other forms (drops, ointment, syrup) default to 1 unit.
+            unit_groups = ['SYRUP', 'OINTMENT', 'CREAM', 'GEL', 'INJECTION', 'DROP', 'LOTION', 'SOLUTION', 'SUSPENSION', 'SPRAY', 'INHALER']
+            is_unit_based = any(g in name.upper() for g in unit_groups) or not any(t in name.upper() for t in ['TAB', 'CAP', 'PILL'])
 
             if is_unit_based:
-                try:
-                    return int(''.join(filter(str.isdigit, str(dur))) or 1)
-                except Exception:
-                    return 1
+                return 1
 
             per_day = 0
             if '-' in freq:

@@ -31,10 +31,41 @@ class RegistryFieldSerializer(serializers.ModelSerializer):
 class RegistryDataSerializer(serializers.ModelSerializer):
     family_members = serializers.SerializerMethodField()
     registry_type_project = serializers.IntegerField(source='registry_type.project.id', read_only=True)
+    registry_type_project_name = serializers.CharField(source='registry_type.project.name', read_only=True)
+    batch_info = serializers.SerializerMethodField()
     
     class Meta:
         model = RegistryData
         fields = '__all__'
+
+    def get_batch_info(self, obj):
+        try:
+            rt = obj.registry_type
+            is_pharmacy = (
+                rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
+                'pharmacy' in rt.slug.lower() or
+                'pharmacy' in rt.name.lower() or
+                'drug' in rt.slug.lower() or
+                'drug' in rt.name.lower()
+            )
+            if is_pharmacy:
+                batches = obj.batches.all()
+                if batches.exists():
+                    costs = [float(b.unit_cost) for b in batches]
+                    min_cost = min(costs)
+                    max_cost = max(costs)
+                    total_qty = sum(b.quantity for b in batches)
+                    return {
+                        'has_batches': True,
+                        'min_cost': min_cost,
+                        'max_cost': max_cost,
+                        'total_qty': total_qty,
+                        'batch_count': batches.count(),
+                        'costs_match': min_cost == max_cost
+                    }
+        except Exception:
+            pass
+        return {'has_batches': False}
 
     def get_family_members(self, obj):
         # Dynamically resolve family members based on type category instead of hardcoded slugs

@@ -973,21 +973,23 @@ const Clinical = () => {
                                                 {(() => {
                                                     const drug = pharmacyInventory.find(d => d.name.toLowerCase() === m.name.toLowerCase());
                                                     if (drug) {
-                                                        const isLow = drug.quantity < m.total_units;
+                                                        const initialQty = parseInt(drug.additional_fields?.initial_quantity) || 100;
+                                                        const threshold = Math.max(5, Math.round(initialQty * 0.2));
+                                                        const isLow = drug.quantity <= threshold;
                                                         return (
                                                             <span style={{ 
-                                                                background: isLow ? '#fef2f2' : '#f0fdf4', 
-                                                                color: isLow ? '#ef4444' : '#10b981', 
+                                                                background: isLow ? '#fffbeb' : '#f0fdf4', 
+                                                                color: isLow ? '#b45309' : '#10b981', 
                                                                 padding: '3px 12px', 
                                                                 borderRadius: '8px', 
                                                                 fontSize: '0.75rem', 
                                                                 fontWeight: 900, 
-                                                                border: `1px solid ${isLow ? '#fee2e2' : '#dcfce7'}`,
+                                                                border: `1px solid ${isLow ? '#fde68a' : '#dcfce7'}`,
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 gap: '4px'
                                                             }}>
-                                                                {isLow ? 'Low Stock' : 'In Stock'}: {drug.quantity} items
+                                                                {isLow ? `Low Stock (Under 20%): ${drug.quantity} remaining` : `In Stock: ${drug.quantity} items`}
                                                             </span>
                                                         );
                                                     }

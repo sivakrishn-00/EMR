@@ -136,6 +136,11 @@ const AdminMasters = () => {
   });
   
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [depletionItems, setDepletionItems] = useState([]);
+  const [isDepletionLoading, setIsDepletionLoading] = useState(false);
+  const [statsViewTab, setStatsViewTab] = useState("TRENDS");
+  const [batchSearchQuery, setBatchSearchQuery] = useState("");
+  const [depletionSearchQuery, setDepletionSearchQuery] = useState("");
   
   // Laboratory Diagnostic Masters State
   const [labTests, setLabTests] = useState([]);
@@ -311,11 +316,29 @@ const AdminMasters = () => {
 
   const fetchDashboardStats = async () => {
     if (!selectedProject) return;
+    setIsDepletionLoading(true);
     try {
-      const res = await api.get(`patients/registry-report/?project=${selectedProject}`);
+      const res = await api.get(`patients/reports/?project=${selectedProject}`);
       setDashboardStats(res.data);
+
+      const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory&project=${selectedProject}`;
+      const invRes = await api.get(endpoint);
+      const invData = invRes.data.results || invRes.data || [];
+      
+      const sorted = [...invData].sort((a, b) => {
+        const initialQtyA = parseInt(a.additional_fields?.initial_quantity) || 100;
+        const pctA = Math.round((a.quantity / initialQtyA) * 100) || 0;
+        
+        const initialQtyB = parseInt(b.additional_fields?.initial_quantity) || 100;
+        const pctB = Math.round((b.quantity / initialQtyB) * 100) || 0;
+        
+        return pctA - pctB;
+      });
+      setDepletionItems(sorted);
     } catch (err) {
-      console.error("Failed to fetch dashboard stats", err);
+      console.error("Failed to fetch dashboard stats or depletion items", err);
+    } finally {
+      setIsDepletionLoading(false);
     }
   };
 
@@ -1561,6 +1584,27 @@ const AdminMasters = () => {
                 <Radio size={16} /> Sync Bridge
               </button>
 
+              <button
+                className="btn"
+                style={{
+                  background: activeBoard === "STATS" ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" : "transparent",
+                  color: activeBoard === "STATS" ? "white" : "var(--text-muted)",
+                  boxShadow: activeBoard === "STATS" ? "0 4px 12px rgba(245, 158, 11, 0.2)" : "none",
+                  fontSize: "0.75rem",
+                  padding: "0 1.25rem",
+                  height: "40px",
+                  borderRadius: "14px",
+                  transition: "all 0.2s",
+                  fontWeight: activeBoard === "STATS" ? 800 : 500
+                }}
+                onClick={() => {
+                  setActiveBoard("STATS");
+                  fetchDashboardStats();
+                }}
+              >
+                <Activity size={16} /> Analytics & Stock Monitor
+              </button>
+
               {activeBoard === "PROTOCOLS" && (
                 <>
                   <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
@@ -1601,108 +1645,739 @@ const AdminMasters = () => {
               <div className="fade-in">
                 {dashboardStats ? (
                   <>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr 1fr",
-                        gap: "1.25rem",
-                        marginBottom: "1.5rem",
-                      }}
-                    >
-                      <div
-                        className="card"
-                        style={{
-                          padding: "1.5rem",
-                          borderRadius: "24px",
-                          background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-                          color: "white",
-                        }}
-                      >
-                        <p style={{ fontSize: "0.75rem", fontWeight: 800, opacity: 0.8 }}>TOTAL INVENTORY VALUE</p>
-                        <h2 style={{ fontSize: "2rem", fontWeight: 900, marginTop: "0.5rem" }}>
-                          ₹{dashboardStats.inventory_value.toLocaleString()}
-                        </h2>
-                        <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
-                           <span style={{ fontSize: "0.75rem", background: "rgba(255,255,255,0.2)", padding: "4px 8px", borderRadius: "6px" }}>
-                              {dashboardStats.total_registered} Patients
-                           </span>
-                        </div>
-                      </div>
-                      
-                      <div
-                        className="card"
-                        style={{
-                          padding: "1.5rem",
-                          borderRadius: "24px",
-                          background: "var(--surface)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >
-                        <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>STOCK HEALTH</p>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", height: "100%", paddingBottom: "1.5rem" }}>
-                           <div>
-                              <h4 style={{ fontSize: "1.5rem", fontWeight: 900, color: "#f59e0b" }}>{dashboardStats.stock_health.low}</h4>
-                              <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>LOW STOCK ITEMS</p>
-                           </div>
-                           <div style={{ borderLeft: "1px solid var(--border)", height: "40px" }} />
-                           <div>
-                              <h4 style={{ fontSize: "1.5rem", fontWeight: 900, color: "#ef4444" }}>{dashboardStats.stock_health.out}</h4>
-                              <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>OUT OF STOCK</p>
-                           </div>
-                        </div>
-                      </div>
+                    {(() => {
+                      const currentProtocols = getCurrentProtocols(selectedProject) || [];
+                      const hasPharmacy = currentProtocols.some(p => 
+                        p.id?.toLowerCase().includes("pharmacy") || 
+                        p.id?.toLowerCase().includes("drug") || 
+                        p.category === "PHARMACY" || 
+                        p.category === "CLINICAL_DRUGS"
+                      );
 
-                      <div
-                        className="card"
-                        style={{
-                          padding: "1.5rem",
-                          borderRadius: "24px",
-                          background: "var(--surface)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >
-                        <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>CLINICAL CONVERSION</p>
-                        <h2 style={{ fontSize: "2rem", fontWeight: 900, color: "#10b981", marginTop: "0.5rem" }}>
-                          {dashboardStats.conversion_rate}%
-                        </h2>
-                        <p style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)", marginTop: "4px" }}>
-                           Visits successfully completed today
-                        </p>
-                      </div>
-                    </div>
+                      return (
+                        <>
+                          {/* KPI Metric Cards */}
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: hasPharmacy ? "1fr 1fr 1fr" : "1fr 1fr",
+                              gap: "1rem",
+                              marginBottom: "1.25rem",
+                            }}
+                          >
+                            {hasPharmacy ? (
+                              <div
+                                className="card"
+                                style={{
+                                  padding: "1.15rem 1.25rem",
+                                  borderRadius: "16px",
+                                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                                  color: "white",
+                                  boxShadow: "0 8px 20px rgba(79, 70, 229, 0.15)",
+                                  border: "none",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  justifyContent: "space-between"
+                                }}
+                              >
+                                <p style={{ fontSize: "0.6875rem", fontWeight: 800, opacity: 0.9, letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL INVENTORY VALUE</p>
+                                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, marginTop: "0.5rem" }}>
+                                  ₹{dashboardStats.inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </h2>
+                                <div style={{ display: "flex", gap: "10px", marginTop: "0.75rem" }}>
+                                   <span style={{ fontSize: "0.6875rem", background: "rgba(255,255,255,0.18)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                                      {dashboardStats.total_registered} Patients Served
+                                   </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className="card"
+                                style={{
+                                  padding: "1.15rem 1.25rem",
+                                  borderRadius: "16px",
+                                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                                  color: "white",
+                                  boxShadow: "0 8px 20px rgba(79, 70, 229, 0.15)",
+                                  border: "none",
+                                }}
+                              >
+                                <p style={{ fontSize: "0.6875rem", fontWeight: 800, opacity: 0.9, letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL REGISTERED PATIENTS</p>
+                                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, marginTop: "0.5rem" }}>
+                                  {dashboardStats.total_registered} Patients
+                                </h2>
+                                <div style={{ display: "flex", gap: "10px", marginTop: "0.75rem" }}>
+                                   <span style={{ fontSize: "0.6875rem", background: "rgba(255,255,255,0.18)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                                      Primary Patients & Dependents
+                                   </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {hasPharmacy && (
+                              <div
+                                className="card"
+                                style={{
+                                  padding: "1.15rem 1.25rem",
+                                  borderRadius: "16px",
+                                  background: "linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%)",
+                                  border: "1px solid #fca5a5",
+                                  boxShadow: "0 8px 20px rgba(239, 68, 68, 0.04)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  justifyContent: "space-between"
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                   <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#991b1b", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
+                                   <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", animation: "pulse 1.5s infinite" }} />
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
+                                   <div>
+                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#c2410c", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
+                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#9a3412", marginTop: "2px" }}>LOW STOCK ITEMS</p>
+                                   </div>
+                                   <div style={{ borderLeft: "1px solid #fca5a5", height: "35px", opacity: 0.6 }} />
+                                   <div>
+                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#b91c1c", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
+                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#991b1b", marginTop: "2px" }}>OUT OF STOCK</p>
+                                   </div>
+                                </div>
+                              </div>
+                            )}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1.25rem" }}>
-                       <div className="card" style={{ padding: "1.5rem", borderRadius: "24px" }}>
-                          <h4 style={{ fontSize: "0.875rem", fontWeight: 900, marginBottom: "1.5rem" }}>MEDICATION CONSUMPTION TRENDS</h4>
-                          <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", height: "200px", padding: "1rem 0" }}>
-                             {dashboardStats.trends.map((t, i) => (
-                                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                                   <div style={{ 
-                                      width: "100%", 
-                                      background: "#eff6ff", 
-                                      borderRadius: "8px", 
-                                      height: `${Math.min(100, (t.units / (Math.max(...dashboardStats.trends.map(x=>x.units), 1))) * 100)}%`,
-                                      border: "1px solid #dbeafe",
-                                      minHeight: "4px"
-                                   }} />
-                                   <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "#94a3b8" }}>{t.date.split('-').slice(1).join('/')}</span>
-                                </div>
-                             ))}
+                            <div
+                              className="card"
+                              style={{
+                                padding: "1.15rem 1.25rem",
+                                borderRadius: "16px",
+                                background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                                border: "1px solid #86efac",
+                                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.04)",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between"
+                              }}
+                            >
+                              <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#166534", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
+                              <h2 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#15803d", marginTop: "0.5rem" }}>
+                                {dashboardStats.conversion_rate}%
+                              </h2>
+<p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#166534", marginTop: "4px" }}>
+                                 Visits successfully completed today
+                              </p>
+                            </div>
                           </div>
-                       </div>
-                       
-                       <div className="card" style={{ padding: "1.5rem", borderRadius: "24px" }}>
-                          <h4 style={{ fontSize: "0.875rem", fontWeight: 900, marginBottom: "1.5rem" }}>TOP DISPENSED</h4>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                             {dashboardStats.top_medications.slice(0, 5).map((m, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "0.75rem", borderRadius: "12px" }}>
-                                   <span style={{ fontSize: "0.75rem", fontWeight: 800 }}>{m.name}</span>
-                                   <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "var(--primary)" }}>{m.total} Units</span>
-                                </div>
-                             ))}
-                          </div>
-                       </div>
-                    </div>
+
+                          {/* Split Dashboard Row */}
+                          {hasPharmacy ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                               
+                               {/* Top Row: Trends and Top Dispensed side-by-side (equal height stretch) */}
+                               <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "stretch" }}>
+                                  
+                                   {/* Section A: Weekly Consumption Trends (Left Side) */}
+                                   <div className="card" style={{ flex: "1 1 450px", minWidth: "280px", padding: "1.15rem 1.25rem", borderRadius: "16px", background: "white", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                      <div>
+                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                                            <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
+                                               📊 WEEKLY MEDICATION TRENDS
+                                            </h4>
+                                            <span style={{ fontSize: "0.5625rem", color: "var(--text-muted)", fontWeight: 800, background: "var(--background)", padding: "3px 8px", borderRadius: "6px" }}>Live Consumption Chart</span>
+                                         </div>
+
+                                         {/* Dynamic Insight Banner */}
+                                         {(() => {
+                                            const peak = [...dashboardStats.trends].sort((a,b) => b.units - a.units)[0];
+                                            if (peak && peak.units > 0) {
+                                               let peakDay = "";
+                                               try {
+                                                  const d = new Date(peak.date);
+                                                  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                                  peakDay = days[d.getDay()];
+                                               } catch(e) {}
+                                               return (
+                                                  <div style={{ 
+                                                     display: "flex", 
+                                                     alignItems: "center", 
+                                                     gap: "6px", 
+                                                     background: "linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)", 
+                                                     padding: "0.45rem 0.75rem", 
+                                                     borderRadius: "10px", 
+                                                     fontSize: "0.6875rem", 
+                                                     fontWeight: 800, 
+                                                     color: "#4f46e5",
+                                                     border: "1px solid #e0e7ff",
+                                                     marginBottom: "1rem"
+                                                  }}>
+                                                     <span style={{ fontSize: "0.85rem" }}>⚡</span>
+                                                     <span>Peak dispensing reached <b>{peak.units} units</b> on <b>{peakDay} ({peak.date.split('-').slice(1).join('/')})</b></span>
+                                                  </div>
+                                               );
+                                            }
+                                            return null;
+                                         })()}
+
+                                         {/* Chart Columns Container */}
+                                         <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", height: "165px", padding: "0.5rem 0" }}>
+                                            {dashboardStats.trends.map((t, i) => {
+                                               const maxVal = Math.max(...dashboardStats.trends.map(x => x.units), 1);
+                                               const percentHeight = Math.min(100, (t.units / maxVal) * 100);
+                                               
+                                               let dayName = "";
+                                               try {
+                                                  const d = new Date(t.date);
+                                                  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                                                  dayName = days[d.getDay()];
+                                               } catch (e) {
+                                                  dayName = "";
+                                               }
+
+                                               return (
+                                                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", height: "100%" }}>
+                                                     
+                                                     {/* Outer Track Column */}
+                                                     <div style={{ 
+                                                        width: "100%", 
+                                                        background: "#f8fafc", 
+                                                        border: "1px solid #e2e8f0",
+                                                        borderRadius: "12px", 
+                                                        height: "125px",
+                                                        position: "relative",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        justifyContent: "flex-end",
+                                                        overflow: "hidden",
+                                                        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
+                                                     }} title={`${t.units} units dispensed`}>
+                                                        
+                                                        {/* Raised Value Indicator inside or floating on top */}
+                                                        <span style={{ 
+                                                           position: "absolute", 
+                                                           top: "6px", 
+                                                           left: "50%", 
+                                                           transform: "translateX(-50%)", 
+                                                           fontSize: "0.5625rem", 
+                                                           fontWeight: 900, 
+                                                           color: t.units > 0 ? "#4f46e5" : "#94a3b8",
+                                                           background: t.units > 0 ? "#eef2ff" : "transparent",
+                                                           padding: t.units > 0 ? "1px 4px" : "0",
+                                                           borderRadius: "4px",
+                                                           zIndex: 2
+                                                        }}>
+                                                           {t.units}
+                                                        </span>
+
+                                                        {/* Dynamic Bar with Ambient Glow */}
+                                                        <div style={{ 
+                                                           width: "100%", 
+                                                           background: "linear-gradient(180deg, #6366f1 0%, #4338ca 100%)", 
+                                                           borderRadius: "8px 8px 0 0", 
+                                                           height: `${percentHeight}%`,
+                                                           boxShadow: t.units > 0 ? "0 -2px 10px rgba(99, 102, 241, 0.35)" : "none",
+                                                           transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                                                           minHeight: t.units > 0 ? "8px" : "0"
+                                                        }} />
+                                                     </div>
+
+                                                     {/* Multi-tier Date Label */}
+                                                     <div style={{ textAlign: "center", lineHeight: "1.2" }}>
+                                                        <span style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
+                                                        <span style={{ fontSize: "0.5rem", fontWeight: 800, color: "#94a3b8" }}>{t.date.split('-').slice(1).join('/')}</span>
+                                                     </div>
+
+                                                  </div>
+                                               );
+                                            })}
+                                         </div>
+                                      </div>
+                                   </div>
+
+                                  {/* Right Column Widget 1: TOP DISPENSED (Right Side) */}
+                                  <div className="card" style={{ 
+                                     flex: "1 1 360px",
+                                     minWidth: "280px",
+                                     padding: "1.15rem 1.25rem", 
+                                     borderRadius: "16px", 
+                                     background: "linear-gradient(135deg, #fefeff 0%, #f4f6fe 100%)", 
+                                     borderLeft: "5px solid #6366f1",
+                                     borderTop: "1px solid var(--border)",
+                                     borderBottom: "1px solid var(--border)",
+                                     borderRight: "1px solid var(--border)",
+                                     boxShadow: "0 6px 20px rgba(99, 102, 241, 0.03)",
+                                     display: "flex",
+                                     flexDirection: "column",
+                                     justifyContent: "space-between"
+                                  }}>
+                                     <div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                           <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", letterSpacing: "0.02em" }}>🔥 TOP DISPENSED</h4>
+                                           <span style={{ fontSize: "0.5625rem", color: "#6366f1", fontWeight: 900, background: "#eef2ff", padding: "2px 6px", borderRadius: "6px" }}>Volume Rank</span>
+                                        </div>
+
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                           {dashboardStats.top_medications.slice(0, 5).map((m, i) => {
+                                              const maxDispensed = Math.max(...dashboardStats.top_medications.map(x => x.total), 1);
+                                              const percentage = (m.total / maxDispensed) * 100;
+                                              
+                                              // Dynamic Medal Styling based on rank
+                                              const medalBg = i === 0 ? "#fef3c7" : i === 1 ? "#f1f5f9" : i === 2 ? "#ffedd5" : "#f1f5f9";
+                                              const medalColor = i === 0 ? "#d97706" : i === 1 ? "#475569" : i === 2 ? "#c2410c" : "#64748b";
+                                              const medalText = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i+1}`;
+
+                                              return (
+                                                 <div key={i} style={{ 
+                                                    display: "flex", 
+                                                    flexDirection: "column", 
+                                                    gap: "6px", 
+                                                    background: "white", 
+                                                    padding: "0.65rem 0.85rem", 
+                                                    borderRadius: "12px", 
+                                                    boxShadow: "0 2px 6px rgba(99,102,241,0.01)",
+                                                    border: "1px solid #eef2ff"
+                                                 }}>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                          <span style={{ 
+                                                             fontSize: "0.65rem", 
+                                                             fontWeight: 900, 
+                                                             background: medalBg, 
+                                                             color: medalColor, 
+                                                             width: "18px", 
+                                                             height: "18px", 
+                                                             borderRadius: "50%", 
+                                                             display: "flex", 
+                                                             alignItems: "center", 
+                                                             justifyContent: "center" 
+                                                          }}>
+                                                             {medalText}
+                                                          </span>
+                                                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)" }}>{m.name}</span>
+                                                       </div>
+                                                       <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "#4f46e5" }}>{m.total} Units</span>
+                                                    </div>
+                                                    
+                                                    {/* Proportional Progress Bar */}
+                                                    <div style={{ width: "100%", height: "4px", background: "#f1f5f9", borderRadius: "2px", overflow: "hidden" }}>
+                                                       <div style={{ 
+                                                          width: `${percentage}%`, 
+                                                          height: "100%", 
+                                                          background: "linear-gradient(90deg, #818cf8 0%, #6366f1 100%)",
+                                                          borderRadius: "2px",
+                                                          transition: "width 0.4s ease-out"
+                                                       }} />
+                                                    </div>
+                                                 </div>
+                                              );
+                                           })}
+                                        </div>
+                                     </div>
+                                  </div>
+                               </div>
+
+                               {/* Bottom Row: Full-width Batch Stock Monitor */}
+                               <div className="card" style={{ padding: "1.15rem 1.25rem", borderRadius: "16px", background: "white", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)" }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+                                     <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                        <span>📦 BATCH STOCKS MONITOR</span>
+                                        <span style={{ 
+                                           fontSize: "0.625rem", 
+                                           background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)", 
+                                           color: "#4f46e5", 
+                                           padding: "2px 8px", 
+                                           borderRadius: "20px", 
+                                           fontWeight: 900,
+                                           border: "1px solid #c7d2fe",
+                                           boxShadow: "0 1px 3px rgba(79, 70, 229, 0.05)"
+                                        }}>
+                                           {(() => {
+                                              const filteredCount = (dashboardStats.batches || []).filter(b => {
+                                                 const q = batchSearchQuery.toLowerCase();
+                                                 return b.medication_name.toLowerCase().includes(q) || b.batch_number.toLowerCase().includes(q);
+                                              }).length;
+                                              const totalCount = (dashboardStats.batches || []).length;
+                                              return batchSearchQuery ? `${filteredCount} of ${totalCount} Batches` : `${totalCount} Total Batches`;
+                                           })()}
+                                        </span>
+                                     </h4>
+                                     
+                                     {/* Premium Search Input (No Childish Emoji) */}
+                                     <div style={{ position: "relative", minWidth: "180px" }}>
+                                        <input
+                                           type="text"
+                                           placeholder="Filter batch database..."
+                                           value={batchSearchQuery}
+                                           onChange={(e) => setBatchSearchQuery(e.target.value)}
+                                           style={{
+                                              width: "100%",
+                                              padding: "0.4rem 0.75rem 0.4rem 1.85rem",
+                                              fontSize: "0.7rem",
+                                              fontWeight: 800,
+                                              borderRadius: "8px",
+                                              border: "1px solid #cbd5e1",
+                                              background: "#f8fafc",
+                                              outline: "none",
+                                              transition: "all 0.2s",
+                                              color: "var(--text-main)"
+                                           }}
+                                        />
+                                        <svg style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", width: "12px", height: "12px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24">
+                                           <circle cx="11" cy="11" r="8" />
+                                           <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                        </svg>
+                                     </div>
+                                  </div>
+
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
+                                     {dashboardStats.batches && dashboardStats.batches.length > 0 ? (
+                                        (() => {
+                                           // Group and find currently consuming batch (earliest non-expired, non-depleted)
+                                           const activeBatchForMed = {};
+                                           const activeBatchesSorted = [...dashboardStats.batches]
+                                              .filter(b => b.quantity > 0 && b.status !== 'EXPIRED')
+                                              .sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+                                           
+                                           activeBatchesSorted.forEach(b => {
+                                              if (!activeBatchForMed[b.medication_name]) {
+                                                 activeBatchForMed[b.medication_name] = b.batch_number;
+                                              }
+                                           });
+
+                                           const filtered = dashboardStats.batches.filter(b => {
+                                              const q = batchSearchQuery.toLowerCase();
+                                              return b.medication_name.toLowerCase().includes(q) || b.batch_number.toLowerCase().includes(q);
+                                           });
+
+                                           const sortedBatches = [...filtered].sort((a, b) => {
+                                              const aIsConsuming = a.quantity > 0 && a.status !== 'EXPIRED' && activeBatchForMed[a.medication_name] === a.batch_number;
+                                              const bIsConsuming = b.quantity > 0 && b.status !== 'EXPIRED' && activeBatchForMed[b.medication_name] === b.batch_number;
+                                              
+                                              if (aIsConsuming && !bIsConsuming) return -1;
+                                              if (!aIsConsuming && bIsConsuming) return 1;
+                                              
+                                              if (a.status === 'EXPIRED') return -1;
+                                              if (b.status === 'EXPIRED') return 1;
+                                              if (a.status === 'EXPIRING_SOON') return -1;
+                                              if (b.status === 'EXPIRING_SOON') return 1;
+                                              return a.quantity - b.quantity;
+                                           });
+
+                                           if (sortedBatches.length === 0) {
+                                              return (
+                                                 <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: 800 }}>
+                                                    No batches match your filter criteria.
+                                                 </div>
+                                              );
+                                           }
+
+                                           return sortedBatches.map((b) => {
+                                              const isExpired = b.status === 'EXPIRED' || b.days_to_expiry <= 0;
+                                              const isDepleted = b.quantity <= 0;
+                                              const isConsuming = !isExpired && !isDepleted && activeBatchForMed[b.medication_name] === b.batch_number;
+                                              
+                                              let roleLabel = "📦 BACKUP STOCK";
+                                              let roleColor = "#4f46e5";
+                                              let roleBg = "#e0e7ff";
+                                              let roleBorder = "1px solid #c7d2fe";
+                                              
+                                              if (isDepleted) {
+                                                 roleLabel = "🚫 DEPLETED";
+                                                 roleColor = "#64748b";
+                                                 roleBg = "#f1f5f9";
+                                                 roleBorder = "1px solid #e2e8f0";
+                                              } else if (isExpired) {
+                                                 roleLabel = "🚫 EXPIRED";
+                                                 roleColor = "#ef4444";
+                                                 roleBg = "#fef2f2";
+                                                 roleBorder = "1px solid #fee2e2";
+                                              } else if (isConsuming) {
+                                                 roleLabel = "🔥 ACTIVE CONSUMING";
+                                                 roleColor = "#ea580c";
+                                                 roleBg = "#fff7ed";
+                                                 roleBorder = "1px dashed #fdba74";
+                                              }
+
+                                              const statusColor = b.status === 'EXPIRED' ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#d97706' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#2563eb' : '#059669';
+                                              const statusBg = b.status === 'EXPIRED' ? '#fef2f2' : b.status === 'EXPIRING_SOON' ? '#fffbeb' : b.status === 'LOW_STOCK' ? '#fff7ed' : b.status === 'HIGH_STOCK' ? '#eff6ff' : '#f0fdf4';
+                                              const statusLabel = b.status === 'EXPIRED' ? 'EXPIRED' : b.status === 'EXPIRING_SOON' ? 'EXPIRING' : b.status === 'LOW_STOCK' ? 'LOW' : b.status === 'HIGH_STOCK' ? 'HIGH' : 'SAFE';
+
+                                              return (
+                                                 <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", padding: "0.6rem 0.85rem", borderRadius: "12px", border: isConsuming ? "2px solid #fdba74" : "1px solid #e2e8f0", boxShadow: isConsuming ? "0 3px 8px rgba(234, 88, 12, 0.05)" : "0 1px 4px rgba(0,0,0,0.01)", transition: "all 0.2s" }} className="hover-lift">
+                                                    <div>
+                                                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)" }}>{b.medication_name}</span>
+                                                          <span style={{ fontSize: "0.5625rem", background: "#f1f5f9", color: "#475569", padding: "1px 5px", borderRadius: "4px", fontWeight: 800 }}>B {b.batch_number}</span>
+                                                          <span style={{ fontSize: "0.5625rem", background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", padding: "1px 6px", borderRadius: "4px", fontWeight: 900 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
+                                                          
+                                                          <span style={{ 
+                                                             fontSize: "0.53rem", 
+                                                             background: roleBg, 
+                                                             color: roleColor, 
+                                                             padding: "1px 5px", 
+                                                             borderRadius: "4px", 
+                                                             fontWeight: 900,
+                                                             border: roleBorder,
+                                                             display: "flex",
+                                                             alignItems: "center",
+                                                             gap: "2px"
+                                                          }}>
+                                                             {isConsuming && <span style={{ display: "inline-block", width: "4px", height: "4px", background: "#ea580c", borderRadius: "50%", animation: "pulse 1.5s infinite" }} />}
+                                                             {roleLabel}
+                                                          </span>
+                                                       </div>
+                                                       <div style={{ fontSize: "0.625rem", color: "var(--text-muted)", marginTop: "3px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                                                          <span>Mfg: <b>{b.mfg_date}</b></span>
+                                                          <span style={{ color: "#cbd5e1" }}>|</span>
+                                                          <span>Exp: <b style={{ color: "#334155" }}>{b.expiry_date}</b></span>
+                                                          <span style={{ color: "#cbd5e1" }}>|</span>
+                                                          {isExpired ? (
+                                                             <span style={{ color: "#ef4444", fontWeight: 900 }}>EXPIRED</span>
+                                                          ) : b.days_to_expiry <= 90 ? (
+                                                             <span style={{ color: "#b45309", fontWeight: 800 }}>Expiring {b.days_to_expiry}d</span>
+                                                          ) : (
+                                                             <span>({b.days_to_expiry}d)</span>
+                                                          )}
+                                                       </div>
+                                                    </div>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                       <div style={{ textAlign: "right" }}>
+                                                          <span style={{ fontSize: "0.6875rem", fontWeight: 900, color: "#1e293b", display: "block" }}>{b.quantity} / {b.initial_qty}</span>
+                                                          <span style={{ fontSize: "0.5rem", color: "var(--text-muted)", display: "block" }}>{Math.round((b.quantity / (b.initial_qty || 1)) * 100)}% left</span>
+                                                       </div>
+                                                       <span style={{ 
+                                                          fontSize: "0.5625rem", 
+                                                          background: statusBg, 
+                                                          color: statusColor, 
+                                                          padding: "2px 6px", 
+                                                          borderRadius: "6px", 
+                                                          fontWeight: 900,
+                                                          border: `1px solid ${statusColor}10`,
+                                                          minWidth: "40px",
+                                                          textAlign: "center"
+                                                       }}>
+                                                          {statusLabel}
+                                                       </span>
+                                                    </div>
+                                                 </div>
+                                              );
+                                           });
+                                        })()
+                                     ) : (
+                                        <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.75rem" }}>
+                                           No active batch listings registered for this pharmacy workspace.
+                                        </div>
+                                     )}
+                                  </div>
+                               </div>
+                            </div>
+                          ) : (
+                            <div 
+                              className="card" 
+                              style={{ 
+                                padding: "3.5rem 2rem", 
+                                borderRadius: "16px", 
+                                textAlign: "center", 
+                                background: "var(--surface)", 
+                                border: "1px solid var(--border)" 
+                              }}
+                            >
+                              <div style={{ 
+                                width: "56px", 
+                                height: "56px", 
+                                borderRadius: "50%", 
+                                background: "#fffbeb", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                justifyContent: "center", 
+                                margin: "0 auto 1.25rem" 
+                              }}>
+                                 <Info size={28} color="#d97706" />
+                              </div>
+                              <h4 style={{ fontSize: "1rem", fontWeight: 900, color: "var(--text-main)", marginBottom: "0.5rem" }}>
+                                No Active Pharmacy Registry
+                              </h4>
+                              <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", maxWidth: "480px", margin: "0 auto", lineHeight: "1.6" }}>
+                                Pharmacy inventory metrics and real-time drug depletion warnings are hidden because there are no active Pharmacy or Drug registries configured in this workspace.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Unified Drug Depletion Monitor (Admin Master Only) */}
+                          {hasPharmacy && (
+                            <div className="card fade-in" style={{ padding: '1.15rem 1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', marginTop: '1.25rem' }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.15rem", flexWrap: "wrap", gap: "1rem" }}>
+                                 <div>
+                                   <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                                     <Pill size={16} color="#ef4444" /> Unified Drug Depletion Monitor
+                                   </h4>
+                                   <p style={{ color: "var(--text-muted)", fontSize: "0.6875rem", fontWeight: 500, marginTop: "2px" }}>Real-time health overview of critically low medication inventory</p>
+                                 </div>
+
+                                 {/* Premium Table Search Bar */}
+                                 <div style={{ position: "relative", minWidth: "260px" }}>
+                                    <input
+                                       type="text"
+                                       placeholder="Search table medications..."
+                                       value={depletionSearchQuery}
+                                       onChange={(e) => setDepletionSearchQuery(e.target.value)}
+                                       style={{
+                                          width: "100%",
+                                          padding: "0.45rem 1rem 0.45rem 2rem",
+                                          fontSize: "0.725rem",
+                                          fontWeight: 800,
+                                          borderRadius: "8px",
+                                          border: "1px solid #cbd5e1",
+                                          background: "#f8fafc",
+                                          outline: "none",
+                                          transition: "all 0.2s",
+                                          color: "var(--text-main)"
+                                       }}
+                                    />
+                                    <svg style={{ position: "absolute", left: "0.7rem", top: "50%", transform: "translateY(-50%)", width: "12px", height: "12px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                 </div>
+                              </div>
+                              
+                              <div className="table-responsive" style={{ borderRadius: "12px", border: "1px solid var(--border)", overflow: "hidden", maxHeight: "480px", overflowY: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                  <thead>
+                                    <tr style={{ background: "var(--background)", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, zIndex: 10 }}>
+                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Medication Name</th>
+                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Facility Project</th>
+                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Quantity Left</th>
+                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Depletion Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {isDepletionLoading ? (
+                                      <tr>
+                                        <td colSpan="4" style={{ textAlign: "center", padding: "3rem", color: "var(--text-muted)" }}>
+                                          Analyzing inventory levels...
+                                        </td>
+                                      </tr>
+                                    ) : depletionItems.length === 0 ? (
+                                      <tr>
+                                        <td colSpan="4" style={{ textAlign: "center", padding: "3.5rem", color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                          No medication stocks found in this workspace.
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                       (() => {
+                                          const filteredDepletion = depletionItems.filter(item => 
+                                             item.name.toLowerCase().includes(depletionSearchQuery.toLowerCase())
+                                          );
+                                          
+                                          if (filteredDepletion.length === 0) {
+                                             return (
+                                                <tr>
+                                                   <td colSpan="4" style={{ textAlign: "center", padding: "3.5rem", color: "var(--text-muted)", fontSize: "0.8125rem", fontWeight: 800 }}>
+                                                      No medications match your search criteria.
+                                                   </td>
+                                                </tr>
+                                             );
+                                          }
+                                          
+                                          return filteredDepletion.map((item, idx) => {
+                                             const initialQty = parseInt(item.additional_fields?.initial_quantity) || 100;
+                                             const pct = Math.round((item.quantity / initialQty) * 100) || 0;
+                                             const isZero = item.quantity === 0;
+                                             const isLow = pct <= 20;
+                                             
+                                             // Dynamic color tokens based on stock health level
+                                             const dotColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
+                                             const badgeBg = isZero ? "#fef2f2" : isLow ? "#fffbeb" : "#ecfdf5";
+                                             const badgeColor = isZero ? "#ef4444" : isLow ? "#b45309" : "#059669";
+                                             const badgeBorder = isZero ? "#fee2e2" : isLow ? "#fef3c7" : "#a7f3d0";
+                                             
+                                             const qtyBg = isZero ? "#ffe4e6" : isLow ? "#fef3c7" : "#d1fae5";
+                                             const qtyColor = isZero ? "#be123c" : isLow ? "#b45309" : "#065f46";
+                                             const qtyBorder = isZero ? "#fecdd3" : isLow ? "#fde68a" : "#a7f3d0";
+                                             
+                                             const gradient = isZero 
+                                               ? "linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)" 
+                                               : isLow 
+                                                 ? "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
+                                                 : "linear-gradient(90deg, #10b981 0%, #059669 100%)";
+                                                 
+                                             const statusText = isZero ? "DEPLETED" : isLow ? `${pct}% left` : `SAFE - ${pct}%`;
+                                             
+                                             return (
+                                               <tr 
+                                                 key={idx} 
+                                                 style={{ 
+                                                   borderBottom: "1px solid var(--border)",
+                                                   transition: "all 0.2s ease",
+                                                   background: idx % 2 === 0 ? "rgba(248, 250, 252, 0.4)" : "transparent"
+                                                 }}
+                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239, 246, 255, 0.6)"; }}
+                                                 onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? "rgba(248, 250, 252, 0.4)" : "transparent"; }}
+                                               >
+                                                 <td style={{ padding: "1rem 1.125rem", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                                                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: dotColor, animation: isLow ? "pulse 1.5s infinite" : "none" }} />
+                                                   {item.name}
+                                                 </td>
+                                                 <td style={{ padding: "1rem 1.125rem" }}>
+                                                   <span style={{ 
+                                                     background: "linear-gradient(135deg, #e0e7ff 0%, #eef2ff 100%)", 
+                                                     color: "#4f46e5", 
+                                                     padding: "4px 10px", 
+                                                     borderRadius: "12px", 
+                                                     fontWeight: 800, 
+                                                     fontSize: "0.75rem", 
+                                                     border: "1px solid #c7d2fe",
+                                                     display: "inline-block"
+                                                   }}>
+                                                     {item.registry_type_project_name || "Global"}
+                                                   </span>
+                                                 </td>
+                                                 <td style={{ padding: "1rem 1.125rem", fontSize: "0.8125rem", fontWeight: 900 }}>
+                                                   <span style={{ 
+                                                     color: qtyColor,
+                                                     background: qtyBg,
+                                                     padding: "4px 8px",
+                                                     borderRadius: "8px",
+                                                     border: `1px solid ${qtyBorder}`
+                                                   }}>
+                                                     {item.quantity} / {initialQty} units
+                                                   </span>
+                                                 </td>
+                                                 <td style={{ padding: "1rem 1.125rem" }}>
+                                                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                     <div style={{ flex: 1, minWidth: "80px", height: "8px", background: "#f1f5f9", borderRadius: "4px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                                                       <div style={{ 
+                                                         width: `${Math.min(100, pct)}%`, 
+                                                         height: "100%", 
+                                                         background: gradient, 
+                                                         borderRadius: "4px",
+                                                         transition: "width 0.5s cubic-bezier(0.4, 0, 0.2, 1)"
+                                                       }} />
+                                                     </div>
+                                                     <span style={{ 
+                                                       fontSize: "0.6875rem", 
+                                                       fontWeight: 900, 
+                                                       padding: "3px 8px", 
+                                                       borderRadius: "6px", 
+                                                       background: badgeBg, 
+                                                       color: badgeColor,
+                                                       border: `1px solid ${badgeBorder}`,
+                                                       boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
+                                                     }}>
+                                                       {statusText}
+                                                     </span>
+                                                   </div>
+                                                 </td>
+                                               </tr>
+                                             );
+                                          });
+                                       })()
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 ) : (
                   <div
@@ -2856,7 +3531,30 @@ const AdminMasters = () => {
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.description || "--"}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.category || "--"}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.quantity || 0}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.cost || 0.00}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>
+                                                {m.batch_info?.has_batches && !m.batch_info.costs_match ? (
+                                                  <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                                    <span style={{ fontWeight: 800, color: "#1e293b" }}>
+                                                      ₹{m.cost || 0.00} <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 600 }}>(Latest)</span>
+                                                    </span>
+                                                    <span style={{ 
+                                                      fontSize: "0.675rem", 
+                                                      color: "#059669", 
+                                                      fontWeight: 800, 
+                                                      background: "#ecfdf5", 
+                                                      border: "1px solid #a7f3d0",
+                                                      padding: "2px 8px", 
+                                                      borderRadius: "6px", 
+                                                      width: "fit-content",
+                                                      marginTop: "2px"
+                                                    }}>
+                                                      Multi-Price (₹{m.batch_info.min_cost} - ₹{m.batch_info.max_cost})
+                                                    </span>
+                                                  </div>
+                                                ) : (
+                                                  <span>₹{m.cost || 0.00}</span>
+                                                )}
+                                              </td>
                                            </>
                                         ) : (
                                           (
@@ -4582,26 +5280,50 @@ const AdminMasters = () => {
                             gap: "0.5rem",
                           }}
                         >
-                          {(
-                            getCurrentProtocols(bulkProject).find(
+                          {(() => {
+                            const schemaFields = getCurrentProtocols(bulkProject).find(
                               (p) => p.id === exploringProtocolId,
-                            )?.fields || []
-                          ).map((f) => (
-                            <span
-                              key={f.slug}
-                              style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 800,
-                                background: "white",
-                                color: "#6366f1",
-                                padding: "0.4rem 0.75rem",
-                                borderRadius: "8px",
-                                border: "1px solid #e0e7ff",
-                              }}
-                            >
-                              {f.slug}
-                            </span>
-                          ))}
+                            )?.fields || [];
+                            
+                            const isPharmacy = exploringProtocolId && (
+                              exploringProtocolId.includes("pharmacy") || 
+                              exploringProtocolId.includes("drug")
+                            );
+                            
+                            return (
+                              <>
+                                {schemaFields.map((f) => (
+                                  <span
+                                    key={f.slug}
+                                    style={{
+                                      fontSize: "0.7rem",
+                                      fontWeight: 800,
+                                      background: "white",
+                                      color: "#6366f1",
+                                      padding: "0.4rem 0.75rem",
+                                      borderRadius: "8px",
+                                      border: "1px solid #e0e7ff",
+                                    }}
+                                  >
+                                    {f.slug}
+                                  </span>
+                                ))}
+                                {isPharmacy && (
+                                  <>
+                                    <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "#fffbeb", color: "#b45309", padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                                      batch_number (Optional)
+                                    </span>
+                                    <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "#fffbeb", color: "#b45309", padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                                      mfg_date (Optional)
+                                    </span>
+                                    <span style={{ fontSize: "0.7rem", fontWeight: 800, background: "#fffbeb", color: "#b45309", padding: "0.4rem 0.75rem", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                                      expiry_date (Optional)
+                                    </span>
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         <p
                           style={{

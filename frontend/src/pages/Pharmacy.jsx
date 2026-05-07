@@ -248,19 +248,33 @@ const Pharmacy = () => {
                                                ? getDoseCount(item.frequency, item.duration, item.item_group) 
                                                : (item.total_units || 1)} units
                                    </span>
-                                   <span style={{ 
-                                       marginLeft: 'auto',
-                                       color: (typeof getInventoryStock(item.medication_name, item.project_id) === 'string' && getInventoryStock(item.medication_name, item.project_id).includes('Sync')) ? '#64748b' : 
-                                              (parseInt(getInventoryStock(item.medication_name, item.project_id)) >= ((['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group) ? getDoseCount(item.frequency, item.duration, item.item_group) : (item.total_units || 1)) ? '#10b981' : '#ef4444'), 
-                                       fontWeight: 800,
-                                       fontSize: '0.6875rem',
-                                       background: 'var(--surface)',
-                                       padding: '2px 8px',
-                                       borderRadius: '6px',
-                                       border: '1px solid #e9d5ff'
-                                   }}>
-                                       In Stock: {getInventoryStock(item.medication_name, item.project_id)}
-                                   </span>
+                                   {(() => {
+                                       const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === item.medication_name.toLowerCase());
+                                       if (drugObj) {
+                                           const initialQty = parseInt(drugObj.additional_fields?.initial_quantity) || 100;
+                                           const threshold = Math.max(5, Math.round(initialQty * 0.2));
+                                           const isLow = drugObj.quantity <= threshold;
+                                           return (
+                                               <span style={{ 
+                                                   marginLeft: 'auto',
+                                                   color: isLow ? '#b45309' : '#10b981', 
+                                                   fontWeight: 800,
+                                                   fontSize: '0.6875rem',
+                                                   background: isLow ? '#fffbeb' : '#f0fdf4',
+                                                   padding: '2px 8px',
+                                                   borderRadius: '6px',
+                                                   border: `1px solid ${isLow ? '#fde68a' : '#dcfce7'}`
+                                               }}>
+                                                   {isLow ? `Low Stock (Under 20%): ${drugObj.quantity} remaining` : `In Stock: ${drugObj.quantity} items`}
+                                               </span>
+                                           );
+                                       }
+                                       return (
+                                           <span style={{ marginLeft: 'auto', color: '#ef4444', fontWeight: 800, fontSize: '0.6875rem', background: '#fef2f2', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fee2e2' }}>
+                                               Out of Registry
+                                           </span>
+                                       );
+                                   })()}
                                </p>
                            </div>
                            <CheckCircle size={18} color="#10b981" />

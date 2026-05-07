@@ -292,10 +292,71 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         data = serializer.save()
         log_action(self.request.user, 'Registry', 'Data Entry Created', f"Record {data.ucode} added to registry {data.registry_type.name}")
+        
+        # Self-healing Sync: Automatically create a default batch for manually-added pharmacy registry items
+        rt = data.registry_type
+        is_pharmacy = (
+            rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
+            'pharmacy' in rt.slug.lower() or
+            'pharmacy' in rt.name.lower() or
+            'drug' in rt.slug.lower() or
+            'drug' in rt.name.lower()
+        )
+        if is_pharmacy:
+            from pharmacy.models import DrugBatch
+            from django.utils import timezone
+            DrugBatch.objects.get_or_create(
+                registry_item=data,
+                batch_number='DEFAULT',
+                defaults={
+                    'mfg_date': timezone.localdate(),
+                    'expiry_date': timezone.localdate() + timezone.timedelta(days=365),
+                    'initial_qty': data.quantity,
+                    'quantity': data.quantity,
+                    'unit_cost': data.cost
+                }
+            )
 
     def perform_update(self, serializer):
         data = serializer.save()
         log_action(self.request.user, 'Registry', 'Data Entry Updated', f"Record {data.ucode} modified in registry {data.registry_type.name}")
+        
+        # Self-healing Sync: Align child batches when the parent medicine quantity or price is manually modified
+        rt = data.registry_type
+        is_pharmacy = (
+            rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
+            'pharmacy' in rt.slug.lower() or
+            'pharmacy' in rt.name.lower() or
+            'drug' in rt.slug.lower() or
+            'drug' in rt.name.lower()
+        )
+        if is_pharmacy:
+            from pharmacy.models import DrugBatch
+            from django.utils import timezone
+            
+            batches = DrugBatch.objects.filter(registry_item=data)
+            if batches.exists():
+                # Identify the DEFAULT or first batch to absorb manual adjustments
+                default_batch = batches.filter(batch_number='DEFAULT').first() or batches.first()
+                if default_batch:
+                    # Calculate total quantity held in other custom batches
+                    other_qty = sum(b.quantity for b in batches if b.id != default_batch.id)
+                    # The default batch quantity is adjusted so that the overall batch total matches the parent quantity
+                    default_batch.quantity = max(0, data.quantity - other_qty)
+                    # Sync the batch cost to the manual price update
+                    default_batch.unit_cost = data.cost
+                    default_batch.save()
+            else:
+                # Fallback: Create a DEFAULT batch if it was somehow deleted or missing
+                DrugBatch.objects.create(
+                    registry_item=data,
+                    batch_number='DEFAULT',
+                    mfg_date=timezone.localdate(),
+                    expiry_date=timezone.localdate() + timezone.timedelta(days=365),
+                    initial_qty=data.quantity,
+                    quantity=data.quantity,
+                    unit_cost=data.cost
+                )
 
     def get_queryset(self):
         """
@@ -383,9 +444,13 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         # Support slug-based lookup if registry_type_id is not numeric
         active_type_id = None
         project_id = request.data.get('project')
+        rt = None
         
         if str(registry_type_id).isdigit():
             active_type_id = int(registry_type_id)
+            rt = RegistryType.objects.filter(id=active_type_id).first()
+            if not rt:
+                return Response({"error": f"Registry type ID '{registry_type_id}' not found"}, status=404)
         else:
             rt_qs = RegistryType.objects.filter(slug=registry_type_id)
             if project_id:
@@ -402,34 +467,82 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         schema_fields = RegistryField.objects.filter(registry_type_id=active_type_id)
         field_slugs = [f.slug for f in schema_fields]
 
+        def parse_date_safely(date_str):
+            if not date_str:
+                return None
+            import re
+            from datetime import datetime, date
+            date_str = str(date_str).strip()
+            patterns = [
+                '%Y-%m-%d',
+                '%d-%m-%Y',
+                '%m-%d-%Y',
+                '%Y/%m/%d',
+                '%d/%m/%Y',
+                '%m/%d/%Y',
+            ]
+            for pat in patterns:
+                try:
+                    return datetime.strptime(date_str, pat).date()
+                except:
+                    continue
+            try:
+                m = re.match(r'^(\d{2})[-/](\d{2,4})$', date_str)
+                if m:
+                    month = int(m.group(1))
+                    year = int(m.group(2))
+                    if year < 100:
+                        year += 2000
+                    return date(year, month, 1)
+            except:
+                pass
+            return None
+
+        # Track cleared item batches per bulk upload session
+        cleared_batches = set()
         success_count = 0
+        
         for data in records:
             try:
+                # Normalize keys: convert keys to lowercase, replace spaces with underscores,
+                # and strip any "_(optional)" or "(optional)" suffixes so they match cleanly!
+                clean_data = {}
+                for k, v in data.items():
+                    clean_k = str(k).strip().lower().replace(' ', '_')
+                    if clean_k.endswith('_(optional)'):
+                        clean_k = clean_k[:-11]
+                    elif clean_k.endswith('(optional)'):
+                        clean_k = clean_k[:-10]
+                    clean_data[clean_k] = v
+
                 # Resolve ucode/primary key
-                ucode = data.get('ucode') or data.get('card_no') or data.get('item_code') or next(iter(data.values()))
-                name = data.get('name') or data.get('item_name') or data.get('label') or ""
+                ucode = clean_data.get('ucode') or clean_data.get('card_no') or clean_data.get('item_code') or next(iter(clean_data.values()))
+                name = clean_data.get('name') or clean_data.get('item_name') or clean_data.get('label') or ""
                 
                 # Case-insensitive mapping of CSV headers to schema slugs
                 additional = {}
                 slug_map = {s.lower(): s for s in field_slugs} 
                 
-                for key, val in data.items():
+                for key, val in clean_data.items():
                     clean_key = str(key).strip().lower()
                     if clean_key in slug_map:
                         additional[slug_map[clean_key]] = val
                     elif key in field_slugs:
                         additional[key] = val
                 
-                qty_input = int(data.get('quantity') or data.get('qty') or 0)
-                cost_input = float(data.get('cost') or data.get('price') or 0.0)
+                existing_item = RegistryData.objects.filter(registry_type_id=active_type_id, ucode=str(ucode).strip()).first()
+                qty_input = int(clean_data.get('quantity') or clean_data.get('qty') or 0)
+                cost_input = float(clean_data.get('cost') or clean_data.get('price') or 0.0)
+                if cost_input == 0.0 and existing_item and existing_item.cost:
+                    cost_input = float(existing_item.cost)
 
                 obj, created = RegistryData.objects.get_or_create(
                     registry_type_id=active_type_id,
                     ucode=str(ucode).strip(),
                     defaults={
                         'name': str(name).strip(),
-                        'category': data.get('category') or data.get('item_group', ''),
-                        'description': str(data.get('description') or ''),
+                        'category': clean_data.get('category') or clean_data.get('item_group', ''),
+                        'description': str(clean_data.get('description') or ''),
                         'quantity': qty_input,
                         'cost': cost_input,
                         'additional_fields': additional
@@ -439,8 +552,12 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                 if not created:
                     # Update fields
                     obj.name = str(name).strip() or obj.name
-                    obj.category = data.get('category') or data.get('item_group', obj.category)
-                    obj.cost = cost_input or obj.cost
+                    obj.category = clean_data.get('category') or clean_data.get('item_group', obj.category)
+                    
+                    # Prevent overriding parent cost during refill/increment uploads
+                    if mode != 'INCREMENT' and mode != 'ADD':
+                        obj.cost = cost_input or obj.cost
+                        
                     obj.additional_fields.update(additional)
                     
                     if mode == 'INCREMENT' or mode == 'ADD':
@@ -448,6 +565,100 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                     else:
                         obj.quantity = qty_input
                     
+                    obj.save()
+
+                # Sync drug batches for pharmacy registries
+                is_pharmacy = (
+                    rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
+                    'pharmacy' in rt.slug.lower() or
+                    'pharmacy' in rt.name.lower() or
+                    'drug' in rt.slug.lower() or
+                    'drug' in rt.name.lower()
+                )
+
+                if is_pharmacy:
+                    from pharmacy.models import DrugBatch
+                    from django.utils import timezone
+                    
+                    batch_number = clean_data.get('batch_number') or clean_data.get('batch') or clean_data.get('batch_no')
+                    if not batch_number:
+                        batch_number = "DEFAULT"
+                        
+                    mfg_raw = clean_data.get('mfg_date') or clean_data.get('mfg') or clean_data.get('manufacturing_date') or clean_data.get('mfg_dt')
+                    exp_raw = clean_data.get('expiry_date') or clean_data.get('expiry') or clean_data.get('expiry_dt') or clean_data.get('exp_date') or clean_data.get('expire')
+                    
+                    mfg_date = parse_date_safely(mfg_raw)
+                    expiry_date = parse_date_safely(exp_raw)
+                    
+                    if not mfg_date:
+                        mfg_date = timezone.localdate()
+                    if not expiry_date:
+                        expiry_date = timezone.localdate() + timezone.timedelta(days=365) # 1 year default
+                        
+                    # Self-Healing Sync: If parent medicine has stock but NO physical batches exist in the DB,
+                    # convert the existing parent stock into a real physical DEFAULT batch first.
+                    # This recovers historical stock entries that were created when backend triggers were crashed.
+                    if not DrugBatch.objects.filter(registry_item=obj).exists():
+                        pre_existing_qty = obj.quantity
+                        if mode == 'INCREMENT' or mode == 'ADD':
+                            pre_existing_qty = max(0, obj.quantity - qty_input)
+                        
+                        if pre_existing_qty > 0:
+                            DrugBatch.objects.create(
+                                registry_item=obj,
+                                batch_number='DEFAULT',
+                                mfg_date=timezone.localdate() - timezone.timedelta(days=45),
+                                expiry_date=timezone.localdate() + timezone.timedelta(days=320),
+                                initial_qty=pre_existing_qty,
+                                quantity=pre_existing_qty,
+                                unit_cost=obj.cost
+                            )
+                        
+                    # Clean/Overwrite existing batches only once per unique medication in the bulk upload
+                    if mode == 'OVERWRITE' or mode == 'REPLACE':
+                        if obj.id not in cleared_batches:
+                            DrugBatch.objects.filter(registry_item=obj).delete()
+                            cleared_batches.add(obj.id)
+                            
+                    base_batch_number = str(batch_number).strip()
+                    
+                    # Cost variations support: if there's an existing batch with this name but with a DIFFERENT unit cost,
+                    # we should create a separate batch with a suffix so the different costs/prices are preserved!
+                    # This is especially true for default/blank batches during refills.
+                    existing_batches = DrugBatch.objects.filter(registry_item=obj, batch_number=base_batch_number)
+                    if existing_batches.exists():
+                        first_existing = existing_batches.first()
+                        if float(first_existing.unit_cost) != float(cost_input):
+                            # Append the cost suffix to make it a distinct, isolated batch card!
+                            batch_number = f"{base_batch_number} (₹{cost_input:.2f})"
+
+                    # Update/Create the specific drug batch
+                    batch_obj, b_created = DrugBatch.objects.get_or_create(
+                        registry_item=obj,
+                        batch_number=str(batch_number).strip(),
+                        defaults={
+                            'mfg_date': mfg_date,
+                            'expiry_date': expiry_date,
+                            'initial_qty': qty_input,
+                            'quantity': qty_input,
+                            'unit_cost': cost_input
+                        }
+                    )
+                    
+                    if not b_created:
+                        batch_obj.mfg_date = mfg_date
+                        batch_obj.expiry_date = expiry_date
+                        if mode == 'INCREMENT' or mode == 'ADD':
+                            batch_obj.quantity += qty_input
+                        else:
+                            batch_obj.quantity = qty_input
+                        batch_obj.unit_cost = cost_input or batch_obj.unit_cost
+                        batch_obj.save()
+                        
+                    # Sync parent quantity to the total of active batches
+                    from django.db.models import Sum
+                    total_qty = DrugBatch.objects.filter(registry_item=obj).aggregate(total=Sum('quantity'))['total'] or 0
+                    obj.quantity = total_qty
                     obj.save()
 
                 success_count += 1
@@ -755,33 +966,46 @@ class RegistryReportView(viewsets.ViewSet):
                     consumption_map[med_name] = consumption_map.get(med_name, 0) + qty
             except: pass
 
-        # Process AuditLogs
-        for log in consumption_logs:
-            try:
-                # Group 1: Name, Group 2: Qty
-                match = re.search(r'\[CONSUMPTION\]\s*(.*?)\s*\|\s*(\d+)', log.details, re.IGNORECASE)
-                if match:
-                    add_to_series(timezone.localtime(log.timestamp).date(), int(match.group(2)), match.group(1).strip())
-            except: continue
-
         # Process Dispensed Records (Highest Priority)
         processed_prescription_ids = set()
         for dr in dispensed_records:
             add_to_series(timezone.localtime(dr.dispensed_at).date(), dr.quantity, dr.prescription.medication_name)
             processed_prescription_ids.add(dr.prescription_id)
 
+        # Process AuditLogs (Secondary Priority - fallback if no explicit dispensing records)
+        for log in consumption_logs:
+            try:
+                # Group 1: Name, Group 2: Qty
+                match = re.search(r'\[CONSUMPTION\]\s*(.*?)\s*\|\s*(\d+)', log.details, re.IGNORECASE)
+                if match:
+                    # Deduplicate: Skip log if we already processed this prescription via DispensingRecord
+                    id_match = re.search(r'ID:(\d+)', log.details)
+                    if id_match:
+                        pid = int(id_match.group(1))
+                        if pid in processed_prescription_ids:
+                            continue
+                    add_to_series(timezone.localtime(log.timestamp).date(), int(match.group(2)), match.group(1).strip())
+            except: continue
+
         # Process Prescriptions (Secondary Priority - fallback if no explicit records)
         # We calculate actual clinical units based on MNC-standard frequency parsing
         def get_dose_qty(rec):
             try:
-                # If it's a DispensingRecord with quantity > 1, use that as source of truth
-                if hasattr(rec, 'quantity') and rec.quantity > 1:
+                # If it's a DispensingRecord, use that actual quantity as the absolute source of truth (including 1)
+                if hasattr(rec, 'quantity') and rec.quantity is not None:
                     return rec.quantity
                 
                 # Otherwise, derive from prescription metadata
                 p = rec if isinstance(rec, Prescription) else rec.prescription
                 freq = str(p.frequency or "").upper()
                 dur = str(p.duration or "0")
+                name = str(p.medication_name or "").upper()
+                
+                # Only multiply duration (days) for tablets/capsules/pills. Other forms (drops, ointment, syrup) default to 1 unit.
+                unit_groups = ['SYRUP', 'OINTMENT', 'CREAM', 'GEL', 'INJECTION', 'DROP', 'LOTION', 'SOLUTION', 'SUSPENSION', 'SPRAY', 'INHALER']
+                is_unit_based = any(g in name for g in unit_groups) or not any(t in name for t in ['TAB', 'CAP', 'PILL'])
+                if is_unit_based:
+                    return 1
                 
                 per_day = 0
                 if '-' in freq:
@@ -800,13 +1024,6 @@ class RegistryReportView(viewsets.ViewSet):
             if p.id not in processed_prescription_ids and p.status in ['DISPENSED', 'PARTIALLY_DISPENSED']:
                 qty = get_dose_qty(p)
                 add_to_series(timezone.localtime(p.created_at).date(), qty, p.medication_name)
-
-        trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])
-
-        # 2. Conversion Analytics (Dynamic)
-        total_v = visit_qs.count()
-        completed_v = visit_qs.filter(status__in=['COMPLETED', 'PENDING_PHARMACY']).count()
-        conversion_rate = round((completed_v / total_v * 100) if total_v > 0 else 0, 1)
 
         # 1b. Total Historical Consumption (All Time)
         total_units_sum = 0
@@ -833,6 +1050,14 @@ class RegistryReportView(viewsets.ViewSet):
             if p.id not in all_time_processed_pids:
                 total_units_sum += get_dose_qty(p)
 
+        # Trends are sorted chronologically
+        trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])
+
+        # 2. Conversion Analytics (Dynamic)
+        total_v = visit_qs.count()
+        completed_v = visit_qs.filter(status__in=['COMPLETED', 'PENDING_PHARMACY']).count()
+        conversion_rate = round((completed_v / total_v * 100) if total_v > 0 else 0, 1)
+
         # 3. Inventory Health
         inventory_stats = inventory_items.aggregate(
             total_value=Sum(Case(When(quantity__gt=0, then='cost'), default=0, output_field=FloatField())),
@@ -841,6 +1066,76 @@ class RegistryReportView(viewsets.ViewSet):
         )
 
         all_c = sorted([{'name': k, 'total': v} for k, v in consumption_map.items()], key=lambda x: x['total'], reverse=True)
+
+        # 4. Fetch Active Batches with Detailed Metadata for Premium UI Viz
+        from pharmacy.models import DrugBatch
+        active_batches_qs = DrugBatch.objects.filter(registry_item__in=inventory_items).select_related('registry_item')
+        
+        batches_list = []
+        for batch in active_batches_qs:
+            days_to_expiry = (batch.expiry_date - today).days
+            status = 'SAFE'
+            if batch.quantity == 0:
+                status = 'DEPLETED'
+            elif days_to_expiry <= 0:
+                status = 'EXPIRED'
+            elif days_to_expiry <= 90:
+                status = 'EXPIRING_SOON'
+            elif batch.quantity < 15:
+                status = 'LOW_STOCK'
+            elif batch.quantity > 100:
+                status = 'HIGH_STOCK'
+                
+            batches_list.append({
+                'id': batch.id,
+                'medication_name': batch.registry_item.name,
+                'batch_number': batch.batch_number,
+                'mfg_date': batch.mfg_date.strftime('%Y-%m-%d') if batch.mfg_date else None,
+                'expiry_date': batch.expiry_date.strftime('%Y-%m-%d') if batch.expiry_date else None,
+                'days_to_expiry': days_to_expiry,
+                'initial_qty': batch.initial_qty,
+                'quantity': batch.quantity,
+                'unit_cost': float(batch.unit_cost),
+                'status': status
+            })
+
+        # Proactively supplement virtual default batches for items with stock but no physical batch entries
+        items_with_physical_batches = set(active_batches_qs.values_list('registry_item_id', flat=True))
+        for item in inventory_items:
+            if item.id not in items_with_physical_batches and item.quantity > 0:
+                mfg = today - timedelta(days=45)
+                exp = today + timedelta(days=320)
+                
+                initial_qty = 100
+                if item.additional_fields and isinstance(item.additional_fields, dict):
+                    try:
+                        initial_qty = int(item.additional_fields.get('initial_quantity') or item.additional_fields.get('initial_qty') or item.quantity)
+                    except Exception:
+                        initial_qty = item.quantity or 100
+                if initial_qty < item.quantity:
+                    initial_qty = item.quantity
+                
+                days_to_expiry = (exp - today).days
+                status = 'SAFE'
+                if item.quantity == 0:
+                    status = 'DEPLETED'
+                elif item.quantity < 15:
+                    status = 'LOW_STOCK'
+                elif item.quantity > 100:
+                    status = 'HIGH_STOCK'
+                    
+                batches_list.append({
+                    'id': f"fallback_{item.id}",
+                    'medication_name': item.name,
+                    'batch_number': "DEFAULT",
+                    'mfg_date': mfg.strftime('%Y-%m-%d'),
+                    'expiry_date': exp.strftime('%Y-%m-%d'),
+                    'days_to_expiry': days_to_expiry,
+                    'initial_qty': initial_qty,
+                    'quantity': item.quantity,
+                    'unit_cost': float(item.cost or 0.0),
+                    'status': status
+                })
 
         return Response({
             'total_registered': patient_qs.count(),
@@ -857,7 +1152,8 @@ class RegistryReportView(viewsets.ViewSet):
             'by_gender': list(patient_qs.values('gender').annotate(count=Count('gender'))),
             'top_medications': all_c[:10],
             'all_consumption': all_c,
-            'project_name': active_project.name if active_project else "All Projects"
+            'project_name': active_project.name if active_project else "All Projects",
+            'batches': batches_list
         })
 
 from .reports import generate_patient_pdf_report

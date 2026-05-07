@@ -130,6 +130,24 @@ class DashboardStatsView(generics.GenericAPIView):
         
         recent_visits = visit_qs.filter(is_active=True).order_by('-visit_date')[:5]
         
+        # --- CENTRAL STOCK DEPLETION MONITOR FOR GLOBAL ADMINS ---
+        low_stock_items = []
+        if is_admin:
+            from patients.models import RegistryData
+            # Find drugs in any project's pharmacy registry that are critically low (<= 15 items)
+            critical_items = RegistryData.objects.filter(
+                registry_type__slug__icontains='pharmacy',
+                quantity__lte=15
+            ).select_related('registry_type', 'registry_type__project').order_by('quantity')[:8]
+            
+            for item in critical_items:
+                low_stock_items.append({
+                    'id': item.id,
+                    'name': item.name,
+                    'quantity': item.quantity,
+                    'project_name': item.registry_type.project.name if item.registry_type.project else 'Global',
+                    'initial_qty': int(item.additional_fields.get('initial_quantity', 100)) if (item.additional_fields and isinstance(item.additional_fields, dict)) else 100,
+                })
         
         # Dept Flow counts
         dept_counts = {
@@ -146,6 +164,7 @@ class DashboardStatsView(generics.GenericAPIView):
             'doctor_pending': dept_counts['Doctor'],
             'pharmacy_pending': dept_counts['Pharmacy'],
             'recent_visits': VisitSerializer(recent_visits, many=True).data,
+            'low_stock_items': low_stock_items,
             'dept_flow': [
                 {'name': 'Nursing', 'value': min(100, dept_counts['Nursing'] * 10), 'color': '#f59e0b'},
                 {'name': 'Doctor', 'value': min(100, dept_counts['Doctor'] * 10), 'color': '#6366f1'},
