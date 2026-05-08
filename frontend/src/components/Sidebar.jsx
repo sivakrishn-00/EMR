@@ -106,7 +106,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
               <li key={item.name} style={{ marginBottom: '0.25rem' }}>
                 <NavLink
                   to={item.path}
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  className={({ isActive }) => `nav-link ${isActive || window.location.pathname.startsWith(item.path) ? 'active' : ''}`}
                 >
                   <item.icon size={16} className="nav-icon" />
                   {!isCollapsed && <span className="nav-text">{item.name}</span>}
@@ -135,7 +135,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
                   <li key={item.name} style={{ marginBottom: '0.25rem' }}>
                     <NavLink
                       to={item.path}
-                      className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                      className={({ isActive }) => `nav-link ${isActive || window.location.pathname.startsWith(item.path) ? 'active' : ''}`}
                     >
                       <item.icon size={16} className="nav-icon" />
                       {!isCollapsed && <span className="nav-text">{item.name}</span>}

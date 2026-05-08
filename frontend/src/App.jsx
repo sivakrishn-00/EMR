@@ -296,6 +296,14 @@ function App() {
             </MainLayout>
           } />
 
+          <Route path="/admin-masters/:board" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/admin-masters">
+                <AdminMasters />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
           <Route path="/projects" element={
             <MainLayout>
               <ProtectedRoute requiredModule="/projects">

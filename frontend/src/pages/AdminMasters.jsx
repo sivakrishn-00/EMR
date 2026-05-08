@@ -37,13 +37,19 @@ import {
   Key,
   Shuffle
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
 const AdminMasters = () => {
   const navigate = useNavigate();
+  const { board } = useParams();
+  const activeBoard = (board || "protocols").toUpperCase();
+  const setActiveBoard = (boardName) => {
+    navigate(`/admin-masters/${boardName.toLowerCase()}`);
+  };
+
   const { user } = useAuth();
   const [employeeMasters, setEmployeeMasters] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +59,6 @@ const AdminMasters = () => {
   const [totalFamilyCount, setTotalFamilyCount] = useState(0);
   const [selectedProject, setSelectedProject] = useState("");
   const [viewMode, setViewMode] = useState("PROJECTS"); // PROJECTS, DATA
-  const [activeBoard, setActiveBoard] = useState("PROTOCOLS"); // STATS, REGISTRY, PROTOCOLS
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
