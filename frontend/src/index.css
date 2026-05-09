@@ -23,6 +23,9 @@
   --radius: 16px;
   --radius-sm: 8px;
   --radius-lg: 24px;
+  --alert-low: #dc2626;
+  --alert-out: #b91c1c;
+  --conversion-text: #059669;
 }
 
 :root.dark-theme {
@@ -37,6 +40,9 @@
   --sidebar-bg: #0b1120;
   --sidebar-text: #94a3b8;
   --sidebar-active: #ffffff;
+  --alert-low: #fca5a5;
+  --alert-out: #f43f5e;
+  --conversion-text: #a7f3d0;
 }
 
 * {

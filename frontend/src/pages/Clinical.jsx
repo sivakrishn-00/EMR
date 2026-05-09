@@ -268,7 +268,7 @@ const Clinical = () => {
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Consultation Queue ({totalCount})</h3>
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Patients waiting for examination</p>
                </div>
-               <button onClick={() => fetchVisitsToSee()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <button onClick={() => fetchVisitsToSee()} style={{ border: 'none', background: 'var(--background)', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Clock size={18} color="#6366f1" />
                </button>
             </div>
@@ -288,7 +288,7 @@ const Clinical = () => {
                     <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div style={{ width: '42px', height: '42px', background: '#eff6ff', color: '#2563eb', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem', boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.1)' }}>
+                            <div className="patient-avatar-placeholder" style={{ width: '42px', height: '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
                                {v.patient_details?.first_name[0].toLowerCase()}
                             </div>
                             <div>
@@ -299,7 +299,7 @@ const Clinical = () => {
                       </td>
                       <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>{v.reason?.substring(0, 30)}</td>
                       <td style={{ padding: '1rem' }}>
-                         <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.6875rem', fontWeight: 800, padding: '0.35rem 0.75rem', borderRadius: '8px' }}>Captured</span>
+                         <span className="badge badge-captured" style={{ fontSize: '0.6875rem', fontWeight: 800, padding: '0.35rem 0.75rem', borderRadius: '8px' }}>Captured</span>
                       </td>
                       <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                           <button 
@@ -359,7 +359,7 @@ const Clinical = () => {
             
             {/* Pagination */}
             {totalCount > 10 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
@@ -385,8 +385,8 @@ const Clinical = () => {
         <div className="workspace-split" style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* TOP: HISTORICAL REFERENCE PANEL (Unified MNC View) */}
           {showHistoryDashboard && (detailedVisit || isLoadingHistory) && (
-            <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed #e2e8f0' : '1.5px solid #6366f1', marginBottom: '2rem' }}>
-                <div className="reference-header" style={{ padding: '0.75rem 1.5rem', background: '#f8fafc' }}>
+            <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed var(--border)' : '1.5px solid var(--primary)', marginBottom: '2rem' }}>
+                <div className="reference-header" style={{ padding: '0.75rem 1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' }}>
                             <History size={16} color={isLoadingHistory ? '#94a3b8' : 'white'} />
@@ -421,18 +421,15 @@ const Clinical = () => {
                 ) : (
                     <>
                         {/* MNC Visit Selector Tabs */}
-                        <div style={{ background: 'white', padding: '0.5rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
+                        <div style={{ background: 'var(--surface)', padding: '0.5rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
                             {patientHistory.slice(0, 5).map((h) => (
                                 <button 
                                     key={h.id}
                                     onClick={() => setDetailedVisit(h)}
+                                    className={`history-tab-btn ${detailedVisit.id === h.id ? 'active' : ''}`}
                                     style={{ 
                                         padding: '0.5rem 1rem', 
                                         borderRadius: '10px', 
-                                        border: '1px solid',
-                                        borderColor: detailedVisit.id === h.id ? '#6366f1' : '#e2e8f0',
-                                        background: detailedVisit.id === h.id ? '#eff6ff' : 'white',
-                                        color: detailedVisit.id === h.id ? '#4338ca' : '#64748b',
                                         fontSize: '0.7rem',
                                         fontWeight: 800,
                                         whiteSpace: 'nowrap',
@@ -460,7 +457,7 @@ const Clinical = () => {
                                         { label: 'Temp', value: `${detailedVisit.vitals?.temperature_c || '--'} °C` },
                                         { label: 'BMI', value: `${detailedVisit.vitals?.bmi || '--'}` }
                                     ].map((item, id) => (
-                                        <div key={id} className="snapshot-item" style={{ padding: '0.5rem 0.75rem', background: 'white' }}>
+                                        <div key={id} className="snapshot-item" style={{ padding: '0.5rem 0.75rem' }}>
                                             <span className="item-label" style={{ fontSize: '0.65rem' }}>{item.label}</span>
                                             <span className="item-value" style={{ fontSize: '0.7rem', fontWeight: 900 }}>{item.value}</span>
                                         </div>
@@ -469,36 +466,36 @@ const Clinical = () => {
 
                                 {/* Column 2: Clinical Context */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <div className="diagnosis-box" style={{ padding: '1rem', background: '#fffbeb', border: '1px solid #fde68a' }}>
+                                    <div className="diagnosis-box" style={{ padding: '1rem' }}>
                                         <p className="section-label-alt" style={{ fontSize: '0.6rem', color: '#92400e' }}>HISTORICAL DIAGNOSIS</p>
                                         <p className="diagnosis-text" style={{ fontSize: '0.85rem', color: '#78350f' }}>{detailedVisit.consultation?.diagnosis || 'No diagnosis recorded'}</p>
                                     </div>
-                                    <div style={{ background: 'white', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0', flex: 1, overflowY: 'auto' }}>
+                                    <div style={{ background: 'var(--surface)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', flex: 1, overflowY: 'auto' }}>
                                         <p style={{ fontSize: '0.65rem', fontWeight: 950, color: '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
                                         {detailedVisit.prescriptions?.length > 0 ? detailedVisit.prescriptions.map((m, i) => (
-                                            <div key={i} style={{ marginBottom: '8px', padding: '6px 10px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                                                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b' }}>{m.medication_name}</p>
-                                                <p style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
+                                            <div key={i} className="history-med-item" style={{ marginBottom: '8px', padding: '6px 10px', borderRadius: '8px' }}>
+                                                <p className="history-med-name" style={{ fontSize: '0.75rem', fontWeight: 800 }}>{m.medication_name}</p>
+                                                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
                                             </div>
                                         )) : <p className="empty-text">No medications prescribed</p>}
                                     </div>
                                 </div>
 
                                 {/* Column 3: Diagnostic Insights */}
-                                <div style={{ background: 'white', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0', overflowY: 'auto', maxHeight: '350px' }}>
+                                <div style={{ background: 'var(--surface)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', overflowY: 'auto', maxHeight: '350px' }}>
                                     <p style={{ fontSize: '0.65rem', fontWeight: 950, color: '#059669', marginBottom: '10px', textTransform: 'uppercase' }}>Verified Lab Results</p>
                                     {detailedVisit.lab_requests?.length > 0 ? detailedVisit.lab_requests.map((lr, i) => (
-                                        <div key={i} style={{ marginBottom: '1rem', padding: '10px', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
-                                            <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>{lr.test_name}</p>
+                                        <div key={i} className="history-lab-item" style={{ marginBottom: '1rem', padding: '10px', borderRadius: '12px' }}>
+                                            <p className="history-lab-name" style={{ fontSize: '0.75rem', fontWeight: 900, marginBottom: '6px' }}>{lr.test_name}</p>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                 {lr.test_master_details?.sub_tests?.map(st => (
                                                     <div key={st.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>{st.name}</span>
-                                                        <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>{lr.result?.values?.[st.name] || '--'}</span>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>{st.name}</span>
+                                                        <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)' }}>{lr.result?.values?.[st.name] || '--'}</span>
                                                     </div>
                                                 ))}
                                                 {!lr.test_master_details?.sub_tests?.length && lr.result?.value && (
-                                                    <p style={{ fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>{lr.result.value}</p>
+                                                    <p style={{ fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', color: 'var(--text-main)' }}>{lr.result.value}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -522,7 +519,7 @@ const Clinical = () => {
                       <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
+                 <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: 'var(--background)', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
                     <X size={20} />
                  </button>
               </div>
@@ -546,12 +543,13 @@ const Clinical = () => {
                         <button 
                            type="button"
                            onClick={() => setShowHistoryDashboard(true)}
-                           style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#6d28d9', padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                           className="view-history-btn"
+                           style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
                         >
                            <History size={13} /> VIEW HISTORY
                         </button>
                      )}
-                     <span style={{ fontSize: '0.6875rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content' }}>EXAMINING</span>
+                     <span className="examining-badge" style={{ fontSize: '0.6875rem', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content' }}>EXAMINING</span>
                   </div>
               </div>
 
@@ -609,8 +607,8 @@ const Clinical = () => {
                    </div>
 
                    {/* Known History */}
-                   <div style={{ gridColumn: 'span 2', background: '#eff6ff', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dbeafe' }}>
-                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Known History / Co-morbidities</p>
+                   <div className="known-history-box" style={{ gridColumn: 'span 2', background: '#eff6ff', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dbeafe' }}>
+                       <p className="known-history-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Known History / Co-morbidities</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
                            <HistoryBadge label="Known DM" value={selectedVisit.vitals?.known_dm} variant="filled" />
                            <HistoryBadge label="Known HTN" value={selectedVisit.vitals?.known_htn} variant="filled" />
@@ -622,8 +620,8 @@ const Clinical = () => {
                    </div>
 
                    {/* Systemic Examination */}
-                   <div style={{ gridColumn: 'span 2', background: '#f0fdf4', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dcfce7' }}>
-                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Systemic Examination (Clinical Notes)</p>
+                   <div className="systemic-exam-box" style={{ gridColumn: 'span 2', background: '#f0fdf4', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dcfce7' }}>
+                       <p className="systemic-exam-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Systemic Examination (Clinical Notes)</p>
                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                            <ExamItem label="Respiratory" value={selectedVisit.vitals?.sys_respiratory} />
                            <ExamItem label="C.V.S" value={selectedVisit.vitals?.sys_cvs} />
@@ -643,17 +641,17 @@ const Clinical = () => {
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {selectedVisit.lab_requests.filter(lr => lr.status === 'COMPLETED').map(lr => (
-                                <div key={lr.id} style={{ padding: '1rem', background: 'var(--surface)', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                                <div key={lr.id} style={{ padding: '1rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a' }}>{lr.test_name}</p>
-                                        <span style={{ fontSize: '0.625rem', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>VERIFIED</span>
+                                        <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>{lr.test_name}</p>
+                                        <span className="badge badge-captured" style={{ fontSize: '0.625rem', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>VERIFIED</span>
                                     </div>
                                     
                                     {lr.test_master_details?.sub_tests?.length > 0 ? (
                                         <div style={{ padding: 0 }}>
                                             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                                                 <thead>
-                                                    <tr style={{ background: '#f1f5f9' }}>
+                                                    <tr style={{ background: 'var(--background)' }}>
                                                         <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Parameter</th>
                                                         <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Result</th>
                                                         <th style={{ padding: '0.5rem', fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ref. Range</th>
@@ -699,9 +697,9 @@ const Clinical = () => {
                                     )}
 
                                     {lr.result?.interpretation && (
-                                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
-                                            <p style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', fontWeight: 800 }}>Interpretation / Analyst Remarks</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#334155', lineHeight: 1.4, fontWeight: 500 }}>{lr.result.interpretation}</p>
+                                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border)' }}>
+                                            <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px', fontWeight: 800 }}>Interpretation / Analyst Remarks</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-main)', lineHeight: 1.4, fontWeight: 500 }}>{lr.result.interpretation}</p>
                                         </div>
                                     )}
                                 </div>
@@ -756,7 +754,7 @@ const Clinical = () => {
                       >
                         <Pill size={14} /> Prescribe Medications
                       </span>
-                      <span style={{ fontSize: "0.625rem", color: "#64748b", background: "white", padding: "2px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                      <span className="inventory-count-badge" style={{ fontSize: "0.625rem", padding: "2px 8px", borderRadius: "6px" }}>
                         Total Available: {totalInventoryCount} Drug Variations 
                       </span>
                     </p>
@@ -787,7 +785,7 @@ const Clinical = () => {
                                 setShowDrugDropdown(true);
                                 if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
                               }} 
-                              style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: '#1e293b' }} 
+                              style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: 'var(--text-main)' }} 
                             />
                             <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                                 <Search size={14} color="#94a3b8" />
@@ -795,7 +793,7 @@ const Clinical = () => {
                         </div>
 
                         {showDrugDropdown && (
-                            <div style={{ position: 'absolute', top: '40px', left: 0, right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 1000, maxHeight: '250px', overflowY: 'auto' }}>
+                            <div className="search-dropdown" style={{ position: 'absolute', top: '40px', left: 0, right: 0, borderRadius: '12px', zIndex: 1000, maxHeight: '250px', overflowY: 'auto' }}>
                                 {pharmacyInventory
                                     .filter(d => !selectedGroup || (d.category || d.item_group) === selectedGroup)
                                     .filter(d => !drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()) || (d.ucode && d.ucode.toLowerCase().includes(drugSearch.toLowerCase())))
@@ -812,12 +810,11 @@ const Clinical = () => {
                                                 setDrugSearch(d.name);
                                                 setShowDrugDropdown(false);
                                             }}
-                                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
-                                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                                            className="search-dropdown-item"
+                                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }}
                                         >
-                                            <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>{d.name}</p>
-                                            <p style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 700 }}>
+                                            <p style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '2px' }}>{d.name}</p>
+                                            <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                                                 CODE: {d.ucode || 'N/A'} | STOCK: {d.quantity || 0}
                                             </p>
                                         </div>
@@ -838,10 +835,9 @@ const Clinical = () => {
                                 .filter(m => m.name === newMed.name)
                                 .reduce((sum, m) => sum + getDoseCount(m.frequency, m.duration, m.item_group), 0);
                             const remaining = (drug.quantity || drug.balance_qty || 0) - alreadyAdded;
-                            const color = remaining > 10 ? '#166534' : remaining > 0 ? '#b45309' : '#ef4444';
-                            const bg = remaining > 10 ? '#dcfce7' : remaining > 0 ? '#fef3c7' : '#fee2e2';
+                            const stockState = remaining > 10 ? 'high' : remaining > 0 ? 'low' : 'empty';
                             return (
-                                <div style={{ position: 'absolute', top: '-18px', right: 0, fontSize: '9px', fontWeight: 900, color: color, background: bg, padding: '2px 6px', borderRadius: '4px', border: `1px solid ${color}40` }}>
+                                <div className={`stock-indicator stock-${stockState}`} style={{ position: 'absolute', top: '-18px', right: 0, fontSize: '9px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px' }}>
                                     STOCK: {remaining} {drug.stock_uom || 'UNITS'} | CODE: {drug.ucode || drug.item_code || 'N/A'}
                                 </div>
                             );
@@ -886,7 +882,7 @@ const Clinical = () => {
                                if (val !== "" && parseInt(val) < 0) return; 
                                setNewMed({...newMed, duration: val});
                            }} 
-                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '90px', fontWeight: 800, color: '#0f172a', border: '2px solid var(--border)', padding: '0 8px' }} 
+                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '90px', fontWeight: 800, color: 'var(--text-main)', border: '2px solid var(--border)', padding: '0 8px' }} 
                        />
 
                        {/* Extra Units Field for Non-Tablets */}
@@ -901,7 +897,8 @@ const Clinical = () => {
                                    if (val !== "" && parseInt(val) < 0) return; 
                                    setNewMed({...newMed, total_units: val});
                                }} 
-                               style={{ background: '#fff1f2', height: '36px', fontSize: '0.75rem', width: '85px', fontWeight: 800, color: '#be185d', border: '2px solid #fce7f3', padding: '0 8px', marginLeft: '4px' }} 
+                               className="units-input"
+                               style={{ height: '36px', fontSize: '0.75rem', width: '85px', fontWeight: 800, padding: '0 8px', marginLeft: '4px' }} 
                            />
                        )}
                        <button type="button" onClick={() => {
@@ -962,7 +959,7 @@ const Clinical = () => {
                                         <div style={{ flex: 1 }}>
                                             <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)', marginBottom: '4px' }}>{m.name}</p>
                                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                                                     | {m.frequency} | {m.timing} | {m.duration} days
                                                 </span>
                                                 
@@ -977,14 +974,11 @@ const Clinical = () => {
                                                         const threshold = Math.max(5, Math.round(initialQty * 0.2));
                                                         const isLow = drug.quantity <= threshold;
                                                         return (
-                                                            <span style={{ 
-                                                                background: isLow ? '#fffbeb' : '#f0fdf4', 
-                                                                color: isLow ? '#b45309' : '#10b981', 
+                                                            <span className={`stock-status-badge ${isLow ? 'low-stock' : 'in-stock'}`} style={{ 
                                                                 padding: '3px 12px', 
                                                                 borderRadius: '8px', 
                                                                 fontSize: '0.75rem', 
                                                                 fontWeight: 900, 
-                                                                border: `1px solid ${isLow ? '#fde68a' : '#dcfce7'}`,
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 gap: '4px'
@@ -1007,7 +1001,8 @@ const Clinical = () => {
                                                 const updated = consultData.medications.filter((_, i) => i !== idx);
                                                 setConsultData({...consultData, medications: updated});
                                             }}
-                                            style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
+                                            className="edit-med-btn"
+                                            style={{ border: 'none', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
                                         >
                                             <Pencil size={14} />
                                         </button>
@@ -1017,7 +1012,8 @@ const Clinical = () => {
                                                 const updated = consultData.medications.filter((_, i) => i !== idx);
                                                 setConsultData({...consultData, medications: updated});
                                             }}
-                                            style={{ border: 'none', background: '#fef2f2', color: '#ef4444', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
+                                            className="delete-med-btn"
+                                            style={{ border: 'none', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}
                                         >
                                             <X size={14} />
                                         </button>
@@ -1029,22 +1025,23 @@ const Clinical = () => {
                   </div>
                )}
 
-               <div style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem', border: !consultData.next_step ? '1.5px solid #fed7d7' : '1.5px solid transparent', transition: 'all 0.3s ease' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+               <div className="next-workflow-box" style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem', border: !consultData.next_step ? '1.5px solid #fed7d7' : '1.5px solid transparent', transition: 'all 0.3s ease' }}>
+                  <p className="next-workflow-title" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <AlertCircle size={14} /> Select Next Workflow Action
                      </span>
                      {!consultData.next_step && (
-                        <span style={{ fontSize: '0.625rem', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '6px', fontWeight: 900, animation: 'pulse 2s infinite' }}>REQUIRED</span>
+                        <span className="required-badge" style={{ fontSize: '0.625rem', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '6px', fontWeight: 900, animation: 'pulse 2s infinite' }}>REQUIRED</span>
                      )}
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: consultData.next_step === 'PENDING_LAB' ? '1rem' : '0' }}>
                      <button 
                        type="button" 
                        onClick={() => setConsultData({...consultData, next_step: 'PENDING_LAB'})}
+                       className={`workflow-btn ${consultData.next_step === 'PENDING_LAB' ? 'active-lab' : ''}`}
                        style={{ 
-                         padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', background: consultData.next_step === 'PENDING_LAB' ? '#1d4ed8' : 'white', 
-                         color: consultData.next_step === 'PENDING_LAB' ? 'white' : '#475569', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                         padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
+                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
                        }}
                      >
                        <FlaskConical size={14} /> Request Lab
@@ -1052,9 +1049,10 @@ const Clinical = () => {
                      <button 
                         type="button" 
                         onClick={() => setConsultData({...consultData, next_step: 'PENDING_PHARMACY'})}
+                        className={`workflow-btn ${consultData.next_step === 'PENDING_PHARMACY' ? 'active-pharmacy' : ''}`}
                         style={{ 
-                          padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', background: consultData.next_step === 'PENDING_PHARMACY' ? '#1d4ed8' : 'white', 
-                          color: consultData.next_step === 'PENDING_PHARMACY' ? 'white' : '#475569', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                          padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
+                          fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
                         }}
                       >
                         <Pill size={14} /> Pharmacy ({consultData.medications.length})
@@ -1062,9 +1060,10 @@ const Clinical = () => {
                      <button 
                        type="button" 
                        onClick={() => setConsultData({...consultData, next_step: 'COMPLETED'})}
+                       className={`workflow-btn ${consultData.next_step === 'COMPLETED' ? 'active-completed' : ''}`}
                        style={{ 
-                         padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', background: consultData.next_step === 'COMPLETED' ? '#059669' : 'white', 
-                         color: consultData.next_step === 'COMPLETED' ? 'white' : '#475569', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                         padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
+                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
                        }}
                      >
                        <CheckCircle size={14} /> Discharge
@@ -1094,7 +1093,7 @@ const Clinical = () => {
                                    }}
                                />
                                {showLabSearch && (
-                                  <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto', background: 'white', border: '1px solid #e0e7ff', borderRadius: '16px', zIndex: 1000, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', padding: '6px' }}>
+                                  <div className="search-dropdown" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto', borderRadius: '16px', zIndex: 1000, padding: '6px' }}>
                                      <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
                                      {labMasters.filter(l => {
                                          const query = searchLab.toLowerCase();
@@ -1114,8 +1113,8 @@ const Clinical = () => {
                                              className="search-item"
                                              style={{ padding: '12px 15px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', transition: 'all 0.2s' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                             <div style={{ fontWeight: 800, fontSize: '0.8125rem' }}>{l.name}</div>
-                                             <div style={{ fontSize: '0.625rem', padding: '2px 8px', background: '#f1f5f9', borderRadius: '6px', fontWeight: 700, color: '#64748b' }}>{l.code}</div>
+                                             <div style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{l.name}</div>
+                                             <div style={{ fontSize: '0.625rem', padding: '2px 8px', background: 'var(--background)', borderRadius: '6px', fontWeight: 700, color: 'var(--text-muted)' }}>{l.code}</div>
                                           </div>
                                           <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>{l.test_type_name} • {l.department_name}</div>
                                         </div>
@@ -1138,16 +1137,16 @@ const Clinical = () => {
                             <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                 {/* Historical / Existing Requests (Locked) */}
                                 {(selectedVisit?.lab_requests || []).map((req, idx) => (
-                                    <div key={`hist-${idx}`} style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
+                                    <div key={`hist-${idx}`} className="fixed-lab-badge" style={{ padding: '6px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
                                         <CheckCircle size={12} color="#10b981" />
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{req.test_name}</span>
-                                        <span style={{ fontSize: '0.55rem', padding: '1px 5px', background: '#e2e8f0', borderRadius: '4px', fontWeight: 900 }}>FIXED</span>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>{req.test_name}</span>
+                                        <span style={{ fontSize: '0.55rem', padding: '1px 5px', background: 'var(--background)', color: 'var(--text-muted)', borderRadius: '4px', fontWeight: 900 }}>FIXED</span>
                                     </div>
                                 ))}
 
                                 {/* New Additions */}
                                 {consultData.lab_investigations.map((inv, idx) => (
-                                    <div key={`new-${idx}`} className="fade-in" style={{ background: '#eff6ff', padding: '6px 12px', borderRadius: '10px', border: '1px solid #3b82f6', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.1)' }}>
+                                    <div key={`new-${idx}`} className="fade-in new-lab-badge" style={{ padding: '6px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.1)' }}>
                                         <FlaskConical size={12} color="#2563eb" />
                                         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>{inv.name}</span>
                                         <button 
@@ -1180,6 +1179,358 @@ const Clinical = () => {
       )}
     </div>
       <style>{`
+        /* Dark Mode Overrides for Clinical Workspace */
+        :root.dark-theme .known-history-box {
+          background: rgba(99, 102, 241, 0.1) !important;
+          border: 1px solid rgba(99, 102, 241, 0.25) !important;
+        }
+        :root.dark-theme .known-history-title {
+          color: #a5b4fc !important;
+        }
+
+        :root.dark-theme .systemic-exam-box {
+          background: rgba(16, 185, 129, 0.1) !important;
+          border: 1px solid rgba(16, 185, 129, 0.25) !important;
+        }
+        :root.dark-theme .systemic-exam-title {
+          color: #34d399 !important;
+        }
+
+        :root.dark-theme .next-workflow-box {
+          background: var(--surface) !important;
+          border-color: var(--border) !important;
+        }
+        :root.dark-theme .next-workflow-title {
+          color: var(--primary-light) !important;
+        }
+        :root.dark-theme .required-badge {
+          background: rgba(239, 68, 68, 0.2) !important;
+          color: #f87171 !important;
+          border: 1px solid rgba(239, 68, 68, 0.4) !important;
+        }
+
+        .workflow-btn {
+          background: white;
+          color: #475569;
+          border: 2px solid transparent;
+          transition: all 0.2s ease;
+        }
+        .workflow-btn:hover {
+          background: #f8fafc;
+        }
+        .workflow-btn.active-lab {
+          background: #1d4ed8 !important;
+          color: white !important;
+        }
+        .workflow-btn.active-pharmacy {
+          background: #1d4ed8 !important;
+          color: white !important;
+        }
+        .workflow-btn.active-completed {
+          background: #059669 !important;
+          color: white !important;
+        }
+
+        :root.dark-theme .workflow-btn {
+          background: var(--background);
+          color: var(--text-muted);
+        }
+        :root.dark-theme .workflow-btn:hover {
+          background: var(--border);
+          color: var(--text-main);
+        }
+        :root.dark-theme .workflow-btn.active-lab {
+          background: #2563eb !important;
+          color: white !important;
+        }
+        :root.dark-theme .workflow-btn.active-pharmacy {
+          background: #2563eb !important;
+          color: white !important;
+        }
+        :root.dark-theme .workflow-btn.active-completed {
+          background: #10b981 !important;
+          color: white !important;
+        }
+
+        .patient-avatar-placeholder {
+          background: #eff6ff;
+          color: #2563eb;
+          box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.1);
+        }
+        :root.dark-theme .patient-avatar-placeholder {
+          background: rgba(37, 99, 235, 0.1) !important;
+          color: #60a5fa !important;
+          box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2) !important;
+        }
+
+        .badge-captured {
+          background: #dcfce7;
+          color: #166534;
+        }
+        :root.dark-theme .badge-captured {
+          background: rgba(22, 101, 52, 0.2) !important;
+          color: #4ade80 !important;
+        }
+
+        .examining-badge {
+          background: #dcfce7;
+          color: #166534;
+        }
+        :root.dark-theme .examining-badge {
+          background: rgba(22, 101, 52, 0.2) !important;
+          color: #4ade80 !important;
+        }
+
+        .view-history-btn {
+          background: #f5f3ff;
+          border: 1px solid #ddd6fe;
+          color: #6d28d9;
+        }
+        :root.dark-theme .view-history-btn {
+          background: rgba(109, 40, 217, 0.15) !important;
+          border-color: rgba(109, 40, 217, 0.3) !important;
+          color: #a78bfa !important;
+        }
+
+        .inventory-count-badge {
+          background: white;
+          color: #64748b;
+          border: 1px solid #e2e8f0;
+        }
+        :root.dark-theme .inventory-count-badge {
+          background: var(--background) !important;
+          color: var(--text-muted) !important;
+          border-color: var(--border) !important;
+        }
+
+        .search-dropdown {
+          background: white;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        :root.dark-theme .search-dropdown {
+          background: var(--surface) !important;
+          border-color: var(--border) !important;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.4) !important;
+        }
+
+        .search-dropdown-item {
+          background: white;
+        }
+        .search-dropdown-item:hover {
+          background: #f8fafc !important;
+        }
+        :root.dark-theme .search-dropdown-item {
+          background: var(--surface) !important;
+        }
+        :root.dark-theme .search-dropdown-item:hover {
+          background: var(--background) !important;
+        }
+
+        .stock-indicator.stock-high {
+          color: #166534;
+          background: #dcfce7;
+          border: 1px solid rgba(22, 101, 52, 0.25);
+        }
+        .stock-indicator.stock-low {
+          color: #b45309;
+          background: #fef3c7;
+          border: 1px solid rgba(180, 83, 9, 0.25);
+        }
+        .stock-indicator.stock-empty {
+          color: #ef4444;
+          background: #fee2e2;
+          border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+
+        :root.dark-theme .stock-indicator.stock-high {
+          color: #4ade80;
+          background: rgba(22, 101, 52, 0.25);
+          border-color: rgba(74, 222, 128, 0.2);
+        }
+        :root.dark-theme .stock-indicator.stock-low {
+          color: #fbbf24;
+          background: rgba(180, 83, 9, 0.25);
+          border-color: rgba(251, 191, 36, 0.2);
+        }
+        :root.dark-theme .stock-indicator.stock-empty {
+          color: #f87171;
+          background: rgba(239, 68, 68, 0.25);
+          border-color: rgba(248, 113, 113, 0.2);
+        }
+
+        .stock-status-badge.in-stock {
+          background: #f0fdf4;
+          color: #10b981;
+          border: 1px solid #dcfce7;
+        }
+        .stock-status-badge.low-stock {
+          background: #fffbeb;
+          color: #b45309;
+          border: 1px solid #fde68a;
+        }
+
+        :root.dark-theme .stock-status-badge.in-stock {
+          background: rgba(16, 185, 129, 0.15) !important;
+          color: #34d399 !important;
+          border-color: rgba(16, 185, 129, 0.3) !important;
+        }
+        :root.dark-theme .stock-status-badge.low-stock {
+          background: rgba(245, 158, 11, 0.15) !important;
+          color: #fbbf24 !important;
+          border-color: rgba(245, 158, 11, 0.3) !important;
+        }
+
+        .edit-med-btn {
+          background: #eff6ff;
+          color: #2563eb;
+        }
+        :root.dark-theme .edit-med-btn {
+          background: rgba(37, 99, 235, 0.15) !important;
+          color: #60a5fa !important;
+        }
+        .delete-med-btn {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+        :root.dark-theme .delete-med-btn {
+          background: rgba(239, 68, 68, 0.15) !important;
+          color: #f87171 !important;
+        }
+
+        .fixed-lab-badge {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+        }
+        :root.dark-theme .fixed-lab-badge {
+          background: var(--background) !important;
+          border-color: var(--border) !important;
+        }
+
+        .new-lab-badge {
+          background: #eff6ff;
+          border: 1px solid #3b82f6;
+        }
+        :root.dark-theme .new-lab-badge {
+          background: rgba(59, 130, 246, 0.15) !important;
+          border-color: rgba(59, 130, 246, 0.3) !important;
+        }
+
+        .units-input {
+          background: #fff1f2 !important;
+          color: #be185d !important;
+          border: 2px solid #fce7f3 !important;
+        }
+        :root.dark-theme .units-input {
+          background: rgba(244, 63, 94, 0.1) !important;
+          color: #fb7185 !important;
+          border-color: rgba(244, 63, 94, 0.2) !important;
+        }
+
+        .history-tab-btn {
+          border: 1px solid #e2e8f0;
+          background: white;
+          color: #64748b;
+        }
+        .history-tab-btn.active {
+          border-color: #6366f1;
+          background: #eff6ff;
+          color: #4338ca;
+        }
+        :root.dark-theme .history-tab-btn {
+          border-color: var(--border);
+          background: var(--background);
+          color: var(--text-muted);
+        }
+        :root.dark-theme .history-tab-btn.active {
+          border-color: var(--primary);
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--primary-light);
+        }
+
+        .history-med-item {
+          background: #f8fafc;
+          border: 1px solid #f1f5f9;
+        }
+        .history-med-name {
+          color: #1e293b;
+        }
+        :root.dark-theme .history-med-item {
+          background: var(--background);
+          border-color: var(--border);
+        }
+        :root.dark-theme .history-med-name {
+          color: var(--text-main);
+        }
+
+        .history-lab-item {
+          border: 1px solid #f1f5f9;
+        }
+        .history-lab-name {
+          color: #0f172a;
+        }
+        :root.dark-theme .history-lab-item {
+          border-color: var(--border);
+        }
+        :root.dark-theme .history-lab-name {
+          color: var(--text-main);
+        }
+
+        /* Override existing light-only properties in dark theme */
+        :root.dark-theme .reference-panel { 
+            background: var(--surface) !important; 
+            border-color: var(--border) !important; 
+        }
+        :root.dark-theme .reference-header { 
+            border-bottom-color: var(--border) !important; 
+            background: var(--background) !important; 
+        }
+        :root.dark-theme .dossier-title { 
+            color: var(--text-main) !important; 
+        }
+        :root.dark-theme .dossier-close { 
+            background: var(--background) !important; 
+            color: var(--text-muted) !important; 
+        }
+        :root.dark-theme .snapshot-item { 
+            background: var(--background) !important; 
+            border-color: var(--border) !important; 
+        }
+        :root.dark-theme .item-value { 
+            color: var(--text-main) !important; 
+        }
+        :root.dark-theme .diagnosis-box { 
+            background: rgba(245, 158, 11, 0.1) !important; 
+            border-color: var(--accent) !important; 
+        }
+        :root.dark-theme .diagnosis-text { 
+            color: var(--accent) !important; 
+        }
+        :root.dark-theme .med-row { 
+            background: var(--background) !important; 
+            border-color: var(--border) !important; 
+        }
+        :root.dark-theme .med-name { 
+            color: var(--text-main) !important; 
+        }
+        :root.dark-theme .lab-card { 
+            background: var(--background) !important; 
+            border-color: var(--border) !important; 
+        }
+        :root.dark-theme .lab-name { 
+            color: var(--text-main) !important; 
+        }
+        :root.dark-theme .param-val { 
+            color: var(--text-main) !important; 
+        }
+        :root.dark-theme .dossier-footer { 
+            background: var(--surface) !important; 
+        }
+        :root.dark-theme .dossier-confirm-btn { 
+            background: var(--primary) !important; 
+            color: white !important; 
+        }
+
         @keyframes pulse {
           0% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.7; transform: scale(0.95); }

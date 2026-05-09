@@ -367,8 +367,8 @@ const ProjectManagement = () => {
                                             alignItems: 'center', 
                                             gap: '1rem', 
                                             padding: '1.25rem', 
-                                            background: projectFormData.use_registry_for_personnel ? 'rgba(245, 158, 11, 0.03)' : '#f8fafc',
-                                            border: '1px solid ' + (projectFormData.use_registry_for_personnel ? '#f59e0b' : '#e2e8f0'),
+                                            background: projectFormData.use_registry_for_personnel ? 'rgba(245, 158, 11, 0.03)' : 'var(--surface)',
+                                            border: '1px solid ' + (projectFormData.use_registry_for_personnel ? '#f59e0b' : 'var(--border)'),
                                             borderRadius: '16px',
                                             cursor: 'pointer',
                                             transition: '0.2s'
@@ -381,8 +381,8 @@ const ProjectManagement = () => {
                                             onChange={e => setProjectFormData({ ...projectFormData, use_registry_for_personnel: e.target.checked })}
                                         />
                                         <div>
-                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enable Personnel & Family Registry</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Enable specialized onboarding for Staff (IE) and their family members.</p>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enable Personnel & Family Registry</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Enable specialized onboarding for Staff (IE) and their family members.</p>
                                         </div>
                                     </label>
                                 </div>
@@ -394,8 +394,8 @@ const ProjectManagement = () => {
                                             alignItems: 'center', 
                                             gap: '1rem', 
                                             padding: '1.25rem', 
-                                            background: projectFormData.allow_appointments ? 'rgba(79, 70, 229, 0.03)' : '#f8fafc',
-                                            border: '1px solid ' + (projectFormData.allow_appointments ? 'var(--primary)' : '#e2e8f0'),
+                                            background: projectFormData.allow_appointments ? 'rgba(79, 70, 229, 0.03)' : 'var(--surface)',
+                                            border: '1px solid ' + (projectFormData.allow_appointments ? 'var(--primary)' : 'var(--border)'),
                                             borderRadius: '16px',
                                             cursor: 'pointer',
                                             transition: '0.2s'
@@ -408,8 +408,8 @@ const ProjectManagement = () => {
                                             onChange={e => setProjectFormData({ ...projectFormData, allow_appointments: e.target.checked })}
                                         />
                                         <div>
-                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enable Patient Self-Service Appointments</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Allow patients in this project to book consultations and tests from their portal.</p>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enable Patient Self-Service Appointments</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Allow patients in this project to book consultations and tests from their portal.</p>
                                         </div>
                                     </label>
                                 </div>
@@ -421,8 +421,8 @@ const ProjectManagement = () => {
                                             alignItems: 'center', 
                                             gap: '1rem', 
                                             padding: '1.25rem', 
-                                            background: projectFormData.vitals_mandatory ? 'rgba(239, 68, 68, 0.03)' : '#f8fafc',
-                                            border: '1px solid ' + (projectFormData.vitals_mandatory ? '#ef4444' : '#e2e8f0'),
+                                            background: projectFormData.vitals_mandatory ? 'rgba(239, 68, 68, 0.03)' : 'var(--surface)',
+                                            border: '1px solid ' + (projectFormData.vitals_mandatory ? '#ef4444' : 'var(--border)'),
                                             borderRadius: '16px',
                                             cursor: 'pointer',
                                             transition: '0.2s'
@@ -435,8 +435,8 @@ const ProjectManagement = () => {
                                             onChange={e => setProjectFormData({ ...projectFormData, vitals_mandatory: e.target.checked })}
                                         />
                                         <div>
-                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Enforce Mandatory Vitals</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>When enabled, Temp and Weight are required for every triage assessment.</p>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enforce Mandatory Vitals</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>When enabled, Temp and Weight are required for every triage assessment.</p>
                                         </div>
                                     </label>
                                 </div>
@@ -540,7 +540,7 @@ const BrandingManager = ({ projects }) => {
 
     return (
         <>
-            <div className="card" style={{ padding: '2rem', marginTop: '2.5rem', background: '#f8fafc', border: '2px solid #e2e8f0' }}>
+            <div className="card" style={{ padding: '2rem', marginTop: '2.5rem', background: 'var(--surface)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <div style={{ padding: '8px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '10px' }}>
@@ -599,7 +599,7 @@ const BrandingManager = ({ projects }) => {
                                     justifyContent: 'center', 
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
-                                    background: 'white'
+                                    background: 'var(--background)'
                                 }}
                                 onMouseOver={e => e.currentTarget.style.borderColor = 'var(--primary)'}
                                 onMouseOut={e => e.currentTarget.style.borderColor = 'var(--border)'}
@@ -626,7 +626,7 @@ const BrandingManager = ({ projects }) => {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    background: 'rgba(255, 255, 255, 0.7)',
+                    background: 'rgba(15, 23, 42, 0.75)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -634,7 +634,7 @@ const BrandingManager = ({ projects }) => {
                     padding: '1.5rem'
                 }}>
                     <div style={{
-                        background: 'white',
+                        background: 'var(--surface)',
                         width: '100%',
                         maxWidth: '400px',
                         borderRadius: '24px',
@@ -657,8 +657,8 @@ const BrandingManager = ({ projects }) => {
                         }}>
                             <AlertTriangle size={36} />
                         </div>
-                        <h3 style={{ fontSize: '1.375rem', fontWeight: 900, marginBottom: '0.75rem', color: '#0f172a' }}>Confirm Removal</h3>
-                        <p style={{ fontSize: '0.9375rem', color: '#64748b', lineHeight: 1.6, marginBottom: '2.5rem' }}>
+                        <h3 style={{ fontSize: '1.375rem', fontWeight: 900, marginBottom: '0.75rem', color: 'var(--text-main)' }}>Confirm Removal</h3>
+                        <p style={{ fontSize: '0.9375rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
                             Are you sure you want to remove this branding asset? This will immediately update the project identity across all user headers.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -668,15 +668,15 @@ const BrandingManager = ({ projects }) => {
                                     flex: 1,
                                     padding: '0.875rem',
                                     borderRadius: '16px',
-                                    border: '1px solid #e2e8f0',
-                                    background: 'white',
-                                    color: '#475569',
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--background)',
+                                    color: 'var(--text-main)',
                                     fontWeight: 800,
                                     cursor: 'pointer',
                                     transition: 'all 0.2s'
                                 }}
-                                onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
-                                onMouseOut={e => e.currentTarget.style.background = 'white'}
+                                onMouseOver={e => e.currentTarget.style.background = 'var(--surface)'}
+                                onMouseOut={e => e.currentTarget.style.background = 'var(--background)'}
                             >
                                 Cancel
                             </button>

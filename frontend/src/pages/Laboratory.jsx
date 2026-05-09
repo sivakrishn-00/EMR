@@ -175,21 +175,21 @@ const Laboratory = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>Workload Queue</h3>
-                <p style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue</h3>
+                <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
              </div>
              
-             <div style={{ background: '#f1f5f9', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px' }}>
+             <div style={{ background: 'var(--background)', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px', border: '1px solid var(--border)' }}>
                 <button 
                   onClick={() => setActiveTab('PENDING')}
                   style={{ 
                     padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
-                    background: activeTab === 'PENDING' ? 'white' : 'transparent',
-                    color: activeTab === 'PENDING' ? '#4f46e5' : '#64748b',
+                    background: activeTab === 'PENDING' ? 'var(--surface)' : 'transparent',
+                    color: activeTab === 'PENDING' ? 'var(--primary)' : 'var(--text-muted)',
                     fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                    boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                    boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
                     alignItems: 'center',
@@ -202,10 +202,10 @@ const Laboratory = () => {
                   onClick={() => setActiveTab('COMPLETED')}
                   style={{ 
                     padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
-                    background: activeTab === 'COMPLETED' ? 'white' : 'transparent',
-                    color: activeTab === 'COMPLETED' ? '#059669' : '#64748b',
+                    background: activeTab === 'COMPLETED' ? 'var(--surface)' : 'transparent',
+                    color: activeTab === 'COMPLETED' ? '#10b981' : 'var(--text-muted)',
                     fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                    boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                    boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
                     alignItems: 'center',
@@ -231,7 +231,7 @@ const Laboratory = () => {
                 {labRequests
                   .filter(r => activeTab === 'COMPLETED' ? r.status === 'COMPLETED' : r.status !== 'COMPLETED')
                   .map(r => (
-                  <tr key={r.id} style={{ background: selectedRequest?.id === r.id ? '#f8fafc' : 'transparent' }}>
+                  <tr key={r.id} style={{ background: selectedRequest?.id === r.id ? 'var(--background)' : 'transparent' }}>
                     <td style={{ padding: '1.25rem 1.25rem' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <div style={{ 
@@ -302,7 +302,7 @@ const Laboratory = () => {
                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequest.patient_name}</strong></p>
                   </div>
                </div>
-               <button onClick={() => setSelectedRequest(null)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer' }}>
+               <button onClick={() => setSelectedRequest(null)} style={{ border: 'none', background: 'var(--background)', color: 'var(--text-main)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <X size={16} />
                </button>
             </div>
@@ -324,7 +324,7 @@ const Laboratory = () => {
             </div>
 
             {selectedRequest.status !== 'COMPLETED' && (
-               <div style={{ marginBottom: '2rem', background: 'var(--surface)', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+               <div style={{ marginBottom: '2rem', background: 'var(--surface)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #4f46e5 0%, #312e81 100%)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -391,10 +391,10 @@ const Laboratory = () => {
                                const val = resultData.values[st.name];
                                const hasData = val !== undefined && val !== '';
                                return (
-                                  <div key={st.id} style={{ padding: '1.25rem', background: 'white', borderRadius: '24px', border: hasData ? '1px solid #e2e8f0' : '1px dashed #cbd5e1' }}>
-                                     <label style={{ fontSize: '0.6rem', fontWeight: 950, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>{st.name}</label>
-                                     <div style={{ fontSize: '1.5rem', fontWeight: 950, color: hasData ? '#1e293b' : '#f1f5f9' }}>{hasData ? val : '---'}</div>
-                                     <div style={{ fontSize: '0.55rem', color: '#cbd5e1', fontWeight: 800 }}>{st.units} | {st.biological_range}</div>
+                                  <div key={st.id} style={{ padding: '1.25rem', background: 'var(--surface)', borderRadius: '24px', border: hasData ? '1px solid var(--border)' : '1px dashed var(--border)' }}>
+                                     <label style={{ fontSize: '0.6rem', fontWeight: 950, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>{st.name}</label>
+                                     <div style={{ fontSize: '1.5rem', fontWeight: 950, color: hasData ? 'var(--text-main)' : 'var(--border)' }}>{hasData ? val : '---'}</div>
+                                     <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 800 }}>{st.units} | {st.biological_range}</div>
                                   </div>
                                );
                             })}

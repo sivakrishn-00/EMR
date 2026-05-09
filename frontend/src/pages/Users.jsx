@@ -446,7 +446,7 @@ const Users = () => {
                 <div style={{ 
                     position: 'fixed', 
                     top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(255, 255, 255, 0.85)', 
+                    background: 'rgba(15, 23, 42, 0.85)', 
                     backdropFilter: 'blur(12px)', 
                     display: 'flex', 
                     justifyContent: 'center', 
@@ -460,7 +460,7 @@ const Users = () => {
                         maxWidth: '560px', 
                         padding: 0, 
                         borderRadius: '32px', 
-                        background: 'white', 
+                        background: 'var(--surface)', 
                         border: '1px solid var(--border)', 
                         boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
                         position: 'relative'
@@ -480,7 +480,7 @@ const Users = () => {
                                     <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                                         {editingUser ? 'Update Staff Profile' : 'Add Staff Member'}
                                     </h2>
-                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>
                                         Configure credentials and access roles
                                     </p>
                                 </div>
@@ -489,7 +489,7 @@ const Users = () => {
                                 onClick={() => setShowModal(false)} 
                                 style={{ 
                                     border: 'none', 
-                                    background: '#f1f5f9', 
+                                    background: 'var(--background)', 
                                     width: '36px', 
                                     height: '36px', 
                                     borderRadius: '12px', 
@@ -499,14 +499,14 @@ const Users = () => {
                                     justifyContent: 'center' 
                                 }}
                             >
-                                <X size={20} color="#64748b" />
+                                <X size={20} color="var(--text-muted)" />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                                 <div className="form-group">
-                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>First Name</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>First Name</label>
                                     <input 
                                         required 
                                         className="form-control"
@@ -517,7 +517,7 @@ const Users = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Last Name</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Last Name</label>
                                     <input 
                                         required 
                                         className="form-control"
@@ -529,7 +529,7 @@ const Users = () => {
                                 </div>
 
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Username (Login ID)</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Username (Login ID)</label>
                                     <input 
                                         required 
                                         className="form-control"
@@ -542,7 +542,7 @@ const Users = () => {
                                 </div>
 
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Email Address</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Email Address</label>
                                     <input 
                                         type="email" 
                                         required 
@@ -555,7 +555,7 @@ const Users = () => {
                                 </div>
 
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Assigned Project Facility</label>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Assigned Project Facility</label>
                                     <select 
                                         required 
                                         className="form-control"
@@ -570,7 +570,7 @@ const Users = () => {
 
                                 {!editingUser ? (
                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                        <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Temporary Password</label>
+                                        <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Temporary Password</label>
                                         <input 
                                             type="password" 
                                             required 
@@ -581,8 +581,8 @@ const Users = () => {
                                         />
                                     </div>
                                 ) : (
-                                    <div style={{ gridColumn: 'span 2', background: '#f8fafc', padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                                        <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                    <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                                             Editing user permissions. Security identifiers are locked.
                                         </p>
                                     </div>
@@ -622,11 +622,11 @@ const Users = () => {
             {/* Delete Confirmation */}
             {confirmDelete && createPortal(
                 <div style={{ 
-                    position: 'fixed', inset: 0, background: 'rgba(255, 255, 255, 0.4)', 
+                    position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', 
                     backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
                     zIndex: 10000 
                 }}>
-                    <div className="card fade-in" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '2.5rem', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
+                    <div className="card fade-in" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '2.5rem', borderRadius: '32px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
                         <div style={{ 
                              width: '64px', height: '64px', background: '#fee2e2', color: '#ef4444', 
                              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -649,16 +649,16 @@ const Users = () => {
             )}
             {showProvisionModal && createPortal(
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '600px', borderRadius: '24px', padding: 0, overflow: 'hidden' }}>
-                        <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)', padding: '1.5rem 2rem', borderBottom: '1px solid #fde68a' }}>
+                    <div className="modal-content" style={{ maxWidth: '600px', borderRadius: '24px', padding: 0, overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                        <div style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%)', padding: '1.5rem 2rem', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                     <div style={{ width: '40px', height: '40px', background: '#f59e0b', color: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <ShieldCheck size={24} />
                                     </div>
                                     <div>
-                                        <h2 style={{ fontWeight: 900, fontSize: '1.2rem', color: '#92400e' }}>Bulk Provisioning</h2>
-                                        <p style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Authorize {selectedPatients.length > 0 ? selectedPatients.length : 'multiple'} patients at once</p>
+                                        <h2 style={{ fontWeight: 900, fontSize: '1.2rem', color: '#f59e0b' }}>Bulk Provisioning</h2>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Authorize {selectedPatients.length > 0 ? selectedPatients.length : 'multiple'} patients at once</p>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -675,26 +675,26 @@ const Users = () => {
                                                     setSelectedPatients([...new Set([...selectedPatients, ...filtered.map(p => p.id)])]);
                                                 }
                                             }}
-                                            style={{ background: 'white', border: '1px solid #fde68a', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#b45309', cursor: 'pointer' }}
+                                            style={{ background: 'var(--background)', border: '1px solid var(--border)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#f59e0b', cursor: 'pointer' }}
                                         >
                                             Toggle Filtered
                                         </button>
                                     )}
-                                    <button onClick={() => { setShowProvisionModal(false); setSelectedPatients([]); setProvisionSearch(''); }} style={{ background: 'white', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <X size={18} color="#b45309" />
+                                    <button onClick={() => { setShowProvisionModal(false); setSelectedPatients([]); setProvisionSearch(''); }} style={{ background: 'var(--background)', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <X size={18} color="#f59e0b" />
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Search Bar inside Modal */}
-                        <div style={{ padding: '1rem 2rem', background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+                        <div style={{ padding: '1rem 2rem', background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ position: 'relative' }}>
-                                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#b45309' }} />
+                                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#f59e0b' }} />
                                 <input 
                                     type="text" 
                                     placeholder="Search by Patient ID or Name..." 
-                                    style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: '12px', border: '1px solid #fde68a', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
+                                    style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-main)', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
                                     value={provisionSearch}
                                     onChange={(e) => setProvisionSearch(e.target.value)}
                                 />
@@ -703,7 +703,7 @@ const Users = () => {
 
                         <div style={{ padding: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
                             {availablePatients.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                                     <p style={{ fontWeight: 700 }}>No unprovisioned patients found.</p>
                                     <p style={{ fontSize: '0.75rem' }}>All registered patients have portal access or are already enabled.</p>
                                 </div>
@@ -725,27 +725,27 @@ const Users = () => {
                                                 }}
                                                 style={{ 
                                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', 
-                                                    background: isSelected ? '#fffbeb' : '#f8fafc', 
-                                                    borderRadius: '16px', border: `1px solid ${isSelected ? '#f59e0b' : '#e2e8f0'}`,
+                                                    background: isSelected ? 'rgba(245, 158, 11, 0.12)' : 'var(--background)', 
+                                                    borderRadius: '16px', border: `1px solid ${isSelected ? '#f59e0b' : 'var(--border)'}`,
                                                     cursor: 'pointer', transition: '0.2s'
                                                 }}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                     <div style={{ 
                                                         width: '20px', height: '20px', borderRadius: '6px', 
-                                                        border: `2px solid ${isSelected ? '#f59e0b' : '#cbd5e1'}`,
-                                                        background: isSelected ? '#f59e0b' : 'white',
+                                                        border: `2px solid ${isSelected ? '#f59e0b' : 'var(--border)'}`,
+                                                        background: isSelected ? '#f59e0b' : 'var(--surface)',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         color: 'white'
                                                     }}>
                                                         {isSelected && <Check size={14} strokeWidth={4} />}
                                                     </div>
                                                     <div>
-                                                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>{p.first_name} {p.last_name}</p>
-                                                        <p style={{ fontSize: '0.75rem', color: '#64748b' }}>ID: {p.patient_id} • {p.phone}</p>
+                                                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{p.first_name} {p.last_name}</p>
+                                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {p.patient_id} • {p.phone}</p>
                                                     </div>
                                                 </div>
-                                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: isSelected ? '#f59e0b' : '#94a3b8', textTransform: 'uppercase' }}>
+                                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: isSelected ? '#f59e0b' : 'var(--text-muted)', textTransform: 'uppercase' }}>
                                                     {isSelected ? 'Selected' : 'Click to select'}
                                                 </div>
                                             </div>
@@ -754,8 +754,8 @@ const Users = () => {
                                 </div>
                             )}
                         </div>
-                        <div style={{ padding: '1.25rem 1.5rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{selectedPatients.length} patients selected</p>
+                        <div style={{ padding: '1.25rem 1.5rem', background: 'var(--background)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>{selectedPatients.length} patients selected</p>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button className="btn btn-secondary" onClick={() => { setShowProvisionModal(false); setSelectedPatients([]); setProvisionSearch(''); }}>Cancel</button>
                                 <button 

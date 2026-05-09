@@ -892,57 +892,57 @@ const Reports = () => {
               {consumptionData?.items?.map((visit, vIdx) => (
                   <div key={vIdx} style={{ marginBottom: '2.5rem', breakInside: 'avoid' }}>
                       <div style={{ 
-                          background: '#f8fafc', 
+                          background: 'var(--background)', 
                           padding: '12px 16px', 
                           borderRadius: '8px', 
                           marginBottom: '16px',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          border: '1px solid #e2e8f0',
-                          borderLeft: '5px solid #0f172a'
+                          border: '1px solid var(--border)',
+                          borderLeft: '5px solid var(--primary)'
                       }}>
                            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <CalendarDays size={14} style={{ color: '#64748b' }} />
-                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+                              <CalendarDays size={14} style={{ color: 'var(--text-muted)' }} />
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase' }}>
                                   {new Date(visit.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fff', padding: '2px 10px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
-                                <ShieldCheck size={12} style={{ color: '#0f172a' }} />
-                                <span style={{ fontSize: '0.625rem', fontWeight: 800, color: '#0f172a' }}>REF: V-{visit.visit_id}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface)', padding: '2px 10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                <ShieldCheck size={12} style={{ color: 'var(--primary)' }} />
+                                <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--text-main)' }}>REF: V-{visit.visit_id}</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #e2e8f0', paddingLeft: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
                                 <User size={14} style={{ color: '#6366f1' }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>{visit.patient_name}</span>
-                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{visit.patient_id}</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}>{visit.patient_name}</span>
+                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: '4px' }}>{visit.patient_id}</span>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>{visit.medications.length} Line Items</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{visit.medications.length} Line Items</span>
                       </div>
                       
                       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                           <thead>
-                              <tr style={{ borderBottom: '2px solid #0f172a' }}>
-                                  <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Medication Description</th>
-                                  <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Qty</th>
-                                  <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rate (₹)</th>
-                                  <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Subtotal (₹)</th>
+                              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                  <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Medication Description</th>
+                                  <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Qty</th>
+                                  <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Rate (₹)</th>
+                                  <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Subtotal (₹)</th>
                               </tr>
                           </thead>
                           <tbody>
                               {visit.medications.map((med, mIdx) => (
-                                  <tr key={mIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                      <td style={{ padding: '14px 16px', fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{med.name}</td>
-                                      <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 900, color: '#0f172a' }}>{med.quantity}</td>
-                                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 600, color: '#64748b' }}>{med.unit_price.toFixed(2)}</td>
-                                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a' }}>{med.total_cost.toFixed(2)}</td>
+                                  <tr key={mIdx} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '14px 16px', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>{med.name}</td>
+                                      <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '0.8125rem', fontWeight: 900, color: 'var(--text-main)' }}>{med.quantity}</td>
+                                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted)' }}>{med.unit_price.toFixed(2)}</td>
+                                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)' }}>{med.total_cost.toFixed(2)}</td>
                                   </tr>
                               ))}
-                              <tr style={{ background: '#f8fafc' }}>
-                                <td colSpan={3} style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Visit Total:</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.875rem', fontWeight: 900, color: '#0f172a' }}>
+                              <tr style={{ background: 'var(--background)' }}>
+                                <td colSpan={3} style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Visit Total:</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-main)' }}>
                                    ₹{visit.medications.reduce((sum, m) => sum + m.total_cost, 0).toFixed(2)}
                                 </td>
                               </tr>
@@ -1030,20 +1030,21 @@ const Reports = () => {
       {showBulkModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
           justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
         }}>
           <div style={{
-            background: 'white', width: '600px', borderRadius: '24px',
-            padding: '2rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+            background: 'var(--surface)', width: '600px', borderRadius: '24px',
+            padding: '2rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
+            border: '1px solid var(--border)', color: 'var(--text-main)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e3a8a' }}>Bulk Historical Consumption Import</h2>
-              <button onClick={() => setShowBulkModal(false)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X /></button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Bulk Historical Consumption Import</h2>
+              <button onClick={() => setShowBulkModal(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={20} /></button>
             </div>
             
-            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '1.5rem', lineHeight: '1.6' }}>
-              Paste your 3-month history below or <strong>upload a CSV file</strong>. Format: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>YYYY-MM-DD, CardNo, DrugName, Quantity, [UnitPrice]</code>. 
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              Paste your 3-month history below or <strong>upload a CSV file</strong>. Format: <code style={{ background: 'var(--background)', color: '#6366f1', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>YYYY-MM-DD, CardNo, DrugName, Quantity, [UnitPrice]</code>. 
               <br/><span style={{ color: '#10b981' }}>Tip: Including [UnitPrice] ensures accurate historical financial auditing.</span>
             </p>
 
@@ -1059,9 +1060,9 @@ const Reports = () => {
                 htmlFor="bulk-file-upload"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  padding: '8px 16px', background: '#eff6ff', color: '#1e3a8a',
+                  padding: '8px 16px', background: 'var(--background)', color: 'var(--text-main)',
                   borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700,
-                  cursor: 'pointer', border: '1px dashed #1e3a8a'
+                  cursor: 'pointer', border: '1px dashed var(--border)'
                 }}
               >
                 <UploadIcon size={14} /> Choose CSV File
@@ -1074,7 +1075,8 @@ const Reports = () => {
               placeholder="2024-04-01, 0001, Amaryl 1mg, 10, 2.50&#10;2024-04-05, 0002, Dolo 650, 5, 1.80"
               style={{
                 width: '100%', height: '250px', padding: '1rem', borderRadius: '12px',
-                border: '1px solid #e2e8f0', fontFamily: 'monospace', fontSize: '0.875rem',
+                border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: '0.875rem',
+                background: 'var(--background)', color: 'var(--text-main)',
                 marginBottom: '1.5rem', resize: 'none'
               }}
             />
@@ -1084,8 +1086,9 @@ const Reports = () => {
                 onClick={handleBulkUpload}
                 disabled={isUploading}
                 style={{
-                  flex: 1, padding: '12px', background: '#1e3a8a', color: 'white',
-                  border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer'
+                  flex: 1, padding: '12px', background: '#6366f1', color: 'white',
+                  border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
                 }}
               >
                 {isUploading ? 'Processing...' : 'Start Import'}
@@ -1093,7 +1096,7 @@ const Reports = () => {
               <button 
                 onClick={() => setShowBulkModal(false)}
                 style={{
-                  padding: '12px 24px', background: '#f1f5f9', color: '#64748b',
+                  padding: '12px 24px', background: 'var(--background)', color: 'var(--text-muted)',
                   border: 'none', borderRadius: '12px', fontWeight: 700, cursor: 'pointer'
                 }}
               >

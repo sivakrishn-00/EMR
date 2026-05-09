@@ -73,9 +73,9 @@ const Audit = () => {
                                     </td>
                                     <td><span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.04em' }}>{log.module}</span></td>
                                     <td><span style={{ fontWeight: 700, fontSize: '0.8125rem' }}>{log.action}</span></td>
-                                    <td style={{ fontSize: '0.75rem', color: '#64748b', maxWidth: '300px' }}>{log.details}</td>
+                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '300px' }}>{log.details}</td>
                                     <td style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{log.ip_address || '127.0.0.1'}</td>
-                                    <td style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                         {new Date(log.timestamp).toLocaleDateString()}<br/>
                                         <span style={{ fontSize: '0.625rem' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
                                     </td>
@@ -83,7 +83,7 @@ const Audit = () => {
                             ))}
                             {!isLoading && logs.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                                         <ClipboardList size={40} style={{ marginBottom: '1rem', opacity: 0.1 }} />
                                         <p>No audit records found.</p>
                                     </td>
@@ -95,8 +95,8 @@ const Audit = () => {
                 
                 {/* Pagination */}
                 {totalCount > 10 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
                                 className="btn btn-secondary" disabled={page === 1} onClick={() => fetchLogs(page - 1)}

@@ -1725,27 +1725,27 @@ const AdminMasters = () => {
                                 style={{
                                   padding: "1.15rem 1.25rem",
                                   borderRadius: "16px",
-                                  background: "linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%)",
-                                  border: "1px solid #fca5a5",
-                                  boxShadow: "0 8px 20px rgba(239, 68, 68, 0.04)",
+                                  background: "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)",
+                                  border: "1px solid rgba(239, 68, 68, 0.25)",
+                                  boxShadow: "0 8px 20px rgba(239, 68, 68, 0.08)",
                                   display: "flex",
                                   flexDirection: "column",
                                   justifyContent: "space-between"
                                 }}
                               >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                   <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#991b1b", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
+                                   <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#ef4444", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
                                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", animation: "pulse 1.5s infinite" }} />
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
                                    <div>
-                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#c2410c", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
-                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#9a3412", marginTop: "2px" }}>LOW STOCK ITEMS</p>
+                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--alert-low)", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
+                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--alert-low)", opacity: 0.8, marginTop: "2px" }}>LOW STOCK ITEMS</p>
                                    </div>
-                                   <div style={{ borderLeft: "1px solid #fca5a5", height: "35px", opacity: 0.6 }} />
+                                   <div style={{ borderLeft: "1px solid rgba(239, 68, 68, 0.3)", height: "35px", opacity: 0.6 }} />
                                    <div>
-                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#b91c1c", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
-                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#991b1b", marginTop: "2px" }}>OUT OF STOCK</p>
+                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--alert-out)", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
+                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--alert-out)", opacity: 0.8, marginTop: "2px" }}>OUT OF STOCK</p>
                                    </div>
                                 </div>
                               </div>
@@ -1756,19 +1756,19 @@ const AdminMasters = () => {
                               style={{
                                 padding: "1.15rem 1.25rem",
                                 borderRadius: "16px",
-                                background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
-                                border: "1px solid #86efac",
-                                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.04)",
+                                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)",
+                                border: "1px solid rgba(16, 185, 129, 0.25)",
+                                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.08)",
                                 display: "flex",
                                 flexDirection: "column",
                                 justifyContent: "space-between"
                               }}
                             >
-                              <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#166534", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
-                              <h2 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#15803d", marginTop: "0.5rem" }}>
+                              <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#10b981", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
+                              <h2 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--conversion-text)", marginTop: "0.5rem" }}>
                                 {dashboardStats.conversion_rate}%
                               </h2>
-<p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "#166534", marginTop: "4px" }}>
+<p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--conversion-text)", opacity: 0.8, marginTop: "4px" }}>
                                  Visits successfully completed today
                               </p>
                             </div>
@@ -1782,7 +1782,7 @@ const AdminMasters = () => {
                                <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "stretch" }}>
                                   
                                    {/* Section A: Weekly Consumption Trends (Left Side) */}
-                                   <div className="card" style={{ flex: "1 1 450px", minWidth: "280px", padding: "1.15rem 1.25rem", borderRadius: "16px", background: "white", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                   <div className="card" style={{ flex: "1 1 450px", minWidth: "280px", padding: "1.15rem 1.25rem", borderRadius: "16px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                                       <div>
                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
                                             <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1806,13 +1806,13 @@ const AdminMasters = () => {
                                                      display: "flex", 
                                                      alignItems: "center", 
                                                      gap: "6px", 
-                                                     background: "linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)", 
+                                                     background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)", 
                                                      padding: "0.45rem 0.75rem", 
                                                      borderRadius: "10px", 
                                                      fontSize: "0.6875rem", 
                                                      fontWeight: 800, 
-                                                     color: "#4f46e5",
-                                                     border: "1px solid #e0e7ff",
+                                                     color: "var(--primary)",
+                                                     border: "1px solid var(--border)",
                                                      marginBottom: "1rem"
                                                   }}>
                                                      <span style={{ fontSize: "0.85rem" }}>⚡</span>
@@ -1844,8 +1844,8 @@ const AdminMasters = () => {
                                                      {/* Outer Track Column */}
                                                      <div style={{ 
                                                         width: "100%", 
-                                                        background: "#f8fafc", 
-                                                        border: "1px solid #e2e8f0",
+                                                        background: "var(--background)", 
+                                                        border: "1px solid var(--border)",
                                                         borderRadius: "12px", 
                                                         height: "125px",
                                                         position: "relative",
@@ -1864,8 +1864,8 @@ const AdminMasters = () => {
                                                            transform: "translateX(-50%)", 
                                                            fontSize: "0.5625rem", 
                                                            fontWeight: 900, 
-                                                           color: t.units > 0 ? "#4f46e5" : "#94a3b8",
-                                                           background: t.units > 0 ? "#eef2ff" : "transparent",
+                                                           color: t.units > 0 ? "var(--primary)" : "var(--text-muted)",
+                                                           background: t.units > 0 ? "rgba(99, 102, 241, 0.25)" : "transparent",
                                                            padding: t.units > 0 ? "1px 4px" : "0",
                                                            borderRadius: "4px",
                                                            zIndex: 2
@@ -1888,7 +1888,7 @@ const AdminMasters = () => {
                                                      {/* Multi-tier Date Label */}
                                                      <div style={{ textAlign: "center", lineHeight: "1.2" }}>
                                                         <span style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
-                                                        <span style={{ fontSize: "0.5rem", fontWeight: 800, color: "#94a3b8" }}>{t.date.split('-').slice(1).join('/')}</span>
+                                                        <span style={{ fontSize: "0.5rem", fontWeight: 800, color: "var(--text-muted)" }}>{t.date.split('-').slice(1).join('/')}</span>
                                                      </div>
 
                                                   </div>
@@ -1904,8 +1904,8 @@ const AdminMasters = () => {
                                      minWidth: "280px",
                                      padding: "1.15rem 1.25rem", 
                                      borderRadius: "16px", 
-                                     background: "linear-gradient(135deg, #fefeff 0%, #f4f6fe 100%)", 
-                                     borderLeft: "5px solid #6366f1",
+                                     background: "linear-gradient(135deg, var(--surface) 0%, var(--background) 100%)", 
+                                     borderLeft: "5px solid var(--primary)", 
                                      borderTop: "1px solid var(--border)",
                                      borderBottom: "1px solid var(--border)",
                                      borderRight: "1px solid var(--border)",
@@ -1917,7 +1917,7 @@ const AdminMasters = () => {
                                      <div>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                                            <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", letterSpacing: "0.02em" }}>🔥 TOP DISPENSED</h4>
-                                           <span style={{ fontSize: "0.5625rem", color: "#6366f1", fontWeight: 900, background: "#eef2ff", padding: "2px 6px", borderRadius: "6px" }}>Volume Rank</span>
+                                           <span style={{ fontSize: "0.5625rem", color: "var(--primary)", fontWeight: 900, background: "rgba(99, 102, 241, 0.15)", padding: "2px 6px", borderRadius: "6px" }}>Volume Rank</span>
                                         </div>
 
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -1935,11 +1935,11 @@ const AdminMasters = () => {
                                                     display: "flex", 
                                                     flexDirection: "column", 
                                                     gap: "6px", 
-                                                    background: "white", 
+                                                    background: "var(--background)", 
                                                     padding: "0.65rem 0.85rem", 
                                                     borderRadius: "12px", 
                                                     boxShadow: "0 2px 6px rgba(99,102,241,0.01)",
-                                                    border: "1px solid #eef2ff"
+                                                    border: "1px solid var(--border)"
                                                  }}>
                                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1963,7 +1963,7 @@ const AdminMasters = () => {
                                                     </div>
                                                     
                                                     {/* Proportional Progress Bar */}
-                                                    <div style={{ width: "100%", height: "4px", background: "#f1f5f9", borderRadius: "2px", overflow: "hidden" }}>
+                                                    <div style={{ width: "100%", height: "4px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
                                                        <div style={{ 
                                                           width: `${percentage}%`, 
                                                           height: "100%", 
@@ -1981,18 +1981,18 @@ const AdminMasters = () => {
                                </div>
 
                                {/* Bottom Row: Full-width Batch Stock Monitor */}
-                               <div className="card" style={{ padding: "1.15rem 1.25rem", borderRadius: "16px", background: "white", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)" }}>
+                               <div className="card" style={{ padding: "1.15rem 1.25rem", borderRadius: "16px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)" }}>
                                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
                                      <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                                         <span>📦 BATCH STOCKS MONITOR</span>
                                         <span style={{ 
                                            fontSize: "0.625rem", 
-                                           background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)", 
-                                           color: "#4f46e5", 
+                                           background: "rgba(99, 102, 241, 0.15)", 
+                                           color: "var(--primary)", 
                                            padding: "2px 8px", 
                                            borderRadius: "20px", 
                                            fontWeight: 900,
-                                           border: "1px solid #c7d2fe",
+                                           border: "1px solid var(--border)",
                                            boxShadow: "0 1px 3px rgba(79, 70, 229, 0.05)"
                                         }}>
                                            {(() => {
@@ -2081,38 +2081,38 @@ const AdminMasters = () => {
                                               const isConsuming = !isExpired && !isDepleted && activeBatchForMed[b.medication_name] === b.batch_number;
                                               
                                               let roleLabel = "📦 BACKUP STOCK";
-                                              let roleColor = "#4f46e5";
-                                              let roleBg = "#e0e7ff";
-                                              let roleBorder = "1px solid #c7d2fe";
+                                              let roleColor = "var(--primary)";
+                                              let roleBg = "rgba(99, 102, 241, 0.15)";
+                                              let roleBorder = "1px solid var(--border)";
                                               
                                               if (isDepleted) {
                                                  roleLabel = "🚫 DEPLETED";
-                                                 roleColor = "#64748b";
-                                                 roleBg = "#f1f5f9";
-                                                 roleBorder = "1px solid #e2e8f0";
+                                                 roleColor = "var(--text-muted)";
+                                                 roleBg = "var(--surface)";
+                                                 roleBorder = "1px solid var(--border)";
                                               } else if (isExpired) {
                                                  roleLabel = "🚫 EXPIRED";
                                                  roleColor = "#ef4444";
-                                                 roleBg = "#fef2f2";
-                                                 roleBorder = "1px solid #fee2e2";
+                                                 roleBg = "rgba(239, 68, 68, 0.15)";
+                                                 roleBorder = "1px solid rgba(239, 68, 68, 0.2)";
                                               } else if (isConsuming) {
                                                  roleLabel = "🔥 ACTIVE CONSUMING";
                                                  roleColor = "#ea580c";
-                                                 roleBg = "#fff7ed";
-                                                 roleBorder = "1px dashed #fdba74";
+                                                 roleBg = "rgba(234, 88, 12, 0.15)";
+                                                 roleBorder = "1px dashed #ea580c";
                                               }
 
-                                              const statusColor = b.status === 'EXPIRED' ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#d97706' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#2563eb' : '#059669';
-                                              const statusBg = b.status === 'EXPIRED' ? '#fef2f2' : b.status === 'EXPIRING_SOON' ? '#fffbeb' : b.status === 'LOW_STOCK' ? '#fff7ed' : b.status === 'HIGH_STOCK' ? '#eff6ff' : '#f0fdf4';
+                                              const statusColor = b.status === 'EXPIRED' ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#f59e0b' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#3b82f6' : '#10b981';
+                                              const statusBg = b.status === 'EXPIRED' ? 'rgba(239, 68, 68, 0.15)' : b.status === 'EXPIRING_SOON' ? 'rgba(245, 158, 11, 0.15)' : b.status === 'LOW_STOCK' ? 'rgba(249, 115, 22, 0.15)' : b.status === 'HIGH_STOCK' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)';
                                               const statusLabel = b.status === 'EXPIRED' ? 'EXPIRED' : b.status === 'EXPIRING_SOON' ? 'EXPIRING' : b.status === 'LOW_STOCK' ? 'LOW' : b.status === 'HIGH_STOCK' ? 'HIGH' : 'SAFE';
 
                                               return (
-                                                 <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", padding: "0.6rem 0.85rem", borderRadius: "12px", border: isConsuming ? "2px solid #fdba74" : "1px solid #e2e8f0", boxShadow: isConsuming ? "0 3px 8px rgba(234, 88, 12, 0.05)" : "0 1px 4px rgba(0,0,0,0.01)", transition: "all 0.2s" }} className="hover-lift">
+                                                 <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--background)", padding: "0.6rem 0.85rem", borderRadius: "12px", border: isConsuming ? "2px solid #ea580c" : "1px solid var(--border)", boxShadow: isConsuming ? "0 3px 8px rgba(234, 88, 12, 0.05)" : "0 1px 4px rgba(0,0,0,0.01)", transition: "all 0.2s" }} className="hover-lift">
                                                     <div>
                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                                                           <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)" }}>{b.medication_name}</span>
-                                                          <span style={{ fontSize: "0.5625rem", background: "#f1f5f9", color: "#475569", padding: "1px 5px", borderRadius: "4px", fontWeight: 800 }}>B {b.batch_number}</span>
-                                                          <span style={{ fontSize: "0.5625rem", background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0", padding: "1px 6px", borderRadius: "4px", fontWeight: 900 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
+                                                          <span style={{ fontSize: "0.5625rem", background: "var(--surface)", color: "var(--text-main)", padding: "1px 5px", borderRadius: "4px", fontWeight: 800 }}>B {b.batch_number}</span>
+                                                          <span style={{ fontSize: "0.5625rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)", padding: "1px 6px", borderRadius: "4px", fontWeight: 900 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
                                                           
                                                           <span style={{ 
                                                              fontSize: "0.53rem", 
@@ -2133,7 +2133,7 @@ const AdminMasters = () => {
                                                        <div style={{ fontSize: "0.625rem", color: "var(--text-muted)", marginTop: "3px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                                                           <span>Mfg: <b>{b.mfg_date}</b></span>
                                                           <span style={{ color: "#cbd5e1" }}>|</span>
-                                                          <span>Exp: <b style={{ color: "#334155" }}>{b.expiry_date}</b></span>
+                                                          <span>Exp: <b style={{ color: "var(--text-main)" }}>{b.expiry_date}</b></span>
                                                           <span style={{ color: "#cbd5e1" }}>|</span>
                                                           {isExpired ? (
                                                              <span style={{ color: "#ef4444", fontWeight: 900 }}>EXPIRED</span>
@@ -2146,7 +2146,7 @@ const AdminMasters = () => {
                                                     </div>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                                        <div style={{ textAlign: "right" }}>
-                                                          <span style={{ fontSize: "0.6875rem", fontWeight: 900, color: "#1e293b", display: "block" }}>{b.quantity} / {b.initial_qty}</span>
+                                                          <span style={{ fontSize: "0.6875rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{b.quantity} / {b.initial_qty}</span>
                                                           <span style={{ fontSize: "0.5rem", color: "var(--text-muted)", display: "block" }}>{Math.round((b.quantity / (b.initial_qty || 1)) * 100)}% left</span>
                                                        </div>
                                                        <span style={{ 
@@ -2289,13 +2289,13 @@ const AdminMasters = () => {
                                              
                                              // Dynamic color tokens based on stock health level
                                              const dotColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
-                                             const badgeBg = isZero ? "#fef2f2" : isLow ? "#fffbeb" : "#ecfdf5";
-                                             const badgeColor = isZero ? "#ef4444" : isLow ? "#b45309" : "#059669";
-                                             const badgeBorder = isZero ? "#fee2e2" : isLow ? "#fef3c7" : "#a7f3d0";
+                                             const badgeBg = isZero ? "rgba(244, 63, 94, 0.15)" : isLow ? "rgba(234, 179, 8, 0.15)" : "rgba(16, 185, 129, 0.15)";
+                                             const badgeColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
+                                             const badgeBorder = isZero ? "rgba(244, 63, 94, 0.2)" : isLow ? "rgba(234, 179, 8, 0.2)" : "rgba(16, 185, 129, 0.2)";
                                              
-                                             const qtyBg = isZero ? "#ffe4e6" : isLow ? "#fef3c7" : "#d1fae5";
-                                             const qtyColor = isZero ? "#be123c" : isLow ? "#b45309" : "#065f46";
-                                             const qtyBorder = isZero ? "#fecdd3" : isLow ? "#fde68a" : "#a7f3d0";
+                                             const qtyBg = isZero ? "rgba(244, 63, 94, 0.1)" : isLow ? "rgba(234, 179, 8, 0.1)" : "rgba(16, 185, 129, 0.1)";
+                                             const qtyColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
+                                             const qtyBorder = isZero ? "rgba(244, 63, 94, 0.2)" : isLow ? "rgba(234, 179, 8, 0.2)" : "rgba(16, 185, 129, 0.2)";
                                              
                                              const gradient = isZero 
                                                ? "linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)" 
@@ -2311,10 +2311,10 @@ const AdminMasters = () => {
                                                  style={{ 
                                                    borderBottom: "1px solid var(--border)",
                                                    transition: "all 0.2s ease",
-                                                   background: idx % 2 === 0 ? "rgba(248, 250, 252, 0.4)" : "transparent"
+                                                   background: idx % 2 === 0 ? "rgba(255, 255, 255, 0.02)" : "transparent"
                                                  }}
-                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239, 246, 255, 0.6)"; }}
-                                                 onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? "rgba(248, 250, 252, 0.4)" : "transparent"; }}
+                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"; }}
+                                                 onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? "rgba(255, 255, 255, 0.02)" : "transparent"; }}
                                                >
                                                  <td style={{ padding: "1rem 1.125rem", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
                                                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: dotColor, animation: isLow ? "pulse 1.5s infinite" : "none" }} />
@@ -2749,9 +2749,9 @@ const AdminMasters = () => {
                 </div>
 
                 {isLoadingMachines ? (
-                  <div style={{ padding: '8rem', textAlign: 'center', background: 'white', borderRadius: '32px' }}>
+                  <div style={{ padding: '8rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px' }}>
                       <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
-                      <p style={{ fontWeight: 800, color: '#94a3b8' }}>Syncing registry states...</p>
+                      <p style={{ fontWeight: 800, color: 'var(--text-muted)' }}>Syncing registry states...</p>
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1.25rem' }}>
@@ -2759,59 +2759,59 @@ const AdminMasters = () => {
                         <div key={m.id} className="card" style={{ 
                             padding: '1.5rem', 
                             borderRadius: '24px', 
-                            border: '1px solid #eef2f6', 
-                            background: 'linear-gradient(to bottom right, #ffffff, #f9fafb)',
+                            border: '1px solid var(--border)', 
+                            background: 'var(--surface)',
                             position: 'relative',
                             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                     <div style={{ position: 'relative' }}>
-                                        <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '16px', border: m.is_online ? '2.5px solid #10b981' : '2px solid #e2e8f0' }}>
-                                            <Radio size={24} color={m.is_online ? '#10b981' : '#94a3b8'} />
+                                        <div style={{ padding: '12px', background: 'var(--background)', borderRadius: '16px', border: m.is_online ? '2.5px solid #10b981' : '2.5px solid var(--border)' }}>
+                                            <Radio size={24} color={m.is_online ? '#10b981' : 'var(--text-muted)'} />
                                         </div>
-                                        {m.is_online && <div style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, background: '#10b981', borderRadius: '50%', border: '3px solid white', animation: 'pulse 2s infinite' }} />}
+                                        {m.is_online && <div style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, background: '#10b981', borderRadius: '50%', border: '3px solid var(--surface)', animation: 'pulse 2s infinite' }} />}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#1e293b' }}>{m.machine_name || m.name}</div>
-                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{m.lab_id || 'LOCAL_GW'} • {m.location || 'SITE'}</div>
+                                        <div style={{ fontWeight: 900, fontSize: '1.1rem', color: 'var(--text-main)' }}>{m.machine_name || m.name}</div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{m.lab_id || 'LOCAL_GW'} • {m.location || 'SITE'}</div>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                     <button 
                                       onClick={() => { setCurrentMachine(m); setMachineForm({...m}); setIsEditingMachine(true); setShowMachineModal(true); }}
-                                      style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#f1f5f9', color: '#64748b' }}
+                                      style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: 'var(--background)', color: 'var(--text-main)' }}
                                     >
                                       <Edit2 size={14} />
                                     </button>
                                 </div>
                             </div>
 
-                            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '18px', border: '1px solid #f1f5f9', marginBottom: '1.25rem' }}>
+                            <div style={{ background: 'var(--background)', padding: '1rem', borderRadius: '18px', border: '1px solid var(--border)', marginBottom: '1.25rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Session Health</span>
+                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Session Health</span>
                                     <span style={{ fontSize: '0.65rem', fontWeight: 900, color: m.is_online ? '#059669' : '#eab308' }}>
                                         {m.is_online ? 'ACTIVE SIGNAL' : 'SIGNAL IDLE'}
                                     </span>
                                 </div>
-                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
                                     <div style={{ width: m.is_online ? '100%' : '30%', height: '100%', background: m.is_online ? '#10b981' : '#f59e0b', transition: 'width 1s' }} />
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>TELEMETRY</div>
+                                <div style={{ background: 'var(--background)', padding: '0.75rem', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--text-muted)', marginBottom: '4px' }}>TELEMETRY</div>
                                     <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#6366f1' }}>{m.telemetry_data?.total_records || 0} Records</div>
                                 </div>
-                                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', marginBottom: '4px' }}>LAST PULSE</div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>{m.last_pulse ? new Date(m.last_pulse).toLocaleTimeString() : '---'}</div>
+                                <div style={{ background: 'var(--background)', padding: '0.75rem', borderRadius: '14px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--text-muted)', marginBottom: '4px' }}>LAST PULSE</div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}>{m.last_pulse ? new Date(m.last_pulse).toLocaleTimeString() : '---'}</div>
                                 </div>
                             </div>
 
-                            <div style={{ marginTop: '0.5rem', background: '#f0f9ff', padding: '0.75rem', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 800 }}>
+                            <div style={{ marginTop: '0.5rem', background: 'rgba(14, 165, 233, 0.15)', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(14, 165, 233, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 800 }}>
                                     Security Managed Centrally
                                 </div>
                                 <button 
@@ -2825,13 +2825,13 @@ const AdminMasters = () => {
                         </div>
                       ))}
                       {labMachines.length === 0 && (
-                        <div style={{ gridColumn: '1/-1', padding: '8rem 2rem', textAlign: 'center', background: '#ffffff', borderRadius: '32px', border: '2px dashed #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
-                            <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                        <div style={{ gridColumn: '1/-1', padding: '8rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                            <div style={{ width: '64px', height: '64px', background: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
                                 <Radio size={32} />
                             </div>
                             <div>
-                                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '0.25rem' }}>No Bridge Data Available</h3>
-                                <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>Establishing a sync bridge is required to begin ingestion for this project workspace. Please ensure your local agents are configured with the correct project key.</p>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No Bridge Data Available</h3>
+                                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>Establishing a sync bridge is required to begin ingestion for this project workspace. Please ensure your local agents are configured with the correct project key.</p>
                             </div>
                         </div>
                       )}
@@ -2858,35 +2858,35 @@ const AdminMasters = () => {
                     <div className="table-responsive">
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <thead>
-                              <tr style={{ background: 'var(--background)', borderBottom: '1px solid #f1f5f9' }}>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Test Name / Code</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dept / Components</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                              <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Test Name / Code</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dept / Components</th>
+                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
                               </tr>
                           </thead>
                           <tbody>
                                {labTests.map(test => (
                                  <React.Fragment key={test.id}>
-                                   <tr style={{ borderBottom: '1px solid #f8fafc', background: test.is_active ? 'transparent' : '#fcfcfc' }}>
+                                   <tr style={{ borderBottom: '1px solid var(--border)', background: test.is_active ? 'transparent' : 'var(--background)' }}>
                                        <td style={{ padding: '1.5rem 2rem' }}>
                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ padding: '8px', background: '#f1f5f9', borderRadius: '10px' }}>
+                                              <div style={{ padding: '8px', background: 'var(--background)', borderRadius: '10px' }}>
                                                  <FlaskConical size={20} color="var(--primary)" />
                                               </div>
                                               <div>
-                                                <div style={{ fontWeight: 800, color: test.is_active ? '#1e293b' : '#94a3b8', fontSize: '1rem' }}>{test.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Code: {test.code || 'N/A'}</div>
+                                                <div style={{ fontWeight: 800, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '1rem' }}>{test.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Code: {test.code || 'N/A'}</div>
                                               </div>
                                            </div>
                                        </td>
                                        <td style={{ padding: '1.5rem 2rem' }}>
-                                           <span style={{ fontSize: '0.625rem', fontWeight: 900, background: test.is_active ? '#e0e7ff' : '#f1f5f9', color: test.is_active ? '#4338ca' : '#94a3b8', padding: '0.4rem 0.75rem', borderRadius: '8px', textTransform: 'uppercase' }}>
+                                           <span style={{ fontSize: '0.625rem', fontWeight: 900, background: test.is_active ? 'rgba(99, 102, 241, 0.15)' : 'var(--background)', color: test.is_active ? '#818cf8' : 'var(--text-muted)', padding: '0.4rem 0.75rem', borderRadius: '8px', textTransform: 'uppercase' }}>
                                                {test.test_type_details?.name || 'N/A'}
                                            </span>
                                        </td>
                                        <td style={{ padding: '1.5rem 2rem' }}>
-                                           <div style={{ fontSize: '0.875rem', fontWeight: 700, color: test.is_active ? '#475569' : '#cbd5e1' }}>{test.department_details?.name || 'N/A'}</div>
+                                           <div style={{ fontSize: '0.875rem', fontWeight: 700, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)' }}>{test.department_details?.name || 'N/A'}</div>
                                            <button 
                                               onClick={() => setExpandedLabTests({ ...expandedLabTests, [test.id]: !expandedLabTests[test.id] })}
                                               style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, marginTop: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -2955,12 +2955,12 @@ const AdminMasters = () => {
                                                {test.sub_tests && test.sub_tests.length > 0 ? (
                                                   <div style={{ display: 'grid', gap: '0.75rem' }}>
                                                      {test.sub_tests.map(sub => (
-                                                        <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'var(--surface)', borderRadius: '12px', border: '1px solid #edf2f7', opacity: sub.is_active ? 1 : 0.6 }}>
+                                                        <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', opacity: sub.is_active ? 1 : 0.6 }}>
                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sub.is_active ? '#10b981' : '#cbd5e1' }}></div>
+                                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sub.is_active ? '#10b981' : 'var(--text-muted)' }}></div>
                                                               <div>
-                                                                 <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.875rem' }}>{sub.name} <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>[{sub.code}]</span></div>
-                                                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{sub.value_type} • {sub.units || 'No units'} • {sub.biological_range || 'No range'}</div>
+                                                                 <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.875rem' }}>{sub.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>[{sub.code}]</span></div>
+                                                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{sub.value_type} • {sub.units || 'No units'} • {sub.biological_range || 'No range'}</div>
                                                               </div>
                                                            </div>
                                                            <div style={{ display: 'flex', gap: '6px' }}>
@@ -2982,7 +2982,7 @@ const AdminMasters = () => {
                                                                  });
                                                                  setIsEditingSubTest(true);
                                                                  setShowSubTestModal(true);
-                                                              }} style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '4px 8px', color: '#475569', cursor: 'pointer' }}><Edit2 size={12} /></button>
+                                                              }} style={{ background: 'var(--background)', border: 'none', borderRadius: '6px', padding: '4px 8px', color: 'var(--text-main)', cursor: 'pointer' }}><Edit2 size={12} /></button>
                                                               <button onClick={() => handleToggleSubTestStatus(sub)} style={{ background: sub.is_active ? '#fff7ed' : '#ecfdf5', border: 'none', borderRadius: '6px', padding: '4px 8px', color: sub.is_active ? '#ea580c' : '#059669', cursor: 'pointer' }}><Power size={12} /></button>
                                                               <button onClick={() => handleDeleteSubTest(sub.id, sub.name)} style={{ background: '#fef2f2', border: 'none', borderRadius: '6px', padding: '4px 8px', color: '#dc2626', cursor: 'pointer' }}><Trash2 size={12} /></button>
                                                            </div>
@@ -2990,7 +2990,7 @@ const AdminMasters = () => {
                                                      ))}
                                                   </div>
                                                ) : (
-                                                  <div style={{ fontSize: '0.875rem', color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>No components defined for this test.</div>
+                                                  <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>No components defined for this test.</div>
                                                )}
                                             </div>
                                         </td>
@@ -3023,10 +3023,10 @@ const AdminMasters = () => {
                     alignItems: "center",
                     gap: "0.75rem",
                     marginBottom: "1.5rem",
-                    background: "#f8fafc",
+                    background: "var(--surface)",
                     padding: "0.75rem 1.25rem",
                     borderRadius: "16px",
-                    border: "1px solid #f1f5f9",
+                    border: "1px solid var(--border)",
                   }}
                 >
                   <button
@@ -3034,7 +3034,7 @@ const AdminMasters = () => {
                     style={{
                       border: "none",
                       background: "none",
-                      color: "#64748b",
+                      color: "var(--text-muted)",
                       fontSize: "0.75rem",
                       fontWeight: 800,
                       cursor: "pointer",
@@ -3045,7 +3045,7 @@ const AdminMasters = () => {
                   >
                     <Layers size={14} /> Workspace Hub
                   </button>
-                  <ChevronRight size={14} color="#cbd5e1" />
+                  <ChevronRight size={14} color="var(--border)" />
                   <span
                     style={{
                       fontSize: "0.75rem",
@@ -3068,6 +3068,8 @@ const AdminMasters = () => {
                     padding: "1.25rem",
                     borderRadius: "24px",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
                   }}
                 >
                   <div
@@ -3085,7 +3087,7 @@ const AdminMasters = () => {
                           left: "1.25rem",
                           top: "50%",
                           transform: "translateY(-50%)",
-                          color: "#94a3b8",
+                          color: "var(--text-muted)",
                         }}
                       />
                       <input
@@ -3098,9 +3100,10 @@ const AdminMasters = () => {
                         style={{
                           paddingLeft: "3rem",
                           height: "52px",
-                          border: "1.5px solid #f1f5f9",
+                          border: "1.5px solid var(--border)",
                           borderRadius: "16px",
-                          background: "#fbfcfe",
+                          background: "var(--background)",
+                          color: "var(--text-main)",
                         }}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -3116,14 +3119,14 @@ const AdminMasters = () => {
                           width: "52px",
                           height: "52px",
                           padding: 0,
-                          background: "white",
-                          border: "1.5px solid #f1f5f9",
+                          background: "var(--background)",
+                          border: "1.5px solid var(--border)",
                           borderRadius: "16px",
                         }}
                         onClick={() => fetchEmployeeMasters(1)}
                         title="Refresh Data"
                       >
-                        <RotateCcw size={20} color="#64748b" />
+                        <RotateCcw size={20} color="var(--text-muted)" />
                       </button>
                       <button
                         className="btn btn-primary"
@@ -3169,7 +3172,7 @@ const AdminMasters = () => {
                           display: "flex",
                           alignItems: "center",
                           gap: "0.5rem",
-                          background: "#1e293b",
+                          background: "var(--primary)",
                           border: "none",
                           fontSize: "0.75rem",
                           fontWeight: 800
@@ -3184,9 +3187,9 @@ const AdminMasters = () => {
                           padding: "0 2.5rem",
                           borderRadius: "16px",
                           fontWeight: 800,
-                          background: "white",
-                          color: "#1e293b",
-                          border: "1.5px solid #f1f5f9"
+                          background: "var(--background)",
+                          color: "var(--text-main)",
+                          border: "1.5px solid var(--border)"
                         }}
                         onClick={() => fetchEmployeeMasters(1)}
                       >
@@ -3202,7 +3205,7 @@ const AdminMasters = () => {
                     padding: 0,
                     overflow: "hidden",
                     borderRadius: "24px",
-                    border: "1px solid #f1f5f9",
+                    border: "1px solid var(--border)",
                   }}
                 >
                   <div
@@ -3213,8 +3216,8 @@ const AdminMasters = () => {
                       <thead>
                         <tr
                           style={{
-                            background: "#f8fafc",
-                            borderBottom: "1px solid #f1f5f9",
+                            background: "var(--background)",
+                            borderBottom: "1px solid var(--border)",
                           }}
                         >
                           {["employee_master"].includes(
@@ -3416,7 +3419,7 @@ const AdminMasters = () => {
                                 style={{
                                   padding: "8rem 2rem",
                                   textAlign: "center",
-                                  background: "#fff",
+                                  background: "transparent",
                                 }}
                               >
                                 <div style={{ maxWidth: "300px", margin: "0 auto" }}>
@@ -3424,19 +3427,19 @@ const AdminMasters = () => {
                                     style={{
                                       width: "80px",
                                       height: "80px",
-                                      background: "#f8fafc",
+                                      background: "var(--background)",
                                       borderRadius: "30px",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
                                       margin: "0 auto 1.5rem auto",
-                                      border: "1px solid #f1f5f9",
+                                      border: "1px solid var(--border)",
                                     }}
                                   >
-                                    <Search size={32} color="#cbd5e1" />
+                                    <Search size={32} color="var(--text-muted)" />
                                   </div>
-                                  <h3 style={{ fontWeight: 900, color: "#1e293b", marginBottom: "0.5rem", fontSize: "1.25rem" }}>No Records Found</h3>
-                                  <p style={{ color: "#64748b", fontWeight: 700, fontSize: "0.875rem", lineHeight: 1.6 }}>
+                                  <h3 style={{ fontWeight: 900, color: "var(--text-main)", marginBottom: "0.5rem", fontSize: "1.25rem" }}>No Records Found</h3>
+                                  <p style={{ color: "var(--text-muted)", fontWeight: 700, fontSize: "0.875rem", lineHeight: 1.6 }}>
                                     We couldn't find any results matching "{searchQuery}". Try refining your search or checking another registry.
                                   </p>
                                 </div>
@@ -3457,7 +3460,7 @@ const AdminMasters = () => {
                             );
                             return (
                               <React.Fragment key={m.id}>
-                                <tr style={{ background: "#fdfdff" }}>
+                                <tr style={{ background: "transparent" }}>
                                   {["employee", "family", "health", "employee_master", "family_member"].includes(
                                     exploringProtocolId,
                                   ) ? (
@@ -3466,7 +3469,7 @@ const AdminMasters = () => {
                                         style={{
                                           padding: "1.25rem 1.5rem",
                                           fontWeight: 900,
-                                          color: "#64748b",
+                                          color: "var(--text-muted)",
                                           fontSize: "0.8125rem",
                                         }}
                                       >
@@ -3484,25 +3487,25 @@ const AdminMasters = () => {
                                       <td
                                         style={{
                                           fontWeight: 800,
-                                          color: "#1e293b",
+                                          color: "var(--text-main)",
                                           fontSize: "0.875rem",
                                         }}
                                       >
                                         {m.name}
                                       </td>
-                                      <td style={{ fontWeight: 800, color: "#1e293b", fontSize: "0.8125rem" }}>
+                                      <td style={{ fontWeight: 800, color: "var(--text-main)", fontSize: "0.8125rem" }}>
                                         {age !== "N/A" ? `${age} / ${m.gender?.[0] || m.gender}` : (m.gender || "--")}
                                       </td>
-                                      <td style={{ color: "#475569", fontSize: '0.8125rem', fontWeight: 700 }}>
+                                      <td style={{ color: "var(--text-muted)", fontSize: '0.8125rem', fontWeight: 700 }}>
                                         {m.aadhar_no || "--"}
                                       </td>
-                                      <td style={{ fontWeight: 600, color: "#64748b" }}>
+                                      <td style={{ fontWeight: 600, color: "var(--text-muted)" }}>
                                         {m.mobile_no || "--"}
                                       </td>
                                       <td
                                         style={{
                                           fontSize: "0.75rem",
-                                          color: "#64748b",
+                                          color: "var(--text-muted)",
                                         }}
                                       >
                                         {m.address ? (m.address.length > 20 ? m.address.substring(0, 20) + "..." : m.address) : "--"}
@@ -3511,7 +3514,7 @@ const AdminMasters = () => {
                                         style={{
                                           fontSize: "0.8125rem",
                                           fontWeight: 900,
-                                          color: "#1e293b",
+                                          color: "var(--text-main)",
                                         }}
                                       >
                                         {m.designation || "-"}
@@ -3523,7 +3526,7 @@ const AdminMasters = () => {
                                           style={{
                                             padding: "1.5rem 1.5rem",
                                             fontWeight: 900,
-                                            color: "#64748b",
+                                            color: "var(--text-muted)",
                                             fontSize: "0.875rem",
                                           }}
                                         >
@@ -3531,23 +3534,23 @@ const AdminMasters = () => {
                                         </td>
                                         {exploringProtocolId?.toLowerCase().includes("pharmacy") ? (
                                            <>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.ucode || "--"}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.name || "--"}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.description || "--"}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.category || "--"}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>{m.quantity || 0}</td>
-                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "#4b5563", fontSize: "0.875rem" }}>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.ucode || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.name || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.description || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.category || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.quantity || 0}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>
                                                 {m.batch_info?.has_batches && !m.batch_info.costs_match ? (
                                                   <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                                                    <span style={{ fontWeight: 800, color: "#1e293b" }}>
-                                                      ₹{m.cost || 0.00} <span style={{ fontSize: "0.65rem", color: "#64748b", fontWeight: 600 }}>(Latest)</span>
+                                                    <span style={{ fontWeight: 800, color: "var(--text-main)" }}>
+                                                      ₹{m.cost || 0.00} <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: 600 }}>(Latest)</span>
                                                     </span>
                                                     <span style={{ 
                                                       fontSize: "0.675rem", 
-                                                      color: "#059669", 
+                                                      color: "#10b981", 
                                                       fontWeight: 800, 
-                                                      background: "#ecfdf5", 
-                                                      border: "1px solid #a7f3d0",
+                                                      background: "rgba(16, 185, 129, 0.15)", 
+                                                      border: "1px solid rgba(16, 185, 129, 0.25)",
                                                       padding: "2px 8px", 
                                                       borderRadius: "6px", 
                                                       width: "fit-content",
@@ -3572,7 +3575,7 @@ const AdminMasters = () => {
                                               style={{
                                                 padding: "1.5rem 1.5rem",
                                                 fontWeight: 700,
-                                                color: "#4b5563",
+                                                color: "var(--text-main)",
                                                 fontSize: "0.875rem",
                                               }}
                                             >
@@ -3599,7 +3602,7 @@ const AdminMasters = () => {
                                         style={{
                                           fontSize: "0.8125rem",
                                           fontWeight: 700,
-                                          color: "#1e293b",
+                                          color: "var(--text-main)",
                                         }}
                                       >
                                         {m.additional_fields?.[
@@ -3763,14 +3766,15 @@ const AdminMasters = () => {
                                         key={`${m.id}-${f.id}`}
                                         style={{
                                           fontSize: "0.8125rem",
-                                          background: "white",
+                                          background: "transparent",
+                                          borderBottom: "1px solid var(--border)",
                                         }}
                                       >
                                         <td style={{ padding: "1rem 1.5rem" }}></td>
                                         <td
                                           style={{
                                             fontWeight: 900,
-                                            color: "#94a3b8",
+                                            color: "var(--text-muted)",
                                             fontSize: "0.8125rem",
                                           }}
                                         >
@@ -3779,26 +3783,26 @@ const AdminMasters = () => {
                                         <td
                                           style={{
                                             fontWeight: 800,
-                                            color: "#475569",
+                                            color: "var(--text-main)",
                                           }}
                                         >
                                           {f.name}
                                         </td>
-                                        <td style={{ fontWeight: 600, color: "#64748b" }}>
+                                        <td style={{ fontWeight: 600, color: "var(--text-muted)" }}>
                                           {fAge} / {f.gender?.[0] || f.gender}
                                         </td>
-                                        <td style={{ color: "#94a3b8" }}>
+                                        <td style={{ color: "var(--text-muted)" }}>
                                           {f.aadhar_no || "--"}
                                         </td>
-                                        <td style={{ color: "#64748b" }}>
+                                        <td style={{ color: "var(--text-muted)" }}>
                                           {f.mobile_no || m.mobile_no || "--"}
                                         </td>
-                                        <td style={{ color: "#94a3b8", fontSize: '0.7rem' }}>
+                                        <td style={{ color: "var(--text-muted)", fontSize: '0.7rem' }}>
                                           {f.address ? (f.address.length > 10 ? f.address.substring(0, 10) + "..." : f.address) : "--"}
                                         </td>
                                         <td
                                           style={{
-                                            color: "#64748b",
+                                            color: "var(--text-muted)",
                                             fontWeight: 800,
                                             textTransform: "uppercase",
                                             fontSize: '0.7rem'
@@ -3879,14 +3883,15 @@ const AdminMasters = () => {
                                       <tr
                                         key={`fam-${m.id}-${f.id}`}
                                         style={{
-                                          background: "#f8fafc",
+                                          background: "transparent",
                                           fontSize: "0.85rem",
+                                          borderBottom: "1px solid var(--border)",
                                         }}
                                       >
                                         <td
                                           style={{
                                             padding: "0.75rem 1.5rem",
-                                            color: "#94a3b8",
+                                            color: "var(--text-muted)",
                                             fontWeight: 900,
                                           }}
                                         >
@@ -3903,7 +3908,7 @@ const AdminMasters = () => {
                                             key={fieldDef.slug}
                                             style={{
                                               padding: "0.75rem 1.5rem",
-                                              color: "#4b5563",
+                                              color: "var(--text-main)",
                                               fontWeight: 600,
                                             }}
                                           >
@@ -3924,8 +3929,8 @@ const AdminMasters = () => {
                                                   style={{
                                                     marginLeft: "8px",
                                                     fontSize: "0.625rem",
-                                                    background: "#e0e7ff",
-                                                    color: "#4338ca",
+                                                    background: "var(--background)",
+                                                    color: "var(--primary)",
                                                     padding: "2px 8px",
                                                     borderRadius: "6px",
                                                     fontWeight: 800,
@@ -4013,14 +4018,14 @@ const AdminMasters = () => {
                       justifyContent: "space-between",
                       alignItems: "center",
                       padding: "1.5rem",
-                      borderTop: "1px solid #f1f5f9",
-                      background: "#f8fafc",
+                      borderTop: "1px solid var(--border)",
+                      background: "var(--background)",
                     }}
                   >
                     <p
                       style={{
                         fontSize: "0.8125rem",
-                        color: "#64748b",
+                        color: "var(--text-muted)",
                         fontWeight: 700,
                       }}
                     >
@@ -4046,11 +4051,12 @@ const AdminMasters = () => {
                           alignItems: "center",
                           gap: "0.5rem",
                           padding: "0 1rem",
-                          background: "white",
+                          background: "var(--surface)",
                           borderRadius: "10px",
-                          border: "1px solid #e2e8f0",
+                          border: "1px solid var(--border)",
                           fontSize: "0.8125rem",
                           fontWeight: 800,
+                          color: "var(--text-main)",
                         }}
                       >
                         {page}
@@ -4105,7 +4111,7 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(255, 255, 255, 0.85)",
+              background: "rgba(15, 23, 42, 0.6)",
               backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
@@ -4122,7 +4128,7 @@ const AdminMasters = () => {
                 maxWidth: "600px",
                 padding: 0,
                 borderRadius: "32px",
-                background: "white",
+                background: "var(--surface)",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
                 border: "1px solid var(--border)",
               }}
@@ -4145,7 +4151,7 @@ const AdminMasters = () => {
                         ? "Edit Master Record"
                         : "Register in Masters"}
                     </h2>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Clinical Registry & Personnel Onboarding</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Clinical Registry & Personnel Onboarding</p>
                   </div>
                 </div>
                 <button
@@ -4155,7 +4161,7 @@ const AdminMasters = () => {
                   }}
                   style={{
                     border: "none",
-                    background: "#f1f5f9",
+                    background: "var(--background)",
                     width: "36px",
                     height: "36px",
                     borderRadius: "12px",
@@ -4165,7 +4171,7 @@ const AdminMasters = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <X size={20} color="#64748b" />
+                  <X size={20} color="var(--text-muted)" />
                 </button>
               </div>
               <form onSubmit={handleMasterSubmit} style={{ padding: "2rem" }}>
@@ -4217,9 +4223,9 @@ const AdminMasters = () => {
                       placeholder="Auto-generating..."
                       className="form-control"
                       style={{
-                        background: '#f8fafc',
+                        background: 'var(--background)',
                         cursor: 'not-allowed',
-                        color: '#64748b'
+                        color: 'var(--text-muted)'
                       }}
                     />
                   </div>
@@ -4350,7 +4356,7 @@ const AdminMasters = () => {
                         gridTemplateColumns: "1fr 1fr",
                         gap: "1.25rem",
                         marginTop: "1rem",
-                        borderTop: "1.5px dashed #f1f5f9",
+                        borderTop: "1.5px dashed var(--border)",
                         paddingTop: "1.5rem",
                       }}
                     >
@@ -4399,7 +4405,7 @@ const AdminMasters = () => {
                     gap: "1rem",
                     marginTop: "1.5rem",
                     padding: "1.5rem 2rem",
-                    background: "white",
+                    background: "var(--surface)",
                   }}
                 >
                   <button
@@ -4418,8 +4424,7 @@ const AdminMasters = () => {
                     className="btn btn-primary"
                     style={{
                       padding: "0.75rem 2.5rem",
-                      background:
-                        "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                      background: "var(--primary)",
                     }}
                   >
                     {isEditingMaster
@@ -4441,7 +4446,7 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(255, 255, 255, 0.85)",
+              background: "rgba(15, 23, 42, 0.6)",
               backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
@@ -4458,7 +4463,7 @@ const AdminMasters = () => {
                 maxWidth: "600px",
                 padding: 0,
                 borderRadius: "32px",
-                background: "white",
+                background: "var(--surface)",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
                 border: "1px solid var(--border)",
               }}
@@ -4479,7 +4484,7 @@ const AdminMasters = () => {
                     <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                       {isEditingFamily ? "Edit Family Member" : "Add Family Member"}
                     </h2>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Personal Dependants & Relations</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Personal Dependants & Relations</p>
                   </div>
                 </div>
                 <button
@@ -4489,7 +4494,7 @@ const AdminMasters = () => {
                   }}
                   style={{
                     border: "none",
-                    background: "#f1f5f9",
+                    background: "var(--background)",
                     width: "36px",
                     height: "36px",
                     borderRadius: "12px",
@@ -4499,7 +4504,7 @@ const AdminMasters = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <X size={20} color="#64748b" />
+                  <X size={20} color="var(--text-muted)" />
                 </button>
               </div>
               <form onSubmit={handleFamilySubmit} style={{ padding: "2rem" }}>
@@ -4641,7 +4646,7 @@ const AdminMasters = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: "rgba(255, 255, 255, 0.85)",
+              background: "rgba(15, 23, 42, 0.6)",
               backdropFilter: "blur(12px)",
               display: "flex",
               justifyContent: "center",
@@ -4658,7 +4663,7 @@ const AdminMasters = () => {
                 maxWidth: "600px",
                 padding: 0,
                 borderRadius: "32px",
-                background: "white",
+                background: "var(--surface)",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
                 border: "1px solid var(--border)",
               }}
@@ -4679,14 +4684,14 @@ const AdminMasters = () => {
                     <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                       Edit Registry Item
                     </h2>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Updating Global Database Entry</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Updating Global Database Entry</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowRegistryEditModal(false)}
                   style={{
                     border: "none",
-                    background: "#f1f5f9",
+                    background: "var(--background)",
                     width: "36px",
                     height: "36px",
                     borderRadius: "12px",
@@ -4696,7 +4701,7 @@ const AdminMasters = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <X size={20} color="#64748b" />
+                  <X size={20} color="var(--text-muted)" />
                 </button>
               </div>
               <form
@@ -4716,7 +4721,7 @@ const AdminMasters = () => {
                       disabled
                       value={registryEditData.ucode}
                       className="form-control"
-                      style={{ background: "#f8fafc" }}
+                      style={{ background: "var(--background)" }}
                     />
                   </div>
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
@@ -4837,7 +4842,7 @@ const AdminMasters = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(255, 255, 255, 0.85)",
+            background: "rgba(15, 23, 42, 0.6)",
             backdropFilter: "blur(12px)",
             display: "flex",
             justifyContent: "center",
@@ -4854,7 +4859,7 @@ const AdminMasters = () => {
               maxWidth: bulkStep === "UPLOAD" ? "800px" : "900px",
               padding: 0,
               borderRadius: "32px",
-              background: "white",
+              background: "var(--surface)",
               boxShadow: "0 20px 50px rgba(0,0,0,0.15)",
               border: '1px solid var(--border)'
             }}
@@ -4888,7 +4893,7 @@ const AdminMasters = () => {
                   <p
                     style={{
                       fontSize: "0.75rem",
-                      color: "#64748b",
+                      color: "var(--text-muted)",
                       fontWeight: 600,
                       marginTop: "2px",
                     }}
@@ -4909,7 +4914,7 @@ const AdminMasters = () => {
                 }}
                 style={{
                   border: "none",
-                  background: "#f1f5f9",
+                  background: "var(--background)",
                   width: "36px",
                   height: "36px",
                   borderRadius: "12px",
@@ -4919,7 +4924,7 @@ const AdminMasters = () => {
                   justifyContent: "center",
                 }}
               >
-                <X size={20} color="#64748b" />
+                <X size={20} color="var(--text-muted)" />
               </button>
             </div>
 
@@ -4951,11 +4956,11 @@ const AdminMasters = () => {
                           border:
                             String(bulkProject) == String(p.id)
                               ? "2px solid var(--primary)"
-                              : "1px solid #f1f5f9",
+                              : "1px solid var(--border)",
                           background:
                             String(bulkProject) == String(p.id)
-                              ? "#f5f3ff"
-                              : "white",
+                              ? "var(--background)"
+                              : "var(--surface)",
                           position: "relative",
                           overflow: "hidden",
                         }}
@@ -4963,7 +4968,7 @@ const AdminMasters = () => {
                         <div
                           style={{
                             padding: "1.25rem",
-                            background: "#eff6ff",
+                            background: "var(--background)",
                             borderRadius: "20px",
                             width: "fit-content",
                             margin: "0 auto 1.5rem auto",
@@ -4976,7 +4981,7 @@ const AdminMasters = () => {
                             fontSize: "1.125rem",
                             fontWeight: 900,
                             marginBottom: "0.5rem",
-                            color: "#1e293b",
+                            color: "var(--text-main)",
                           }}
                         >
                           {p.name}
@@ -4984,7 +4989,7 @@ const AdminMasters = () => {
                         <p
                           style={{
                             fontSize: "0.75rem",
-                            color: "#64748b",
+                            color: "var(--text-muted)",
                             fontWeight: 600,
                           }}
                         >
@@ -5033,10 +5038,10 @@ const AdminMasters = () => {
                       style={{
                         padding: "1.5rem",
                         cursor: "pointer",
-                        border: "1px solid #f1f5f9",
+                        border: "1px solid var(--border)",
                         borderRadius: "24px",
                         transition: "all 0.2s ease",
-                        background: "#fdfdff",
+                        background: "var(--background)",
                         display: "flex",
                         alignItems: "center",
                         gap: "1rem",
@@ -5054,7 +5059,7 @@ const AdminMasters = () => {
                       <div
                         style={{
                           padding: "1rem",
-                          background: "#eff6ff",
+                          background: "var(--surface)",
                           borderRadius: "16px",
                           color: "var(--primary)",
                         }}
@@ -5066,7 +5071,7 @@ const AdminMasters = () => {
                           style={{
                             fontSize: "1rem",
                             fontWeight: 900,
-                            color: "#1e293b",
+                            color: "var(--text-main)",
                             marginBottom: "4px",
                           }}
                         >
@@ -5075,7 +5080,7 @@ const AdminMasters = () => {
                         <p
                           style={{
                             fontSize: "0.75rem",
-                            color: "#64748b",
+                            color: "var(--text-muted)",
                             fontWeight: 600,
                           }}
                         >
@@ -5094,11 +5099,11 @@ const AdminMasters = () => {
                     <>
                       <div
                         style={{
-                          background: "#f8fafc",
+                          background: "var(--background)",
                           padding: "1.5rem",
                           borderRadius: "20px",
                           marginBottom: "2rem",
-                          border: "1px solid #f1f5f9",
+                          border: "1px solid var(--border)",
                         }}
                       >
                         <div
@@ -5112,7 +5117,7 @@ const AdminMasters = () => {
                           <p
                             style={{
                               fontSize: "0.8125rem",
-                              color: "#1e293b",
+                              color: "var(--text-main)",
                               fontWeight: 900,
                               display: "flex",
                               alignItems: "center",
@@ -5132,7 +5137,7 @@ const AdminMasters = () => {
                         >
                           <div
                             style={{
-                              background: "white",
+                              background: "var(--surface)",
                               padding: "0.75rem 1rem",
                               borderRadius: "12px",
                             }}
@@ -5140,7 +5145,7 @@ const AdminMasters = () => {
                             <p
                               style={{
                                 fontSize: "0.625rem",
-                                color: "#94a3b8",
+                                color: "var(--text-muted)",
                                 fontWeight: 800,
                                 textTransform: "uppercase",
                               }}
@@ -5157,7 +5162,7 @@ const AdminMasters = () => {
                           </div>
                           <div
                             style={{
-                              background: "white",
+                              background: "var(--surface)",
                               padding: "0.75rem 1rem",
                               borderRadius: "12px",
                             }}
@@ -5165,7 +5170,7 @@ const AdminMasters = () => {
                             <p
                               style={{
                                 fontSize: "0.625rem",
-                                color: "#94a3b8",
+                                color: "var(--text-muted)",
                                 fontWeight: 800,
                                 textTransform: "uppercase",
                               }}
@@ -5185,18 +5190,18 @@ const AdminMasters = () => {
 
                       <div
                         style={{
-                          border: "2px dashed #e2e8f0",
+                          border: "2px dashed var(--border)",
                           borderRadius: "24px",
                           padding: "4rem 2rem",
                           textAlign: "center",
-                          background: "#f8fafc",
+                          background: "var(--background)",
                           transition: "all 0.2s ease",
                         }}
                       >
                         <div
                           style={{
                             padding: "1rem",
-                            background: "#fff",
+                            background: "var(--surface)",
                             borderRadius: "50%",
                             width: "fit-content",
                             margin: "0 auto 1.5rem auto",
@@ -5211,7 +5216,7 @@ const AdminMasters = () => {
                         <p
                           style={{
                             fontSize: "0.8125rem",
-                            color: "#94a3b8",
+                            color: "var(--text-muted)",
                             fontWeight: 600,
                             marginBottom: "2rem",
                           }}
@@ -5243,9 +5248,9 @@ const AdminMasters = () => {
                         style={{
                           marginTop: "2rem",
                           padding: "1.5rem",
-                          background: "#f8fafc",
+                          background: "var(--background)",
                           borderRadius: "20px",
-                          border: "1px solid #e2e8f0",
+                          border: "1px solid var(--border)",
                         }}
                       >
                         <div
@@ -5272,7 +5277,7 @@ const AdminMasters = () => {
                               fontWeight: 900,
                               textTransform: "uppercase",
                               letterSpacing: "0.05em",
-                              color: "#1e293b",
+                              color: "var(--text-main)",
                             }}
                           >
                             Required CSV Column Sequence
@@ -5303,11 +5308,11 @@ const AdminMasters = () => {
                                     style={{
                                       fontSize: "0.7rem",
                                       fontWeight: 800,
-                                      background: "white",
+                                      background: "var(--surface)",
                                       color: "#6366f1",
                                       padding: "0.4rem 0.75rem",
                                       borderRadius: "8px",
-                                      border: "1px solid #e0e7ff",
+                                      border: "1px solid var(--border)",
                                     }}
                                   >
                                     {f.slug}
@@ -5333,7 +5338,7 @@ const AdminMasters = () => {
                         <p
                           style={{
                             fontSize: "0.675rem",
-                            color: "#94a3b8",
+                            color: "var(--text-muted)",
                             fontWeight: 600,
                             marginTop: "1rem",
                             fontStyle: "italic",
@@ -5348,9 +5353,9 @@ const AdminMasters = () => {
                         style={{
                           marginTop: "1.5rem",
                           padding: "1.25rem",
-                          background: "#fff",
+                          background: "var(--surface)",
                           borderRadius: "18px",
-                          border: "1.5px solid #eef2ff",
+                          border: "1.5px solid var(--border)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
@@ -5364,7 +5369,7 @@ const AdminMasters = () => {
                              width: "44px", 
                              height: "44px", 
                              borderRadius: "12px", 
-                             background: bulkMode === "INCREMENT" ? "rgba(16, 185, 129, 0.1)" : "rgba(99, 102, 241, 0.1)",
+                             background: bulkMode === "INCREMENT" ? "rgba(16, 185, 129, 0.15)" : "var(--background)",
                              display: "flex",
                              alignItems: "center",
                              justifyContent: "center",
@@ -5373,10 +5378,10 @@ const AdminMasters = () => {
                               {bulkMode === "INCREMENT" ? <Plus size={22} color="#10b981" /> : <RotateCcw size={20} color="#6366f1" />}
                            </div>
                            <div>
-                              <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
+                              <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
                                  {bulkMode === "INCREMENT" ? "Add to Existing Stock" : "Overwrite Current Data"}
                               </p>
-                              <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, margin: 0 }}>
+                              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, margin: 0 }}>
                                  {bulkMode === "INCREMENT" ? "Increments quantity for existing medicine codes" : "Replaces all data fields for existing codes"}
                               </p>
                            </div>
@@ -5384,7 +5389,7 @@ const AdminMasters = () => {
                         <div style={{ 
                           width: "52px", 
                           height: "28px", 
-                          background: bulkMode === "INCREMENT" ? "#10b981" : "#cbd5e1",
+                          background: bulkMode === "INCREMENT" ? "#10b981" : "var(--background)",
                           borderRadius: "20px",
                           position: "relative",
                           transition: "all 0.3s"
@@ -5407,17 +5412,17 @@ const AdminMasters = () => {
                         <div style={{
                           marginTop: "1.25rem",
                           padding: "1rem",
-                          background: "#fffbeb",
+                          background: "rgba(217, 119, 6, 0.15)",
                           borderRadius: "14px",
-                          border: "1px solid #fde68a",
+                          border: "1px solid rgba(217, 119, 6, 0.25)",
                           display: "flex",
                           gap: "0.75rem",
                           alignItems: "flex-start"
                         }}>
-                          <AlertCircle size={18} color="#b45309" style={{ marginTop: "2px" }} />
+                          <AlertCircle size={18} color="#f59e0b" style={{ marginTop: "2px" }} />
                           <div>
-                            <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "#92400e", margin: "0 0 2px 0" }}>Caution: Refill Mode Active</p>
-                            <p style={{ fontSize: "0.675rem", fontWeight: 600, color: "#b45309", margin: 0, opacity: 0.9 }}>
+                            <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "#f59e0b", margin: "0 0 2px 0" }}>Caution: Refill Mode Active</p>
+                            <p style={{ fontSize: "0.675rem", fontWeight: 600, color: "#fbbf24", margin: "0 0 2px 0", opacity: 0.9 }}>
                               This will add quantities to current stock. To avoid double-entry, ensure this file hasn't been uploaded before.
                             </p>
                           </div>
@@ -5439,8 +5444,7 @@ const AdminMasters = () => {
                           style={{
                             padding: "0.75rem 2.5rem",
                             borderRadius: "12px",
-                            background:
-                              "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                            background: "var(--primary)",
                           }}
                         >
                           Process Import
@@ -5871,7 +5875,7 @@ const AdminMasters = () => {
                             style={{
                               fontSize: "0.875rem",
                               fontWeight: 800,
-                              color: "#1e293b",
+                              color: "var(--text-main)",
                             }}
                           >
                             {field.field_label}
@@ -6402,7 +6406,7 @@ const AdminMasters = () => {
                             border: "1px solid #e2e8f0",
                             fontSize: "0.75rem",
                             fontWeight: 600,
-                            color: "#1e293b",
+                            color: "var(--text-main)",
                           }}
                         />
                         <select
@@ -6599,8 +6603,8 @@ const AdminMasters = () => {
         document.body
       )}
       {showMachineModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 20px 50px rgba(0,0,0,0.15)", border: "1px solid var(--border)" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ padding: '0.6rem', background: 'linear-gradient(135deg, #6366f1 0%, #44403c 100%)', borderRadius: '12px' }}>
@@ -6608,7 +6612,7 @@ const AdminMasters = () => {
                   </div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>{isEditingMachine ? 'Edit Station' : 'Register Station'}</h2>
                </div>
-               <button onClick={() => setShowMachineModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <button onClick={() => setShowMachineModal(false)} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                  <X size={18} color="#64748b" />
                </button>
             </div>
@@ -6631,14 +6635,14 @@ const AdminMasters = () => {
                    <input type="text" className="form-control" placeholder="e.g. Area Hospital" required value={machineForm.location} onChange={e => setMachineForm({ ...machineForm, location: e.target.value })} />
                 </div>
                 <div 
-                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', padding: '1rem 1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s' }} 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s' }} 
                    onClick={() => setMachineForm({ ...machineForm, is_active: !machineForm.is_active })}
                 >
                    <input type="checkbox" id="m-active" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={machineForm.is_active} readOnly />
-                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#334155', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Station</label>
+                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Station</label>
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: '#1e293b' }}>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: 'var(--primary)' }}>
                 {isEditingMachine ? 'Update Station Profile' : 'Register in Bridge Hub'}
               </button>
             </form>
@@ -6648,8 +6652,8 @@ const AdminMasters = () => {
       )}
 
       {showLabTestModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100000 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 20px 50px rgba(0,0,0,0.15)", border: "1px solid var(--border)" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                  <div style={{ padding: '0.6rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '12px' }}>
@@ -6657,7 +6661,7 @@ const AdminMasters = () => {
                  </div>
                  <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>{isEditingLabTest ? 'Edit Lab Test' : 'Lab Test Master'}</h2>
               </div>
-              <button onClick={() => { setShowLabTestModal(false); resetLabForm(); }} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => { setShowLabTestModal(false); resetLabForm(); }} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} color="#64748b" />
               </button>
             </div>
@@ -6707,11 +6711,11 @@ const AdminMasters = () => {
                 </div>
 
                 <div 
-                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s' }} 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s' }} 
                    onClick={() => setLabTestForm({ ...labTestForm, is_active: !labTestForm.is_active })}
                 >
                    <input type="checkbox" id="lab-active" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={labTestForm.is_active} readOnly />
-                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#334155', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Entry</label>
+                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Active Registry Entry</label>
                 </div>
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '2rem', height: '52px', borderRadius: '16px', background: isEditingLabTest ? '#2563eb' : 'var(--primary)' }}>{isEditingLabTest ? 'Update Test Master' : 'Save Test Master'}</button>
@@ -6722,11 +6726,11 @@ const AdminMasters = () => {
       )}
 
       {showDeptModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.15)", border: "1px solid var(--border)" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>New Department</h2>
-              <button onClick={() => setShowDeptModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowDeptModal(false)} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} color="#64748b" />
               </button>
             </div>
@@ -6749,11 +6753,11 @@ const AdminMasters = () => {
       )}
 
       {showTestTypeModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.1)", border: "1px solid var(--border)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1110000 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.15)", border: "1px solid var(--border)" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 900 }}>New Test Type</h2>
-              <button onClick={() => setShowTestTypeModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowTestTypeModal(false)} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                  <X size={18} color="#64748b" />
               </button>
             </div>
@@ -6776,28 +6780,28 @@ const AdminMasters = () => {
       )}
 
       {showSubTestModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111000 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "600px" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111000 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "600px", border: "1px solid var(--border)", boxShadow: "0 20px 50px rgba(0,0,0,0.15)" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 900 }}>{isEditingSubTest ? 'Edit Component' : 'Sub Test Definition'}</h2>
-                <div style={{ fontSize: '0.875rem', color: '#64748b' }}>For: {currentLabTest?.name}</div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>For: {currentLabTest?.name}</div>
               </div>
               <X onClick={() => { setShowSubTestModal(false); resetSubTestForm(); }} cursor="pointer" />
             </div>
             <form onSubmit={handleSubTestSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Sub Test Name (Required)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Sub Test Name (Required)</label>
                   <input type="text" className="form-control" required placeholder="Enter" value={subTestForm.name} onChange={e => setSubTestForm({ ...subTestForm, name: e.target.value })} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Sub Test Code (Required)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Sub Test Code (Required)</label>
                   <input type="text" className="form-control" required placeholder="Enter" value={subTestForm.code} onChange={e => setSubTestForm({ ...subTestForm, code: e.target.value })} />
                 </div>
                 
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Value Type (Required)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Value Type (Required)</label>
                   <select className="form-control" value={subTestForm.value_type} onChange={e => setSubTestForm({ ...subTestForm, value_type: e.target.value })}>
                     <option value="INPUT">Input</option>
                     <option value="DROPDOWN">Dropdown</option>
@@ -6807,7 +6811,7 @@ const AdminMasters = () => {
 
                 {subTestForm.value_type === "INPUT" && (
                    <div>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Input Data Type (Required)</label>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Input Data Type (Required)</label>
                       <select className="form-control" value={subTestForm.input_data_type} onChange={e => setSubTestForm({ ...subTestForm, input_data_type: e.target.value })}>
                         <option value="text">text</option>
                         <option value="number">number</option>
@@ -6818,11 +6822,11 @@ const AdminMasters = () => {
                 {subTestForm.value_type === "INPUT" && subTestForm.input_data_type === "text" && (
                   <>
                     <div>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Min Chars Length (Required)</label>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Min Chars Length (Required)</label>
                       <input type="number" className="form-control" placeholder="Enter" value={subTestForm.min_chars} onChange={e => setSubTestForm({ ...subTestForm, min_chars: e.target.value })} />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Max chars Length</label>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Max chars Length</label>
                       <input type="number" className="form-control" placeholder="Enter" value={subTestForm.max_chars} onChange={e => setSubTestForm({ ...subTestForm, max_chars: e.target.value })} />
                     </div>
                   </>
@@ -6830,33 +6834,33 @@ const AdminMasters = () => {
 
                 {subTestForm.value_type === "DROPDOWN" && (
                   <div style={{ gridColumn: 'span 1' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Dropdown Values (comma-separated)</label>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Dropdown Values (comma-separated)</label>
                     <input type="text" className="form-control" placeholder="e.g. Positive, Negative" value={subTestForm.dropdown_options} onChange={e => setSubTestForm({ ...subTestForm, dropdown_options: e.target.value })} />
                   </div>
                 )}
 
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Units (Required)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Units (Required)</label>
                   <input type="text" className="form-control" placeholder="e.g. mg/dL" value={subTestForm.units} onChange={e => setSubTestForm({ ...subTestForm, units: e.target.value })} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Biological Range (Required)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Biological Range (Required)</label>
                   <input type="text" className="form-control" placeholder="e.g. 70 - 110" value={subTestForm.biological_range} onChange={e => setSubTestForm({ ...subTestForm, biological_range: e.target.value })} />
                 </div>
                 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px' }}>Description</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Description</label>
                   <input type="text" className="form-control" placeholder="Optional description" value={subTestForm.description} onChange={e => setSubTestForm({ ...subTestForm, description: e.target.value })} />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                    <input type="checkbox" id="sub-active" checked={subTestForm.is_active} onChange={e => setSubTestForm({ ...subTestForm, is_active: e.target.checked })} />
-                   <label htmlFor="sub-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: '#475569' }}>Active Component</label>
+                   <label htmlFor="sub-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>Active Component</label>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '2rem', justifyContent: 'flex-end' }}>
                 <button type="button" onClick={() => { setShowSubTestModal(false); resetSubTestForm(); }} className="btn btn-secondary" style={{ width: '120px', height: '48px', borderRadius: '12px' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ width: '120px', height: '48px', borderRadius: '12px', background: isEditingSubTest ? '#2563eb' : '#5d3191' }}>{isEditingSubTest ? 'Update' : 'Confirm'}</button>
+                <button type="submit" className="btn btn-primary" style={{ width: '120px', height: '48px', borderRadius: '12px', background: isEditingSubTest ? '#2563eb' : 'var(--primary)' }}>{isEditingSubTest ? 'Update' : 'Confirm'}</button>
               </div>
             </form>
           </div>
@@ -6865,13 +6869,13 @@ const AdminMasters = () => {
       )}
 
       {showDeleteModal && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111500 }}>
-          <div style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", textAlign: 'center' }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1111500 }}>
+          <div style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "400px", textAlign: 'center', border: "1px solid var(--border)", boxShadow: "0 20px 50px rgba(0,0,0,0.15)" }}>
             <div style={{ width: '80px', height: '80px', background: '#fef2f2', color: '#dc2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
                <Trash2 size={40} />
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.5rem' }}>Are you sure?</h2>
-            <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '2rem' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
                You are about to delete <strong>{deleteTarget.label}</strong>. This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -6884,13 +6888,13 @@ const AdminMasters = () => {
       )}
 
       {confirmModal?.isOpen && createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1112000 }}>
-          <div className="fade-in" style={{ background: "white", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1112000 }}>
+          <div className="fade-in" style={{ background: "var(--surface)", padding: "2.5rem", borderRadius: "32px", width: "100%", maxWidth: "450px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", border: "1px solid var(--border)" }}>
             <div style={{ width: '64px', height: '64px', background: '#fff1f2', color: '#e11d48', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
               <AlertCircle size={32} />
             </div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', marginBottom: '0.75rem' }}>{confirmModal.title}</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9375rem', fontWeight: 500, lineHeight: 1.6, marginBottom: '2rem' }}>{confirmModal.message}</p>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.75rem' }}>{confirmModal.title}</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 500, lineHeight: 1.6, marginBottom: '2rem' }}>{confirmModal.message}</p>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button 
                 className="btn btn-secondary" 
@@ -6915,38 +6919,38 @@ const AdminMasters = () => {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .form-control { 
-            background: #f8fafc !important; 
+            background: var(--input-bg, var(--background)) !important; 
             height: 52px !important; 
             border-radius: 16px !important; 
-            border: 1.5px solid #e2e8f0 !important; 
+            border: 1.5px solid var(--border) !important; 
             padding: 0 1.25rem !important; 
             width: 100% !important; 
             transition: all 0.2s !important; 
             font-size: 0.9375rem !important;
             font-weight: 600 !important;
-            color: #1e293b !important;
+            color: var(--text-main) !important;
         }
         .form-control:focus { 
-            background: white !important;
-            border-color: #6366f1 !important; 
+            background: var(--surface) !important;
+            border-color: var(--primary) !important; 
             outline: none !important; 
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important; 
+            box-shadow: 0 0 0 4px var(--primary-light) !important; 
         }
         label {
             font-size: 0.75rem !important;
             font-weight: 800 !important;
-            color: #64748b !important;
+            color: var(--text-muted) !important;
             text-transform: uppercase !important;
             letter-spacing: 0.05em !important;
             margin-bottom: 0.5rem !important;
             display: block !important;
         }
         .btn { border-radius: 14px; font-weight: 800; padding: 0.75rem 1.75rem; transition: all 0.2s; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; justify-content: center; border: none; }
-        .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2); }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(79, 70, 229, 0.3); }
-        .btn-secondary { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }
-        .btn-secondary:hover { background: #e2e8f0; }
-        .card { background: white; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3); }
+        .btn-secondary { background: var(--surface); color: var(--text-main); border: 1.5px solid var(--border); }
+        .btn-secondary:hover { background: var(--background); }
+        .card { background: var(--surface); border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.05); border: 1px solid var(--border); }
         @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
       `}</style>
     </>
