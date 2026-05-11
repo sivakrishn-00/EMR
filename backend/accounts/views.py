@@ -3,8 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .serializers import (
     RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
-    AuditLogSerializer, NotificationSerializer, UserRoleSerializer
-)
+    AuditLogSerializer, NotificationSerializer, UserRoleSerializer)
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import User, AuditLog, Notification, UserRole
 from clinical.serializers import VisitSerializer
@@ -54,9 +53,44 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        queryset = AuditLog.objects.all().order_by('-timestamp')
+        
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        if start_date:
+            try:
+                import datetime
+                from django.utils.timezone import make_aware
+                start_dt = make_aware(datetime.datetime.strptime(start_date, '%Y-%m-%d'))
+                queryset = queryset.filter(timestamp__gte=start_dt)
+            except ValueError:
+                pass
+                
+        if end_date:
+            try:
+                import datetime
+                from django.utils.timezone import make_aware
+                end_dt = make_aware(datetime.datetime.strptime(f"{end_date} 23:59:59", '%Y-%m-%d %H:%M:%S'))
+                queryset = queryset.filter(timestamp__lte=end_dt)
+            except ValueError:
+                pass
+            
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(user__username__icontains=search) |
+                Q(module__icontains=search) |
+                Q(action__icontains=search) |
+                Q(details__icontains=search)
+            )
+            
+        return queryset
 
 class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
