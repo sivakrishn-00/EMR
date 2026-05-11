@@ -5938,68 +5938,7 @@ const AdminMasters = () => {
         </div>
       )}
 
-      {confirmModal.isOpen && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "flex-start",
-            zIndex: 1200000,
-            padding: "100px 1rem",
-          }}
-        >
-          <div
-            className="fade-in card"
-            style={{
-              width: "100%",
-              maxWidth: "400px",
-              padding: "2rem",
-              borderRadius: "24px",
-              textAlign: "center",
-            }}
-          >
-            <Trash2
-              size={24}
-              color="#ef4444"
-              style={{ margin: "0 auto 1.5rem auto" }}
-            />
-            <h3 style={{ fontWeight: 800 }}>{confirmModal.title}</h3>
-            <p style={{ color: "#64748b", margin: "1rem 0 2rem 0" }}>
-              {confirmModal.message}
-            </p>
-            <div style={{ display: "flex", gap: "1rem" }}>
-              <button
-                className="btn btn-secondary"
-                style={{ flex: 1 }}
-                onClick={() =>
-                  setConfirmModal({ ...confirmModal, isOpen: false })
-                }
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                style={{
-                  flex: 1,
-                  background: "#ef4444",
-                  borderColor: "#ef4444",
-                }}
-                onClick={confirmModal.onConfirm}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+
 
       {showNewProtocolModal && createPortal(
         <div

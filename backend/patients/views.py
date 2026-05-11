@@ -365,28 +365,7 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         """
         queryset = RegistryData.objects.all().select_related('registry_type').order_by('id')
         
-        # Advanced Clinical Filtering: Support multiple slugs and type-categories
-        registry_type = self.request.query_params.get('registry_type')
-        slugs = self.request.query_params.get('registry_type__slug')
-        categories = self.request.query_params.get('type_category')
-
-        if slugs:
-            slug_list = [s.strip() for s in slugs.split(',') if s.strip()]
-            queryset = queryset.filter(registry_type__slug__in=slug_list)
-        elif registry_type and registry_type != 'null' and registry_type != 'undefined':
-            if str(registry_type).isdigit():
-                queryset = queryset.filter(registry_type_id=int(registry_type))
-            else:
-                queryset = queryset.filter(registry_type__slug=registry_type)
-        
-        if categories:
-            cat_list = [c.strip() for c in categories.split(',') if c.strip()]
-            queryset = queryset.filter(registry_type__type_category__in=cat_list)
-        elif not slugs and not registry_type and not self.request.query_params.get('all', False):
-            # Security: If no protocol/filter is specified, return nothing
-            queryset = queryset.none()
-
-        # Project Isolation: Filter by associated project
+        # Project Isolation: Filter by associated project (Enforced globally for all actions)
         project_id = self.request.query_params.get('project')
         
         user = self.request.user
@@ -402,11 +381,36 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         elif project_id:
             queryset = queryset.filter(registry_type__project_id=project_id)
 
-        # Workspace Search: Filter by primary identifiers (ucode/name)
-        search = self.request.query_params.get('search')
-        if search:
-            from django.db.models import Q
-            queryset = queryset.filter(Q(ucode__icontains=search) | Q(name__icontains=search) | Q(category__icontains=search))
+        # Apply list-specific filters and fallbacks only during the list action
+        if hasattr(self, 'action') and self.action == 'list':
+            queryset = queryset.exclude(name='').exclude(ucode='').exclude(name__isnull=True).exclude(ucode__isnull=True)
+            
+            # Advanced Clinical Filtering: Support multiple slugs and type-categories
+            registry_type = self.request.query_params.get('registry_type')
+            slugs = self.request.query_params.get('registry_type__slug')
+            categories = self.request.query_params.get('type_category')
+
+            if slugs:
+                slug_list = [s.strip() for s in slugs.split(',') if s.strip()]
+                queryset = queryset.filter(registry_type__slug__in=slug_list)
+            elif registry_type and registry_type != 'null' and registry_type != 'undefined':
+                if str(registry_type).isdigit():
+                    queryset = queryset.filter(registry_type_id=int(registry_type))
+                else:
+                    queryset = queryset.filter(registry_type__slug=registry_type)
+            
+            if categories:
+                cat_list = [c.strip() for c in categories.split(',') if c.strip()]
+                queryset = queryset.filter(registry_type__type_category__in=cat_list)
+            elif not slugs and not registry_type and not self.request.query_params.get('all', False):
+                # Security: If no protocol/filter is specified, return nothing
+                queryset = queryset.none()
+
+            # Workspace Search: Filter by primary identifiers (ucode/name)
+            search = self.request.query_params.get('search')
+            if search:
+                from django.db.models import Q
+                queryset = queryset.filter(Q(ucode__icontains=search) | Q(name__icontains=search) | Q(category__icontains=search))
 
         return queryset
 
@@ -515,9 +519,16 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                         clean_k = clean_k[:-10]
                     clean_data[clean_k] = v
 
+                # Skip blank/empty rows in Excel/CSV
+                if not clean_data or not any(str(val).strip() for val in clean_data.values() if val is not None):
+                    continue
+
                 # Resolve ucode/primary key
                 ucode = clean_data.get('ucode') or clean_data.get('card_no') or clean_data.get('item_code') or next(iter(clean_data.values()))
                 name = clean_data.get('name') or clean_data.get('item_name') or clean_data.get('label') or ""
+                
+                if not str(ucode).strip() or not str(name).strip():
+                    continue
                 
                 # Case-insensitive mapping of CSV headers to schema slugs
                 additional = {}
@@ -915,7 +926,7 @@ class RegistryReportView(viewsets.ViewSet):
         else:
             pharmacy_type = RegistryType.objects.filter(Q(icon='Pill') | Q(slug='pharmacy-drugs')).first()
 
-        inventory_items = RegistryData.objects.filter(registry_type=pharmacy_type) if pharmacy_type else RegistryData.objects.none()
+        inventory_items = RegistryData.objects.filter(registry_type=pharmacy_type).exclude(name='').exclude(ucode='').exclude(name__isnull=True).exclude(ucode__isnull=True) if pharmacy_type else RegistryData.objects.none()
 
         if active_project:
             patient_qs = patient_qs.filter(Q(project=active_project) | Q(employee_master__project=active_project))

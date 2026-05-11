@@ -138,7 +138,7 @@ class DashboardStatsView(generics.GenericAPIView):
             critical_items = RegistryData.objects.filter(
                 registry_type__slug__icontains='pharmacy',
                 quantity__lte=15
-            ).select_related('registry_type', 'registry_type__project').order_by('quantity')[:8]
+            ).exclude(name='').exclude(ucode='').exclude(name__isnull=True).exclude(ucode__isnull=True).select_related('registry_type', 'registry_type__project').order_by('quantity')[:8]
             
             for item in critical_items:
                 low_stock_items.append({
