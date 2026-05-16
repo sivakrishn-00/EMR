@@ -199,7 +199,8 @@ const Login = () => {
         .f-lbl { font-size: 0.65rem; font-weight: 850; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; display: block; }
         .f-wrap { display: flex; align-items: center; gap: 1rem; padding: 0 1.25rem; background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 16px; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .f-wrap:focus-within { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08); }
-        .f-input { width: 100%; border: none; background: transparent; padding: 1.25rem 0; font-size: 0.9375rem; font-weight: 700; color: #0f172a; outline: none; }
+        .f-input { width: 100%; border: none !important; background: transparent !important; padding: 1.25rem 0; font-size: 0.9375rem; font-weight: 700; color: #0f172a; outline: none !important; box-shadow: none !important; }
+        .f-input:-webkit-autofill, .f-input:-webkit-autofill:hover, .f-input:-webkit-autofill:focus { -webkit-text-fill-color: #0f172a; -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important; transition: background-color 5000s ease-in-out 0s; }
 
         .g-btn { width: 100%; padding: 1.125rem; background: #4338ca; color: white; border: none; border-radius: 18px; font-size: 1rem; font-weight: 800; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
         .g-btn:hover { background: #3730a3; transform: translateY(-1px); }
@@ -211,6 +212,18 @@ const Login = () => {
 
         .discovery-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 6px 14px; background: #f5f3ff; border-radius: 99px; font-size: 0.75rem; font-weight: 850; color: #4338ca; margin-bottom: 1.5rem; border: 1px solid #ddd6fe; }
         
+        .text-btn { background: none; border: none; width: 100%; font-size: 0.875rem; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 0.375rem; padding: 0.75rem; border-radius: 12px; }
+        .text-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+        .link-btn { background: none; border: none; width: 100%; font-size: 0.875rem; font-weight: 600; color: #4338ca; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 0.25rem; padding: 0.25rem 0; }
+        .link-btn span { position: relative; }
+        .link-btn span::after { content: ''; position: absolute; width: 100%; transform: scaleX(0); height: 1px; bottom: -2px; left: 0; background-color: currentColor; transform-origin: bottom right; transition: transform 0.25s ease-out; }
+        .link-btn:hover span::after { transform: scaleX(1); transform-origin: bottom left; }
+        .link-btn:hover { color: #3730a3; }
+
+        .link-btn-secondary { color: #64748b; font-size: 0.8125rem; }
+        .link-btn-secondary:hover { color: #0f172a; }
+
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
         .spin { animation: spin 1s linear infinite; }
@@ -277,7 +290,7 @@ const Login = () => {
               </div>
               <button className="g-btn" type="submit" disabled={isLoading}>{isLoading ? <Loader2 size={18} className="spin" /> : 'Authorize Access'}</button>
             </form>
-            <button style={{ background: 'none', border: 'none', width: '100%', marginTop: '2rem', fontSize: '0.8125rem', fontWeight: 800, color: '#94a3b8', cursor: 'pointer' }} onClick={() => setStep(0)}>Change Registry ID</button>
+            <button className="text-btn" style={{ marginTop: '2rem' }} onClick={() => setStep(0)}><ChevronLeft size={14} /> Change Registry ID</button>
           </div>
         )}
 
@@ -304,16 +317,18 @@ const Login = () => {
                 {isLoading ? <Loader2 size={18} className="spin" /> : (authMode === 'OTP' ? (isResetting ? 'Verify to Reset' : 'Request Secure Code') : 'Unlock Profile')}
               </button>
               
-              {authMode === 'PASSWORD' && (
-                <button type="button" style={{ background: 'none', border: 'none', width: '100%', marginTop: '1.5rem', fontSize: '0.8rem', fontWeight: 800, color: '#94a3b8', cursor: 'pointer' }} onClick={() => { setAuthMode('OTP'); setIsResetting(true); }}>Forgot password?</button>
+              {authMode === 'PASSWORD' && !identityData?.is_first_time && (
+                <button type="button" className="link-btn" style={{ marginTop: '1.5rem' }} onClick={() => { setAuthMode('OTP'); setIsResetting(true); }}><span>Forgot password?</span></button>
               )}
             </form>
 
-            <button style={{ background: 'none', border: 'none', width: '100%', marginTop: '2.5rem', fontSize: '0.8125rem', fontWeight: 800, color: '#4338ca', cursor: 'pointer' }} onClick={() => { setAuthMode(authMode === 'OTP' ? 'PASSWORD' : 'OTP'); setIsResetting(false); }}>
-              {authMode === 'OTP' ? 'Login with Master Password' : 'First time? Use Verification Code'}
-            </button>
+            {(authMode === 'OTP' || identityData?.is_first_time) && (
+              <button className="link-btn" style={{ marginTop: '2.5rem' }} onClick={() => { setAuthMode(authMode === 'OTP' ? 'PASSWORD' : 'OTP'); setIsResetting(false); }}>
+                <span>{authMode === 'OTP' ? 'Login with Master Password' : 'First time? Use Verification Code'}</span>
+              </button>
+            )}
             
-            <button style={{ background: 'none', border: 'none', width: '100%', marginTop: '2.5rem', fontSize: '0.8125rem', fontWeight: 800, color: '#cbd5e1', cursor: 'pointer' }} onClick={() => { setStep(0); setIsResetting(false); }}>Change Registry ID</button>
+            <button className="text-btn" style={{ marginTop: '2.5rem' }} onClick={() => { setStep(0); setIsResetting(false); }}><ChevronLeft size={14} /> Change Registry ID</button>
           </div>
         )}
 
@@ -328,7 +343,7 @@ const Login = () => {
               <button className="g-btn" type="submit" disabled={isLoading}>Confirm Identity</button>
             </form>
             {resendTimer > 0 ? <p style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8' }}>Retry in {resendTimer}s</p> : <button style={{ background: 'none', border: 'none', width: '100%', marginTop: '2rem', color: '#4338ca', fontWeight: 800, cursor: 'pointer' }} onClick={handlePatientRequestOTP}>Resend Code</button>}
-            <button style={{ background: 'none', border: 'none', width: '100%', marginTop: '2rem', fontSize: '0.8125rem', fontWeight: 800, color: '#94a3b8', cursor: 'pointer' }} onClick={() => setStep(2)}>Back</button>
+            <button className="text-btn" style={{ marginTop: '2rem' }} onClick={() => setStep(2)}><ChevronLeft size={14} /> Back</button>
           </div>
         )}
 

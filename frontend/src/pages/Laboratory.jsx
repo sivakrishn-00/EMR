@@ -38,25 +38,20 @@ const Laboratory = () => {
     sample_type: 'Blood',
     remarks: ''
   });
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     fetchLabRequests();
   }, []);
 
-  const fetchLabRequests = async (pageNum = 1) => {
+  const fetchLabRequests = async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`laboratory/requests/?page=${pageNum}`);
-      if (res.data.results) {
-          setLabRequests(res.data.results);
-          setTotalCount(res.data.count);
-      } else {
-          setLabRequests(res.data);
-          setTotalCount(res.data.length);
-      }
-      setPage(pageNum);
+      const res = await api.get(`laboratory/requests/?page_size=1000`);
+      const data = res.data.results || res.data;
+      setLabRequests(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error("Failed to fetch lab workload");
     } finally {
@@ -166,6 +161,20 @@ const Laboratory = () => {
     toast.success(`Results synced from ${record.machine_name}!`);
   };
 
+  const filteredRequests = labRequests
+    .filter(r => activeTab === 'COMPLETED' ? r.status === 'COMPLETED' : r.status !== 'COMPLETED')
+    .filter(r => 
+      !searchTerm || 
+      r.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.patient_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.test_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentRequests = filteredRequests.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2.5rem' }}>
@@ -175,45 +184,67 @@ const Laboratory = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
              <div>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue</h3>
                 <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
              </div>
              
-             <div style={{ background: 'var(--background)', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px', border: '1px solid var(--border)' }}>
-                <button 
-                  onClick={() => setActiveTab('PENDING')}
-                  style={{ 
-                    padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
-                    background: activeTab === 'PENDING' ? 'var(--surface)' : 'transparent',
-                    color: activeTab === 'PENDING' ? 'var(--primary)' : 'var(--text-muted)',
-                    fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                    boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <Clock size={14} /> PENDING ({labRequests.filter(r => r.status !== 'COMPLETED').length})
-                </button>
-                <button 
-                  onClick={() => setActiveTab('COMPLETED')}
-                  style={{ 
-                    padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
-                    background: activeTab === 'COMPLETED' ? 'var(--surface)' : 'transparent',
-                    color: activeTab === 'COMPLETED' ? '#10b981' : 'var(--text-muted)',
-                    fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                    boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <CheckCircle size={14} /> COMPLETED ({labRequests.filter(r => r.status === 'COMPLETED').length})
-                </button>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div className="search-container" style={{ position: 'relative' }}>
+                   <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
+                   <input
+                      type="text"
+                      placeholder="Search patient or test..."
+                      value={searchTerm}
+                      onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                      className="search-input"
+                      style={{ padding: '0.5rem 2rem 0.5rem 2.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.75rem', outline: 'none' }}
+                   />
+                   {searchTerm && (
+                      <button 
+                         onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                         style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                      >
+                         <X size={14} />
+                      </button>
+                   )}
+                </div>
+                
+                <div style={{ background: 'var(--background)', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px', border: '1px solid var(--border)' }}>
+                   <button 
+                     onClick={() => setActiveTab('PENDING')}
+                     style={{ 
+                       padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
+                       background: activeTab === 'PENDING' ? 'var(--surface)' : 'transparent',
+                       color: activeTab === 'PENDING' ? 'var(--primary)' : 'var(--text-muted)',
+                       fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                       boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '8px'
+                     }}
+                   >
+                     <Clock size={14} /> PENDING ({labRequests.filter(r => r.status !== 'COMPLETED').length})
+                   </button>
+                   <button 
+                     onClick={() => setActiveTab('COMPLETED')}
+                     style={{ 
+                       padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
+                       background: activeTab === 'COMPLETED' ? 'var(--surface)' : 'transparent',
+                       color: activeTab === 'COMPLETED' ? '#10b981' : 'var(--text-muted)',
+                       fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                       boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '8px'
+                     }}
+                   >
+                     <CheckCircle size={14} /> COMPLETED ({labRequests.filter(r => r.status === 'COMPLETED').length})
+                   </button>
+                </div>
              </div>
           </div>
           
@@ -228,9 +259,15 @@ const Laboratory = () => {
                 </tr>
               </thead>
               <tbody>
-                {labRequests
-                  .filter(r => activeTab === 'COMPLETED' ? r.status === 'COMPLETED' : r.status !== 'COMPLETED')
-                  .map(r => (
+                {currentRequests.length === 0 ? (
+                    <tr>
+                       <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#475569' }}>
+                         <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No requests found</p>
+                         <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
+                      </td>
+                    </tr>
+                 ) : (
+                    currentRequests.map(r => (
                   <tr key={r.id} style={{ background: selectedRequest?.id === r.id ? 'var(--background)' : 'transparent' }}>
                     <td style={{ padding: '1.25rem 1.25rem' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -244,13 +281,13 @@ const Laboratory = () => {
                           </div>
                           <div>
                              <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{r.patient_name}</p>
-                             <p style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: 800 }}>ID: {r.patient_id}</p>
+                             <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {r.patient_id}</p>
                           </div>
                        </div>
                     </td>
                     <td>
                         <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>{r.test_name}</p>
-                        <p style={{ fontSize: '0.625rem', color: '#94a3b8' }}>Req by Dr. {r.ordered_by_name || 'MD'}</p>
+                        <p style={{ fontSize: '0.625rem', color: '#475569' }}>Req by Dr. {r.ordered_by_name || 'MD'}</p>
                     </td>
                     <td>
                        <span className={`badge`} style={{ 
@@ -284,10 +321,37 @@ const Laboratory = () => {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
+          
+             {/* Pagination */}
+             {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                   <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                      Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequests.length)} of {filteredRequests.length} entries
+                   </p>
+                   <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                         disabled={currentPage === 1}
+                         className="btn btn-secondary"
+                         style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                      >
+                         Previous
+                      </button>
+                      <button
+                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                         disabled={currentPage === totalPages}
+                         className="btn btn-secondary"
+                         style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                      >
+                         Next
+                      </button>
+                   </div>
+                </div>
+             )}
         </div>
 
         {selectedRequest && (
@@ -386,19 +450,34 @@ const Laboratory = () => {
                       </p>
                       
                       {selectedRequest.test_master_details?.sub_tests?.length > 0 && (
-                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                                                   <div className="table-responsive" style={{ borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
+                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Sub-Test</th>
+                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Value</th>
+                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Units</th>
+                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Reference Range</th>
+                                   </tr>
+                                </thead>
+                                <tbody>
                             {selectedRequest.test_master_details.sub_tests.filter(st => st.is_active).map(st => {
                                const val = resultData.values[st.name];
                                const hasData = val !== undefined && val !== '';
                                return (
-                                  <div key={st.id} style={{ padding: '1.25rem', background: 'var(--surface)', borderRadius: '24px', border: hasData ? '1px solid var(--border)' : '1px dashed var(--border)' }}>
-                                     <label style={{ fontSize: '0.6rem', fontWeight: 950, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>{st.name}</label>
-                                     <div style={{ fontSize: '1.5rem', fontWeight: 950, color: hasData ? 'var(--text-main)' : 'var(--border)' }}>{hasData ? val : '---'}</div>
-                                     <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', fontWeight: 800 }}>{st.units} | {st.biological_range}</div>
-                                  </div>
+                                                                           <tr key={st.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>{st.name}</td>
+                                            <td style={{ padding: '0.75rem 1rem', fontSize: '1rem', fontWeight: 900, color: hasData ? 'var(--text-main)' : '#94a3b8' }}>
+                                               {hasData ? val : '---'}
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.units || '--'}</td>
+                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.biological_range || '--'}</td>
+                                         </tr>
                                );
                             })}
-                         </div>
+                                </tbody>
+                             </table>
+                          </div>
                       )}
 
                       <div className="form-group" style={{ marginTop: '1.5rem' }}>

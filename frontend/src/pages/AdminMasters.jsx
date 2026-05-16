@@ -37,7 +37,7 @@ import {
   Key,
   Shuffle
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +45,7 @@ import { useAuth } from "../context/AuthContext";
 const AdminMasters = () => {
   const navigate = useNavigate();
   const { board } = useParams();
+  const location = useLocation();
   const activeBoard = (board || "protocols").toUpperCase();
   const setActiveBoard = (boardName) => {
     navigate(`/admin-masters/${boardName.toLowerCase()}`);
@@ -59,6 +60,13 @@ const AdminMasters = () => {
   const [totalFamilyCount, setTotalFamilyCount] = useState(0);
   const [selectedProject, setSelectedProject] = useState("");
   const [viewMode, setViewMode] = useState("PROJECTS"); // PROJECTS, DATA
+
+  useEffect(() => {
+    if (location.state && location.state.selectedProject) {
+      setSelectedProject(location.state.selectedProject);
+      setViewMode("DATA");
+    }
+  }, [location.state]);
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
@@ -146,6 +154,8 @@ const AdminMasters = () => {
   const [statsViewTab, setStatsViewTab] = useState("TRENDS");
   const [batchSearchQuery, setBatchSearchQuery] = useState("");
   const [depletionSearchQuery, setDepletionSearchQuery] = useState("");
+  const [depletionDisplayLimit, setDepletionDisplayLimit] = useState(10);
+  const [batchDisplayLimit, setBatchDisplayLimit] = useState(10);
   
   // Laboratory Diagnostic Masters State
   const [labTests, setLabTests] = useState([]);
@@ -1301,7 +1311,14 @@ const AdminMasters = () => {
                     border: "none",
                     fontWeight: 800,
                     boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)",
-                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    height: "40px",
+                    borderRadius: "14px",
+                    fontSize: "0.75rem",
+                    padding: "0 1.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-2px)";
@@ -1318,7 +1335,70 @@ const AdminMasters = () => {
                 >
                   Back to Project List
                 </button>
-                {activeBoard === "PROTOCOLS" && projects.find((p) => String(p.id) === String(selectedProject))?.category_mappings?.some((m) => m.category === "EMPLOYEE") && (
+                {activeBoard === "PROTOCOLS" && (
+                  <button
+                    className="btn btn-primary"
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0 1.25rem",
+                      height: "40px",
+                      borderRadius: "14px",
+                      background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                      border: "none",
+                      fontWeight: 800,
+                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 6px 15px rgba(99, 102, 241, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.2)";
+                    }}
+                    onClick={() => {
+                      setIsEditingProtocol(false);
+                      setNewProtocolData({
+                        name: "",
+                        description: "",
+                        coverage: "",
+                        fields: [],
+                      });
+                      setShowNewProtocolModal(true);
+                    }}
+                  >
+                    <Plus size={16} /> New Registry Type
+                  </button>
+                )}
+                {activeBoard === "DIAGNOSTICS" && (
+                  <button
+                    className="btn btn-primary"
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "0 1.25rem",
+                      height: "40px",
+                      borderRadius: "14px",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      border: "none",
+                      fontWeight: 800,
+                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 6px 15px rgba(16, 185, 129, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(16, 185, 129, 0.2)";
+                    }}
+                    onClick={() => setShowLabTestModal(true)}
+                  >
+                    <Plus size={16} /> New Lab Test
+                  </button>
+                )}
+                {activeBoard === "REGISTRY" && (exploringProtocolId === "employee_master" || exploringProtocolId === "family_member") && (
                   <button
                     className="btn btn-primary"
                     style={{
@@ -1519,131 +1599,108 @@ const AdminMasters = () => {
             <div
               style={{
                 display: "flex",
-                gap: "0.5rem",
+                gap: "2rem",
                 marginTop: "1.5rem",
                 marginBottom: "1.5rem",
-                background: "var(--surface)",
-                padding: "0.5rem",
-                borderRadius: "20px",
-                border: "1px solid var(--border)",
-                width: "fit-content",
+                borderBottom: "1px solid #e2e8f0",
+                width: "100%",
+                paddingBottom: "0",
               }}
             >
                <button
                 className="btn"
                 style={{
-                  background: activeBoard === "PROTOCOLS" ? "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" : "transparent",
-                  color: activeBoard === "PROTOCOLS" ? "white" : "var(--text-muted)",
-                  boxShadow: activeBoard === "PROTOCOLS" ? "0 4px 12px rgba(99, 102, 241, 0.2)" : "none",
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
+                  background: "transparent",
+                  color: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b",
+                  fontSize: "0.85rem",
+                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                  borderRadius: "0",
                   transition: "all 0.2s",
-                  fontWeight: activeBoard === "PROTOCOLS" ? 800 : 500
+                  fontWeight: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? 600 : 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderBottom: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "2px solid #6366f1" : "2px solid transparent",
+                  marginBottom: "-1px",
                 }}
                 onClick={() => setActiveBoard("PROTOCOLS")}
               >
-                <Layers size={16} /> Data Hub
+                <Layers size={16} color={(activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b"} /> Data Hub
               </button>
 
               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "DIAGNOSTICS" ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "transparent",
-                  color: activeBoard === "DIAGNOSTICS" ? "white" : "var(--text-muted)",
-                  boxShadow: activeBoard === "DIAGNOSTICS" ? "0 4px 12px rgba(16, 185, 129, 0.2)" : "none",
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
+                  background: "transparent",
+                  color: activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b",
+                  fontSize: "0.85rem",
+                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                  borderRadius: "0",
                   transition: "all 0.2s",
-                  fontWeight: activeBoard === "DIAGNOSTICS" ? 800 : 500
+                  fontWeight: activeBoard === "DIAGNOSTICS" ? 600 : 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderBottom: activeBoard === "DIAGNOSTICS" ? "2px solid #10b981" : "2px solid transparent",
+                  marginBottom: "-1px",
                 }}
                 onClick={() => {
                   setActiveBoard("DIAGNOSTICS");
                   fetchLabTests();
                 }}
               >
-                <Activity size={16} /> Lab Masters
+                <Activity size={16} color={activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b"} /> Lab Masters
               </button>
 
               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "MACHINES" ? "linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)" : "transparent",
-                  color: activeBoard === "MACHINES" ? "white" : "var(--text-muted)",
-                  boxShadow: activeBoard === "MACHINES" ? "0 4px 12px rgba(168, 85, 247, 0.2)" : "none",
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
+                  background: "transparent",
+                  color: activeBoard === "MACHINES" ? "#a855f7" : "#64748b",
+                  fontSize: "0.85rem",
+                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                  borderRadius: "0",
                   transition: "all 0.2s",
-                  fontWeight: activeBoard === "MACHINES" ? 800 : 500
+                  fontWeight: activeBoard === "MACHINES" ? 600 : 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderBottom: activeBoard === "MACHINES" ? "2px solid #a855f7" : "2px solid transparent",
+                  marginBottom: "-1px",
                 }}
                 onClick={() => {
                   setActiveBoard("MACHINES");
                   fetchLabMachines();
                 }}
               >
-                <Radio size={16} /> Sync Bridge
+                <Radio size={16} color={activeBoard === "MACHINES" ? "#a855f7" : "#64748b"} /> Sync Bridge
               </button>
 
               <button
                 className="btn"
                 style={{
-                  background: activeBoard === "STATS" ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" : "transparent",
-                  color: activeBoard === "STATS" ? "white" : "var(--text-muted)",
-                  boxShadow: activeBoard === "STATS" ? "0 4px 12px rgba(245, 158, 11, 0.2)" : "none",
-                  fontSize: "0.75rem",
-                  padding: "0 1.25rem",
-                  height: "40px",
-                  borderRadius: "14px",
+                  background: "transparent",
+                  color: activeBoard === "STATS" ? "#f59e0b" : "#64748b",
+                  fontSize: "0.85rem",
+                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                  borderRadius: "0",
                   transition: "all 0.2s",
-                  fontWeight: activeBoard === "STATS" ? 800 : 500
+                  fontWeight: activeBoard === "STATS" ? 600 : 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderBottom: activeBoard === "STATS" ? "2px solid #f59e0b" : "2px solid transparent",
+                  marginBottom: "-1px",
                 }}
                 onClick={() => {
                   setActiveBoard("STATS");
                   fetchDashboardStats();
                 }}
               >
-                <Activity size={16} /> Analytics & Stock Monitor
+                <Activity size={16} color={activeBoard === "STATS" ? "#f59e0b" : "#64748b"} /> Analytics & Stock Monitor
               </button>
 
-              {activeBoard === "PROTOCOLS" && (
-                <>
-                  <div style={{ width: "1px", background: "var(--border)", margin: "8px 4px" }} />
 
-                  <button
-                    className="btn btn-primary"
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "0 1.25rem",
-                      height: "40px",
-                      borderRadius: "14px",
-                      background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-                      border: "none",
-                      fontWeight: 800,
-                      boxShadow: "0 4px 12px rgba(15, 23, 42, 0.2)",
-                      transition: "all 0.3s"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                    onClick={() => {
-                      setIsEditingProtocol(false);
-                      setNewProtocolData({
-                        name: "",
-                        description: "",
-                        coverage: "",
-                        fields: [],
-                      });
-                      setShowNewProtocolModal(true);
-                    }}
-                  >
-                    <Plus size={16} /> New Registry Type
-                  </button>
-                </>
-              )}
             </div>
 
             {activeBoard === "STATS" ? (
@@ -1674,23 +1731,23 @@ const AdminMasters = () => {
                               <div
                                 className="card"
                                 style={{
-                                  padding: "1.15rem 1.25rem",
-                                  borderRadius: "16px",
-                                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-                                  color: "white",
-                                  boxShadow: "0 8px 20px rgba(79, 70, 229, 0.15)",
-                                  border: "none",
+                                  padding: "0.5rem 0.75rem",
+                                  borderRadius: "8px",
+                                  background: "var(--surface)",
+                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
+                                  border: "1px solid var(--border)",
+                                  borderLeft: "3px solid #4f46e5",
                                   display: "flex",
                                   flexDirection: "column",
-                                  justifyContent: "space-between"
+                                  justifyContent: "center"
                                 }}
                               >
-                                <p style={{ fontSize: "0.6875rem", fontWeight: 800, opacity: 0.9, letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL INVENTORY VALUE</p>
-                                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, marginTop: "0.5rem" }}>
+                                <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL INVENTORY VALUE</p>
+                                <h2 style={{ fontSize: "1.1rem", fontWeight: 900, color: "var(--text-main)", marginTop: "0.1rem" }}>
                                   ₹{dashboardStats.inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </h2>
-                                <div style={{ display: "flex", gap: "10px", marginTop: "0.75rem" }}>
-                                   <span style={{ fontSize: "0.6875rem", background: "rgba(255,255,255,0.18)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                                <div style={{ display: "flex", gap: "10px", marginTop: "0.1rem" }}>
+                                   <span style={{ fontSize: "0.75rem", color: "#4f46e5", fontWeight: 700 }}>
                                       {dashboardStats.total_registered} Patients Served
                                    </span>
                                 </div>
@@ -1699,20 +1756,23 @@ const AdminMasters = () => {
                               <div
                                 className="card"
                                 style={{
-                                  padding: "1.15rem 1.25rem",
-                                  borderRadius: "16px",
-                                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-                                  color: "white",
-                                  boxShadow: "0 8px 20px rgba(79, 70, 229, 0.15)",
-                                  border: "none",
+                                  padding: "0.5rem 0.75rem",
+                                  borderRadius: "8px",
+                                  background: "var(--surface)",
+                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
+                                  border: "1px solid var(--border)",
+                                  borderLeft: "3px solid #4f46e5",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  justifyContent: "center"
                                 }}
                               >
-                                <p style={{ fontSize: "0.6875rem", fontWeight: 800, opacity: 0.9, letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL REGISTERED PATIENTS</p>
-                                <h2 style={{ fontSize: "1.75rem", fontWeight: 900, marginTop: "0.5rem" }}>
+                                <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL REGISTERED PATIENTS</p>
+                                <h2 style={{ fontSize: "1.1rem", fontWeight: 900, color: "var(--text-main)", marginTop: "0.1rem" }}>
                                   {dashboardStats.total_registered} Patients
                                 </h2>
-                                <div style={{ display: "flex", gap: "10px", marginTop: "0.75rem" }}>
-                                   <span style={{ fontSize: "0.6875rem", background: "rgba(255,255,255,0.18)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                                <div style={{ display: "flex", gap: "10px", marginTop: "0.1rem" }}>
+                                   <span style={{ fontSize: "0.75rem", color: "#4f46e5", fontWeight: 700 }}>
                                       Primary Patients & Dependents
                                    </span>
                                 </div>
@@ -1723,29 +1783,30 @@ const AdminMasters = () => {
                               <div
                                 className="card"
                                 style={{
-                                  padding: "1.15rem 1.25rem",
-                                  borderRadius: "16px",
-                                  background: "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)",
-                                  border: "1px solid rgba(239, 68, 68, 0.25)",
-                                  boxShadow: "0 8px 20px rgba(239, 68, 68, 0.08)",
+                                  padding: "0.5rem 0.75rem",
+                                  borderRadius: "8px",
+                                  background: "var(--surface)",
+                                  border: "1px solid var(--border)",
+                                  borderLeft: "3px solid #ef4444",
+                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
                                   display: "flex",
                                   flexDirection: "column",
-                                  justifyContent: "space-between"
+                                  justifyContent: "center"
                                 }}
                               >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                   <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#ef4444", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
-                                   <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", animation: "pulse 1.5s infinite" }} />
+                                   <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
+                                   <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#ef4444", animation: "pulse 1.5s infinite" }} />
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.1rem" }}>
                                    <div>
-                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--alert-low)", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
-                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--alert-low)", opacity: 0.8, marginTop: "2px" }}>LOW STOCK ITEMS</p>
+                                      <h4 style={{ fontSize: "1.1rem", fontWeight: 900, color: "#ef4444", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
+                                      <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "2px" }}>LOW STOCK ITEMS</p>
                                    </div>
-                                   <div style={{ borderLeft: "1px solid rgba(239, 68, 68, 0.3)", height: "35px", opacity: 0.6 }} />
+                                   <div style={{ borderLeft: "1px solid var(--border)", height: "35px" }} />
                                    <div>
-                                      <h4 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--alert-out)", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
-                                      <p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--alert-out)", opacity: 0.8, marginTop: "2px" }}>OUT OF STOCK</p>
+                                      <h4 style={{ fontSize: "1.1rem", fontWeight: 900, color: "#dc2626", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
+                                      <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "2px" }}>OUT OF STOCK</p>
                                    </div>
                                 </div>
                               </div>
@@ -1754,21 +1815,22 @@ const AdminMasters = () => {
                             <div
                               className="card"
                               style={{
-                                padding: "1.15rem 1.25rem",
+                                padding: "1.5rem",
                                 borderRadius: "16px",
-                                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)",
-                                border: "1px solid rgba(16, 185, 129, 0.25)",
-                                boxShadow: "0 8px 20px rgba(16, 185, 129, 0.08)",
+                                background: "var(--surface)",
+                                border: "1px solid var(--border)",
+                                borderLeft: "4px solid #10b981",
+                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
                                 display: "flex",
                                 flexDirection: "column",
                                 justifyContent: "space-between"
                               }}
                             >
-                              <p style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#10b981", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
-                              <h2 style={{ fontSize: "1.75rem", fontWeight: 900, color: "var(--conversion-text)", marginTop: "0.5rem" }}>
+                              <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
+                              <h2 style={{ fontSize: "2rem", fontWeight: 900, color: "#10b981", marginTop: "0.5rem" }}>
                                 {dashboardStats.conversion_rate}%
                               </h2>
-<p style={{ fontSize: "0.5625rem", fontWeight: 900, color: "var(--conversion-text)", opacity: 0.8, marginTop: "4px" }}>
+                              <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "4px" }}>
                                  Visits successfully completed today
                               </p>
                             </div>
@@ -1782,13 +1844,13 @@ const AdminMasters = () => {
                                <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "stretch" }}>
                                   
                                    {/* Section A: Weekly Consumption Trends (Left Side) */}
-                                   <div className="card" style={{ flex: "1 1 450px", minWidth: "280px", padding: "1.15rem 1.25rem", borderRadius: "16px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                                      <div>
+                                   <div className="card" style={{ flex: "1 1 450px", minWidth: "280px", padding: "0.75rem", borderRadius: "10px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.02)", display: "flex", flexDirection: "column" }}>
+                                      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                                            <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
-                                               📊 WEEKLY MEDICATION TRENDS
+                                            <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "6px" }}>
+                                               WEEKLY MEDICATION TRENDS
                                             </h4>
-                                            <span style={{ fontSize: "0.5625rem", color: "var(--text-muted)", fontWeight: 800, background: "var(--background)", padding: "3px 8px", borderRadius: "6px" }}>Live Consumption Chart</span>
+                                            <span style={{ fontSize: "0.625rem", color: "var(--text-muted)", fontWeight: 800, background: "var(--background)", padding: "3px 8px", borderRadius: "6px" }}>Live Consumption Chart</span>
                                          </div>
 
                                          {/* Dynamic Insight Banner */}
@@ -1806,13 +1868,13 @@ const AdminMasters = () => {
                                                      display: "flex", 
                                                      alignItems: "center", 
                                                      gap: "6px", 
-                                                     background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)", 
-                                                     padding: "0.45rem 0.75rem", 
+                                                     background: "rgba(99, 102, 241, 0.1)", 
+                                                     padding: "0.5rem 0.75rem", 
                                                      borderRadius: "10px", 
-                                                     fontSize: "0.6875rem", 
+                                                     fontSize: "0.75rem", 
                                                      fontWeight: 800, 
-                                                     color: "var(--primary)",
-                                                     border: "1px solid var(--border)",
+                                                     color: "#4f46e5",
+                                                     border: "1px solid rgba(99, 102, 241, 0.2)",
                                                      marginBottom: "1rem"
                                                   }}>
                                                      <span style={{ fontSize: "0.85rem" }}>⚡</span>
@@ -1824,7 +1886,7 @@ const AdminMasters = () => {
                                          })()}
 
                                          {/* Chart Columns Container */}
-                                         <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", height: "165px", padding: "0.5rem 0" }}>
+                                         <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", flex: 1, padding: "0.25rem 0", minHeight: "100px" }}>
                                             {dashboardStats.trends.map((t, i) => {
                                                const maxVal = Math.max(...dashboardStats.trends.map(x => x.units), 1);
                                                const percentHeight = Math.min(100, (t.units / maxVal) * 100);
@@ -1844,8 +1906,7 @@ const AdminMasters = () => {
                                                      {/* Outer Track Column */}
                                                      <div style={{ 
                                                         width: "100%", 
-                                                        background: "var(--background)", 
-                                                        border: "1px solid var(--border)",
+                                                        background: "#f8fafc", 
                                                         borderRadius: "12px", 
                                                         height: "125px",
                                                         position: "relative",
@@ -1853,7 +1914,7 @@ const AdminMasters = () => {
                                                         flexDirection: "column",
                                                         justifyContent: "flex-end",
                                                         overflow: "hidden",
-                                                        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
+                                                        border: "1px solid #e2e8f0"
                                                      }} title={`${t.units} units dispensed`}>
                                                         
                                                         {/* Raised Value Indicator inside or floating on top */}
@@ -1862,24 +1923,23 @@ const AdminMasters = () => {
                                                            top: "6px", 
                                                            left: "50%", 
                                                            transform: "translateX(-50%)", 
-                                                           fontSize: "0.5625rem", 
+                                                           fontSize: "0.625rem", 
                                                            fontWeight: 900, 
-                                                           color: t.units > 0 ? "var(--primary)" : "var(--text-muted)",
-                                                           background: t.units > 0 ? "rgba(99, 102, 241, 0.25)" : "transparent",
-                                                           padding: t.units > 0 ? "1px 4px" : "0",
+                                                           color: t.units > 0 ? "#4f46e5" : "var(--text-muted)",
+                                                           background: t.units > 0 ? "rgba(99, 102, 241, 0.15)" : "transparent",
+                                                           padding: t.units > 0 ? "2px 6px" : "0",
                                                            borderRadius: "4px",
                                                            zIndex: 2
                                                         }}>
                                                            {t.units}
                                                         </span>
 
-                                                        {/* Dynamic Bar with Ambient Glow */}
+                                                        {/* Dynamic Bar */}
                                                         <div style={{ 
                                                            width: "100%", 
-                                                           background: "linear-gradient(180deg, #6366f1 0%, #4338ca 100%)", 
+                                                           background: "#6366f1", 
                                                            borderRadius: "8px 8px 0 0", 
                                                            height: `${percentHeight}%`,
-                                                           boxShadow: t.units > 0 ? "0 -2px 10px rgba(99, 102, 241, 0.35)" : "none",
                                                            transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                                                            minHeight: t.units > 0 ? "8px" : "0"
                                                         }} />
@@ -1887,8 +1947,8 @@ const AdminMasters = () => {
 
                                                      {/* Multi-tier Date Label */}
                                                      <div style={{ textAlign: "center", lineHeight: "1.2" }}>
-                                                        <span style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
-                                                        <span style={{ fontSize: "0.5rem", fontWeight: 800, color: "var(--text-muted)" }}>{t.date.split('-').slice(1).join('/')}</span>
+                                                        <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
+                                                        <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>{t.date.split('-').slice(1).join('/')}</span>
                                                      </div>
 
                                                   </div>
@@ -1902,22 +1962,20 @@ const AdminMasters = () => {
                                   <div className="card" style={{ 
                                      flex: "1 1 360px",
                                      minWidth: "280px",
-                                     padding: "1.15rem 1.25rem", 
-                                     borderRadius: "16px", 
-                                     background: "linear-gradient(135deg, var(--surface) 0%, var(--background) 100%)", 
-                                     borderLeft: "5px solid var(--primary)", 
-                                     borderTop: "1px solid var(--border)",
-                                     borderBottom: "1px solid var(--border)",
-                                     borderRight: "1px solid var(--border)",
-                                     boxShadow: "0 6px 20px rgba(99, 102, 241, 0.03)",
+                                     padding: "0.75rem", 
+                                     borderRadius: "10px", 
+                                     background: "var(--surface)", 
+                                     border: "1px solid var(--border)",
+                                     borderLeft: "3px solid #f59e0b",
+                                     boxShadow: "0 2px 4px rgba(0, 0, 0, 0.02)",
                                      display: "flex",
                                      flexDirection: "column",
                                      justifyContent: "space-between"
                                   }}>
                                      <div>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                                           <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", letterSpacing: "0.02em" }}>🔥 TOP DISPENSED</h4>
-                                           <span style={{ fontSize: "0.5625rem", color: "var(--primary)", fontWeight: 900, background: "rgba(99, 102, 241, 0.15)", padding: "2px 6px", borderRadius: "6px" }}>Volume Rank</span>
+                                           <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-main)", letterSpacing: "0.02em" }}>TOP DISPENSED</h4>
+                                           <span style={{ fontSize: "0.625rem", color: "#d97706", fontWeight: 900, background: "rgba(245, 158, 11, 0.15)", padding: "2px 6px", borderRadius: "6px" }}>Volume Rank</span>
                                         </div>
 
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -1925,31 +1983,30 @@ const AdminMasters = () => {
                                               const maxDispensed = Math.max(...dashboardStats.top_medications.map(x => x.total), 1);
                                               const percentage = (m.total / maxDispensed) * 100;
                                               
-                                              // Dynamic Medal Styling based on rank
-                                              const medalBg = i === 0 ? "#fef3c7" : i === 1 ? "#f1f5f9" : i === 2 ? "#ffedd5" : "#f1f5f9";
-                                              const medalColor = i === 0 ? "#d97706" : i === 1 ? "#475569" : i === 2 ? "#c2410c" : "#64748b";
-                                              const medalText = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i+1}`;
+                                              const medalBg = "#f1f5f9";
+                                              const medalColor = "#475569";
+                                              const medalText = `#${i+1}`;
 
                                               return (
                                                  <div key={i} style={{ 
                                                     display: "flex", 
                                                     flexDirection: "column", 
                                                     gap: "6px", 
-                                                    background: "var(--background)", 
-                                                    padding: "0.65rem 0.85rem", 
+                                                    background: "var(--surface)", 
+                                                    padding: "0.75rem", 
                                                     borderRadius: "12px", 
-                                                    boxShadow: "0 2px 6px rgba(99,102,241,0.01)",
-                                                    border: "1px solid var(--border)"
-                                                 }}>
+                                                    border: "1px solid var(--border)",
+                                                    transition: "all 0.2s ease"
+                                                 }} className="hover-lift">
                                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                                           <span style={{ 
-                                                             fontSize: "0.65rem", 
+                                                             fontSize: "0.75rem", 
                                                              fontWeight: 900, 
                                                              background: medalBg, 
                                                              color: medalColor, 
-                                                             width: "18px", 
-                                                             height: "18px", 
+                                                             width: "20px", 
+                                                             height: "20px", 
                                                              borderRadius: "50%", 
                                                              display: "flex", 
                                                              alignItems: "center", 
@@ -1967,7 +2024,7 @@ const AdminMasters = () => {
                                                        <div style={{ 
                                                           width: `${percentage}%`, 
                                                           height: "100%", 
-                                                          background: "linear-gradient(90deg, #818cf8 0%, #6366f1 100%)",
+                                                          background: "#6366f1",
                                                           borderRadius: "2px",
                                                           transition: "width 0.4s ease-out"
                                                        }} />
@@ -1981,19 +2038,18 @@ const AdminMasters = () => {
                                </div>
 
                                {/* Bottom Row: Full-width Batch Stock Monitor */}
-                               <div className="card" style={{ padding: "1.15rem 1.25rem", borderRadius: "16px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 4px 15px rgba(0,0,0,0.01)" }}>
+                               <div className="card" style={{ padding: "0.75rem", borderRadius: "10px", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.02)" }}>
                                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                                     <h4 style={{ fontSize: "0.8125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                        <span>📦 BATCH STOCKS MONITOR</span>
+                                     <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                        <span>BATCH STOCKS MONITOR</span>
                                         <span style={{ 
                                            fontSize: "0.625rem", 
                                            background: "rgba(99, 102, 241, 0.15)", 
-                                           color: "var(--primary)", 
+                                           color: "#4f46e5", 
                                            padding: "2px 8px", 
                                            borderRadius: "20px", 
                                            fontWeight: 900,
-                                           border: "1px solid var(--border)",
-                                           boxShadow: "0 1px 3px rgba(79, 70, 229, 0.05)"
+                                           border: "1px solid rgba(99, 102, 241, 0.2)",
                                         }}>
                                            {(() => {
                                               const filteredCount = (dashboardStats.batches || []).filter(b => {
@@ -2006,7 +2062,7 @@ const AdminMasters = () => {
                                         </span>
                                      </h4>
                                      
-                                     {/* Premium Search Input (No Childish Emoji) */}
+                                     {/* Premium Search Input */}
                                      <div style={{ position: "relative", minWidth: "180px" }}>
                                         <input
                                            type="text"
@@ -2015,9 +2071,9 @@ const AdminMasters = () => {
                                            onChange={(e) => setBatchSearchQuery(e.target.value)}
                                            style={{
                                               width: "100%",
-                                              padding: "0.4rem 0.75rem 0.4rem 1.85rem",
-                                              fontSize: "0.7rem",
-                                              fontWeight: 800,
+                                              padding: "0.5rem 0.75rem 0.5rem 2rem",
+                                              fontSize: "0.75rem",
+                                              fontWeight: 600,
                                               borderRadius: "8px",
                                               border: "1px solid #cbd5e1",
                                               background: "#f8fafc",
@@ -2026,7 +2082,7 @@ const AdminMasters = () => {
                                               color: "var(--text-main)"
                                            }}
                                         />
-                                        <svg style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", width: "12px", height: "12px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24">
+                                        <svg style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", width: "14px", height: "14px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24">
                                            <circle cx="11" cy="11" r="8" />
                                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                         </svg>
@@ -2055,7 +2111,7 @@ const AdminMasters = () => {
 
                                            const sortedBatches = [...filtered].sort((a, b) => {
                                               const aIsConsuming = a.quantity > 0 && a.status !== 'EXPIRED' && activeBatchForMed[a.medication_name] === a.batch_number;
-                                              const bIsConsuming = b.quantity > 0 && b.status !== 'EXPIRED' && activeBatchForMed[b.medication_name] === b.batch_number;
+                                              const bIsConsuming = b.quantity > 0 && b.status !== 'EXPIRED' && activeBatchForMed[a.medication_name] === b.batch_number;
                                               
                                               if (aIsConsuming && !bIsConsuming) return -1;
                                               if (!aIsConsuming && bIsConsuming) return 1;
@@ -2069,7 +2125,7 @@ const AdminMasters = () => {
 
                                            if (sortedBatches.length === 0) {
                                               return (
-                                                 <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: 800 }}>
+                                                 <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)", fontSize: "0.75rem", fontWeight: 600 }}>
                                                     No batches match your filter criteria.
                                                  </div>
                                               );
@@ -2080,26 +2136,26 @@ const AdminMasters = () => {
                                               const isDepleted = b.quantity <= 0;
                                               const isConsuming = !isExpired && !isDepleted && activeBatchForMed[b.medication_name] === b.batch_number;
                                               
-                                              let roleLabel = "📦 BACKUP STOCK";
-                                              let roleColor = "var(--primary)";
-                                              let roleBg = "rgba(99, 102, 241, 0.15)";
-                                              let roleBorder = "1px solid var(--border)";
+                                              let roleLabel = "BACKUP STOCK";
+                                              let roleColor = "#4f46e5";
+                                              let roleBg = "rgba(99, 102, 241, 0.08)";
+                                              let roleBorder = "1px solid rgba(99, 102, 241, 0.15)";
                                               
                                               if (isDepleted) {
-                                                 roleLabel = "🚫 DEPLETED";
+                                                 roleLabel = "DEPLETED";
                                                  roleColor = "var(--text-muted)";
-                                                 roleBg = "var(--surface)";
-                                                 roleBorder = "1px solid var(--border)";
+                                                 roleBg = "#f8fafc";
+                                                 roleBorder = "1px solid #e2e8f0";
                                               } else if (isExpired) {
-                                                 roleLabel = "🚫 EXPIRED";
+                                                 roleLabel = "EXPIRED";
                                                  roleColor = "#ef4444";
-                                                 roleBg = "rgba(239, 68, 68, 0.15)";
-                                                 roleBorder = "1px solid rgba(239, 68, 68, 0.2)";
+                                                 roleBg = "rgba(239, 68, 68, 0.08)";
+                                                 roleBorder = "1px solid rgba(239, 68, 68, 0.15)";
                                               } else if (isConsuming) {
-                                                 roleLabel = "🔥 ACTIVE CONSUMING";
+                                                 roleLabel = "ACTIVE CONSUMING";
                                                  roleColor = "#ea580c";
-                                                 roleBg = "rgba(234, 88, 12, 0.15)";
-                                                 roleBorder = "1px dashed #ea580c";
+                                                 roleBg = "rgba(234, 88, 12, 0.08)";
+                                                 roleBorder = "1px solid rgba(234, 88, 12, 0.15)";
                                               }
 
                                               const statusColor = b.status === 'EXPIRED' ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#f59e0b' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#3b82f6' : '#10b981';
@@ -2107,20 +2163,20 @@ const AdminMasters = () => {
                                               const statusLabel = b.status === 'EXPIRED' ? 'EXPIRED' : b.status === 'EXPIRING_SOON' ? 'EXPIRING' : b.status === 'LOW_STOCK' ? 'LOW' : b.status === 'HIGH_STOCK' ? 'HIGH' : 'SAFE';
 
                                               return (
-                                                 <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--background)", padding: "0.6rem 0.85rem", borderRadius: "12px", border: isConsuming ? "2px solid #ea580c" : "1px solid var(--border)", boxShadow: isConsuming ? "0 3px 8px rgba(234, 88, 12, 0.05)" : "0 1px 4px rgba(0,0,0,0.01)", transition: "all 0.2s" }} className="hover-lift">
+                                                 <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--surface)", padding: "0.75rem 1rem", borderRadius: "12px", border: "1px solid var(--border)", borderLeft: isConsuming ? "4px solid #ea580c" : "1px solid var(--border)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)", transition: "all 0.2s" }} className="hover-lift">
                                                     <div>
                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                                                           <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)" }}>{b.medication_name}</span>
-                                                          <span style={{ fontSize: "0.5625rem", background: "var(--surface)", color: "var(--text-main)", padding: "1px 5px", borderRadius: "4px", fontWeight: 800 }}>B {b.batch_number}</span>
-                                                          <span style={{ fontSize: "0.5625rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)", padding: "1px 6px", borderRadius: "4px", fontWeight: 900 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
+                                                          <span style={{ fontSize: "0.625rem", background: "#f1f5f9", color: "var(--text-main)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>B {b.batch_number}</span>
+                                                          <span style={{ fontSize: "0.625rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
                                                           
                                                           <span style={{ 
-                                                             fontSize: "0.53rem", 
+                                                             fontSize: "0.625rem", 
                                                              background: roleBg, 
                                                              color: roleColor, 
-                                                             padding: "1px 5px", 
+                                                             padding: "2px 6px", 
                                                              borderRadius: "4px", 
-                                                             fontWeight: 900,
+                                                             fontWeight: 700,
                                                              border: roleBorder,
                                                              display: "flex",
                                                              alignItems: "center",
@@ -2130,32 +2186,32 @@ const AdminMasters = () => {
                                                              {roleLabel}
                                                           </span>
                                                        </div>
-                                                       <div style={{ fontSize: "0.625rem", color: "var(--text-muted)", marginTop: "3px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                                                       <div style={{ fontSize: "0.625rem", color: "var(--text-muted)", marginTop: "4px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                                                           <span>Mfg: <b>{b.mfg_date}</b></span>
                                                           <span style={{ color: "#cbd5e1" }}>|</span>
                                                           <span>Exp: <b style={{ color: "var(--text-main)" }}>{b.expiry_date}</b></span>
                                                           <span style={{ color: "#cbd5e1" }}>|</span>
                                                           {isExpired ? (
-                                                             <span style={{ color: "#ef4444", fontWeight: 900 }}>EXPIRED</span>
+                                                              <span style={{ color: "#ef4444", fontWeight: 700 }}>EXPIRED</span>
                                                           ) : b.days_to_expiry <= 90 ? (
-                                                             <span style={{ color: "#b45309", fontWeight: 800 }}>Expiring {b.days_to_expiry}d</span>
+                                                              <span style={{ color: "#b45309", fontWeight: 700 }}>Expiring {b.days_to_expiry}d</span>
                                                           ) : (
-                                                             <span>({b.days_to_expiry}d)</span>
+                                                              <span>({b.days_to_expiry}d)</span>
                                                           )}
                                                        </div>
                                                     </div>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                                        <div style={{ textAlign: "right" }}>
-                                                          <span style={{ fontSize: "0.6875rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{b.quantity} / {b.initial_qty}</span>
-                                                          <span style={{ fontSize: "0.5rem", color: "var(--text-muted)", display: "block" }}>{Math.round((b.quantity / (b.initial_qty || 1)) * 100)}% left</span>
+                                                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)", display: "block" }}>{b.quantity} / {b.initial_qty}</span>
+                                                          <span style={{ fontSize: "0.625rem", color: "var(--text-muted)", display: "block" }}>{Math.round((b.quantity / (b.initial_qty || 1)) * 100)}% left</span>
                                                        </div>
                                                        <span style={{ 
-                                                          fontSize: "0.5625rem", 
+                                                          fontSize: "0.625rem", 
                                                           background: statusBg, 
                                                           color: statusColor, 
                                                           padding: "2px 6px", 
                                                           borderRadius: "6px", 
-                                                          fontWeight: 900,
+                                                          fontWeight: 700,
                                                           border: `1px solid ${statusColor}10`,
                                                           minWidth: "40px",
                                                           textAlign: "center"
@@ -2209,13 +2265,13 @@ const AdminMasters = () => {
 
                           {/* Unified Drug Depletion Monitor (Admin Master Only) */}
                           {hasPharmacy && (
-                            <div className="card fade-in" style={{ padding: '1.15rem 1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', marginTop: '1.25rem' }}>
+                            <div className="card fade-in" style={{ padding: '1rem', borderRadius: '12px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)", marginTop: '1.25rem' }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.15rem", flexWrap: "wrap", gap: "1rem" }}>
                                  <div>
                                    <h4 style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
                                      <Pill size={16} color="#ef4444" /> Unified Drug Depletion Monitor
                                    </h4>
-                                   <p style={{ color: "var(--text-muted)", fontSize: "0.6875rem", fontWeight: 500, marginTop: "2px" }}>Real-time health overview of critically low medication inventory</p>
+                                   <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", fontWeight: 500, marginTop: "2px" }}>Real-time health overview of critically low medication inventory</p>
                                  </div>
 
                                  {/* Premium Table Search Bar */}
@@ -2227,9 +2283,9 @@ const AdminMasters = () => {
                                        onChange={(e) => setDepletionSearchQuery(e.target.value)}
                                        style={{
                                           width: "100%",
-                                          padding: "0.45rem 1rem 0.45rem 2rem",
-                                          fontSize: "0.725rem",
-                                          fontWeight: 800,
+                                          padding: "0.5rem 0.75rem 0.5rem 2rem",
+                                          fontSize: "0.75rem",
+                                          fontWeight: 600,
                                           borderRadius: "8px",
                                           border: "1px solid #cbd5e1",
                                           background: "#f8fafc",
@@ -2238,18 +2294,25 @@ const AdminMasters = () => {
                                           color: "var(--text-main)"
                                        }}
                                     />
-                                    <svg style={{ position: "absolute", left: "0.7rem", top: "50%", transform: "translateY(-50%)", width: "12px", height: "12px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                    <svg style={{ position: "absolute", left: "0.7rem", top: "50%", transform: "translateY(-50%)", width: "14px", height: "14px", fill: "none", stroke: "#64748b", strokeWidth: 2.5, pointerEvents: "none" }} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                                  </div>
                               </div>
                               
-                              <div className="table-responsive" style={{ borderRadius: "12px", border: "1px solid var(--border)", overflow: "hidden", maxHeight: "480px", overflowY: "auto" }}>
+                              <div className="table-responsive" style={{ borderRadius: "12px", border: "1px solid var(--border)", overflow: "hidden", maxHeight: "480px", overflowY: "auto" }}
+                                onScroll={(e) => {
+                                  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                                  if (scrollTop + clientHeight >= scrollHeight - 20) {
+                                    setDepletionDisplayLimit(prev => prev + 10);
+                                  }
+                                }}
+                              >
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                   <thead>
                                     <tr style={{ background: "var(--background)", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, zIndex: 10 }}>
-                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Medication Name</th>
-                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Facility Project</th>
-                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Quantity Left</th>
-                                      <th style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "0.875rem 1.125rem", letterSpacing: "0.05em", background: "var(--background)" }}>Depletion Status</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Medication Name</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Facility Project</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Quantity Left</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Depletion Status</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2281,21 +2344,18 @@ const AdminMasters = () => {
                                              );
                                           }
                                           
-                                          return filteredDepletion.map((item, idx) => {
+                                          return filteredDepletion.slice(0, depletionDisplayLimit).map((item, idx) => {
                                              const initialQty = parseInt(item.additional_fields?.initial_quantity) || 100;
                                              const pct = Math.round((item.quantity / initialQty) * 100) || 0;
                                              const isZero = item.quantity === 0;
                                              const isLow = pct <= 20;
                                              
-                                             // Dynamic color tokens based on stock health level
-                                             const dotColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
-                                             const badgeBg = isZero ? "rgba(244, 63, 94, 0.15)" : isLow ? "rgba(234, 179, 8, 0.15)" : "rgba(16, 185, 129, 0.15)";
-                                             const badgeColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
-                                             const badgeBorder = isZero ? "rgba(244, 63, 94, 0.2)" : isLow ? "rgba(234, 179, 8, 0.2)" : "rgba(16, 185, 129, 0.2)";
+                                             const dotColor = isZero ? "#ef4444" : isLow ? "#f59e0b" : "#10b981";
+                                             const badgeBg = isZero ? "rgba(239, 68, 68, 0.05)" : isLow ? "rgba(245, 158, 11, 0.05)" : "rgba(16, 185, 129, 0.05)";
+                                             const badgeColor = isZero ? "#ef4444" : isLow ? "#f59e0b" : "#10b981";
+                                             const badgeBorder = isZero ? "rgba(239, 68, 68, 0.1)" : isLow ? "rgba(245, 158, 11, 0.1)" : "rgba(16, 185, 129, 0.1)";
                                              
-                                             const qtyBg = isZero ? "rgba(244, 63, 94, 0.1)" : isLow ? "rgba(234, 179, 8, 0.1)" : "rgba(16, 185, 129, 0.1)";
-                                             const qtyColor = isZero ? "#f43f5e" : isLow ? "#eab308" : "#10b981";
-                                             const qtyBorder = isZero ? "rgba(244, 63, 94, 0.2)" : isLow ? "rgba(234, 179, 8, 0.2)" : "rgba(16, 185, 129, 0.2)";
+                                             const qtyColor = isZero ? "#ef4444" : isLow ? "#f59e0b" : "var(--text-main)";
                                              
                                              const gradient = isZero 
                                                ? "linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)" 
@@ -2311,22 +2371,22 @@ const AdminMasters = () => {
                                                  style={{ 
                                                    borderBottom: "1px solid var(--border)",
                                                    transition: "all 0.2s ease",
-                                                   background: idx % 2 === 0 ? "rgba(255, 255, 255, 0.02)" : "transparent"
+                                                   background: "transparent"
                                                  }}
-                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"; }}
-                                                 onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? "rgba(255, 255, 255, 0.02)" : "transparent"; }}
+                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+                                                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                                                >
-                                                 <td style={{ padding: "1rem 1.125rem", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+                                                 <td style={{ padding: "1rem 1.25rem", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
                                                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: dotColor, animation: isLow ? "pulse 1.5s infinite" : "none" }} />
                                                    {item.name}
                                                  </td>
-                                                 <td style={{ padding: "1rem 1.125rem" }}>
+                                                 <td style={{ padding: "1rem 1.25rem" }}>
                                                    <span style={{ 
-                                                     background: "linear-gradient(135deg, #e0e7ff 0%, #eef2ff 100%)", 
+                                                     background: "#eef2ff", 
                                                      color: "#4f46e5", 
                                                      padding: "4px 10px", 
                                                      borderRadius: "12px", 
-                                                     fontWeight: 800, 
+                                                     fontWeight: 700, 
                                                      fontSize: "0.75rem", 
                                                      border: "1px solid #c7d2fe",
                                                      display: "inline-block"
@@ -2334,18 +2394,16 @@ const AdminMasters = () => {
                                                      {item.registry_type_project_name || "Global"}
                                                    </span>
                                                  </td>
-                                                 <td style={{ padding: "1rem 1.125rem", fontSize: "0.8125rem", fontWeight: 900 }}>
+                                                 <td style={{ padding: "1rem 1.25rem", fontSize: "0.8125rem", fontWeight: 900 }}>
                                                    <span style={{ 
-                                                     color: qtyColor,
-                                                     background: qtyBg,
-                                                     padding: "4px 8px",
-                                                     borderRadius: "8px",
-                                                     border: `1px solid ${qtyBorder}`
-                                                   }}>
-                                                     {item.quantity} / {initialQty} units
-                                                   </span>
+                                                      color: qtyColor,
+                                                      fontWeight: 700,
+                                                      fontSize: "0.8125rem"
+                                                    }}>
+                                                      {item.quantity} / {initialQty} units
+                                                    </span>
                                                  </td>
-                                                 <td style={{ padding: "1rem 1.125rem" }}>
+                                                 <td style={{ padding: "1rem 1.25rem" }}>
                                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                                      <div style={{ flex: 1, minWidth: "80px", height: "8px", background: "#f1f5f9", borderRadius: "4px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
                                                        <div style={{ 
@@ -2381,7 +2439,7 @@ const AdminMasters = () => {
                             </div>
                           )}
                         </>
-                      );
+                      )
                     })()}
                   </>
                 ) : (
@@ -2459,45 +2517,42 @@ const AdminMasters = () => {
                     <thead>
                       <tr
                         style={{
-                          background: "var(--background)",
+                          background: "var(--surface)",
                           borderBottom: "1px solid var(--border)",
                         }}
                       >
                         <th
                           style={{
-                            padding: "1.25rem 2rem",
+                            padding: "1rem 2rem",
                             textAlign: "left",
-                            fontSize: "0.625rem",
-                            fontWeight: 900,
-                            color: "#94a3b8",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            color: "#475569",
+                            background: "var(--surface)",
                           }}
                         >
                           Available Upload Protocol
                         </th>
                         <th
                           style={{
-                            padding: "1.25rem 2rem",
+                            padding: "1rem 2rem",
                             textAlign: "left",
-                            fontSize: "0.625rem",
-                            fontWeight: 900,
-                            color: "#94a3b8",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            color: "#475569",
+                            background: "var(--surface)",
                           }}
                         >
                           Data Coverage
                         </th>
                         <th
                           style={{
-                            padding: "1.25rem 2rem",
+                            padding: "1rem 2rem",
                             textAlign: "right",
-                            fontSize: "0.625rem",
-                            fontWeight: 900,
-                            color: "#94a3b8",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            color: "#475569",
+                            background: "var(--surface)",
                           }}
                         >
                           Management Actions
@@ -2576,12 +2631,13 @@ const AdminMasters = () => {
                               style={{
                                 fontSize: "0.625rem",
                                 fontWeight: 900,
-                                color: "#64748b",
+                                color: "#0f172a",
                                 background: "#f1f5f9",
                                 padding: "0.4rem 0.75rem",
                                 borderRadius: "8px",
                                 textTransform: "uppercase",
                                 letterSpacing: "0.02em",
+                                border: "1px solid #e2e8f0"
                               }}
                             >
                               {proto.coverage}
@@ -2662,14 +2718,15 @@ const AdminMasters = () => {
                               <button
                                 className="btn btn-secondary"
                                 style={{
-                                  background: "white",
-                                  border: "1px solid #e2e8f0",
-                                  color: "#475569",
+                                  background: "#f8fafc",
+                                  border: "1px solid #cbd5e1",
+                                  color: "#1e293b",
                                   fontSize: "0.75rem",
                                   height: "40px",
                                   padding: "0 1.25rem",
                                   borderRadius: "10px",
                                   fontWeight: 800,
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
                                 }}
                                 onClick={() => {
                                   setExploringProtocolId(proto.id);
@@ -2730,7 +2787,19 @@ const AdminMasters = () => {
                         <button 
                             className="btn btn-secondary"
                             onClick={() => navigate('/bridge-hub')}
-                            style={{ borderRadius: '12px', padding: '0.75rem 1.25rem', fontSize: '0.75rem' }}
+                            style={{ 
+                                borderRadius: '12px', 
+                                padding: '0.75rem 1.25rem', 
+                                fontSize: '0.75rem',
+                                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                                color: 'white',
+                                border: 'none',
+                                fontWeight: 800,
+                                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
                         >
                             <Radio size={16} /> Global Hub
                         </button>
@@ -2840,29 +2909,20 @@ const AdminMasters = () => {
               </div>
             ) : activeBoard === "DIAGNOSTICS" ? (
               <div className="fade-in">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Laboratory Diagnostic Masters</h3>
-                        <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Configure project-specific lab tests and component definitions</p>
-                    </div>
-                    <button 
-                        className="btn btn-primary" 
-                        onClick={() => setShowLabTestModal(true)}
-                        style={{ background: 'var(--primary)', borderRadius: '12px', padding: '0.75rem 1.5rem' }}
-                    >
-                        <Plus size={18} /> New Lab Test
-                    </button>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Laboratory Diagnostic Masters</h3>
+                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Configure project-specific lab tests and component definitions</p>
                 </div>
                 
                 <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                     <div className="table-responsive">
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <thead>
-                              <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Test Name / Code</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dept / Components</th>
-                                  <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.625rem', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                              <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                                  <th style={{ padding: '1rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#475569', background: 'var(--surface)' }}>Test Name / Code</th>
+                                  <th style={{ padding: '1rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#475569', background: 'var(--surface)' }}>Type</th>
+                                  <th style={{ padding: '1rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 600, color: '#475569', background: 'var(--surface)' }}>Dept / Components</th>
+                                  <th style={{ padding: '1rem 2rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#475569', background: 'var(--surface)' }}>Actions</th>
                               </tr>
                           </thead>
                           <tbody>
@@ -2870,31 +2930,43 @@ const AdminMasters = () => {
                                  <React.Fragment key={test.id}>
                                    <tr style={{ borderBottom: '1px solid var(--border)', background: test.is_active ? 'transparent' : 'var(--background)' }}>
                                        <td style={{ padding: '1.5rem 2rem' }}>
-                                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ padding: '8px', background: 'var(--background)', borderRadius: '10px' }}>
-                                                 <FlaskConical size={20} color="var(--primary)" />
-                                              </div>
-                                              <div>
-                                                <div style={{ fontWeight: 800, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '1rem' }}>{test.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Code: {test.code || 'N/A'}</div>
-                                              </div>
-                                           </div>
-                                       </td>
-                                       <td style={{ padding: '1.5rem 2rem' }}>
-                                           <span style={{ fontSize: '0.625rem', fontWeight: 900, background: test.is_active ? 'rgba(99, 102, 241, 0.15)' : 'var(--background)', color: test.is_active ? '#818cf8' : 'var(--text-muted)', padding: '0.4rem 0.75rem', borderRadius: '8px', textTransform: 'uppercase' }}>
-                                               {test.test_type_details?.name || 'N/A'}
-                                           </span>
-                                       </td>
-                                       <td style={{ padding: '1.5rem 2rem' }}>
-                                           <div style={{ fontSize: '0.875rem', fontWeight: 700, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)' }}>{test.department_details?.name || 'N/A'}</div>
-                                           <button 
-                                              onClick={() => setExpandedLabTests({ ...expandedLabTests, [test.id]: !expandedLabTests[test.id] })}
-                                              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, marginTop: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                           >
-                                               {test.sub_tests?.length || 0} Dynamic Components
-                                               {expandedLabTests[test.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                           </button>
-                                       </td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                               <button
+                                                  onClick={() => setExpandedLabTests({ ...expandedLabTests, [test.id]: !expandedLabTests[test.id] })}
+                                                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', color: 'var(--text-muted)', transition: 'transform 0.2s', transform: expandedLabTests[test.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                                  title={expandedLabTests[test.id] ? "Collapse" : "Expand"}
+                                               >
+                                                  <ChevronRight size={16} />
+                                               </button>
+                                               <div style={{ padding: '8px', background: 'var(--background)', borderRadius: '10px' }}>
+                                                  <FlaskConical size={20} color="var(--primary)" />
+                                               </div>
+                                               <div>
+                                                 <div style={{ fontWeight: 800, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '1rem' }}>{test.name}</div>
+                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Code: {test.code || 'N/A'}</div>
+                                               </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '1.5rem 2rem' }}>
+                                            <span style={{ fontSize: '0.625rem', fontWeight: 900, background: test.is_active ? 'rgba(99, 102, 241, 0.15)' : 'var(--background)', color: test.is_active ? '#818cf8' : 'var(--text-muted)', padding: '0.4rem 0.75rem', borderRadius: '8px', textTransform: 'uppercase' }}>
+                                                {test.test_type_details?.name || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '1.5rem 2rem' }}>
+                                            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: test.is_active ? 'var(--text-main)' : 'var(--text-muted)' }}>{test.department_details?.name || 'N/A'}</div>
+                                            <div style={{ 
+                                              fontSize: '0.7rem', 
+                                              color: '#6366f1', 
+                                              fontWeight: 700, 
+                                              background: 'rgba(99, 102, 241, 0.1)', 
+                                              padding: '2px 8px', 
+                                              borderRadius: '12px',
+                                              width: 'fit-content',
+                                              marginTop: '4px'
+                                            }}>
+                                                {test.sub_tests?.length || 0} Components
+                                            </div>
+                                        </td>
                                        <td style={{ padding: '1.5rem 2rem', textAlign: 'right' }}>
                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                                                <button 
@@ -2948,54 +3020,63 @@ const AdminMasters = () => {
                                        </td>
                                    </tr>
                                    {expandedLabTests[test.id] && (
-                                      <tr>
-                                        <td colSpan="4" style={{ padding: '0 2rem 1.5rem 4rem' }}>
-                                            <div style={{ background: 'var(--background)', borderRadius: '16px', padding: '1.25rem', border: '1px solid var(--border)' }}>
-                                               <div style={{ fontSize: '0.625rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Component Definitions</div>
-                                               {test.sub_tests && test.sub_tests.length > 0 ? (
-                                                  <div style={{ display: 'grid', gap: '0.75rem' }}>
-                                                     {test.sub_tests.map(sub => (
-                                                        <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', opacity: sub.is_active ? 1 : 0.6 }}>
-                                                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sub.is_active ? '#10b981' : 'var(--text-muted)' }}></div>
-                                                              <div>
-                                                                 <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.875rem' }}>{sub.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>[{sub.code}]</span></div>
-                                                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{sub.value_type} • {sub.units || 'No units'} • {sub.biological_range || 'No range'}</div>
-                                                              </div>
-                                                           </div>
-                                                           <div style={{ display: 'flex', gap: '6px' }}>
-                                                              <button onClick={() => {
-                                                                 setCurrentLabTest(test);
-                                                                 setCurrentSubTest(sub);
-                                                                 setSubTestForm({
-                                                                    name: sub.name,
-                                                                    code: sub.code,
-                                                                    value_type: sub.value_type,
-                                                                    input_data_type: sub.input_data_type,
-                                                                    min_chars: sub.min_chars,
-                                                                    max_chars: sub.max_chars,
-                                                                    units: sub.units,
-                                                                    biological_range: sub.biological_range,
-                                                                    description: sub.description,
-                                                                    dropdown_options: Array.isArray(sub.dropdown_options) ? sub.dropdown_options.join(', ') : sub.dropdown_options,
-                                                                    is_active: sub.is_active
-                                                                 });
-                                                                 setIsEditingSubTest(true);
-                                                                 setShowSubTestModal(true);
-                                                              }} style={{ background: 'var(--background)', border: 'none', borderRadius: '6px', padding: '4px 8px', color: 'var(--text-main)', cursor: 'pointer' }}><Edit2 size={12} /></button>
-                                                              <button onClick={() => handleToggleSubTestStatus(sub)} style={{ background: sub.is_active ? '#fff7ed' : '#ecfdf5', border: 'none', borderRadius: '6px', padding: '4px 8px', color: sub.is_active ? '#ea580c' : '#059669', cursor: 'pointer' }}><Power size={12} /></button>
-                                                              <button onClick={() => handleDeleteSubTest(sub.id, sub.name)} style={{ background: '#fef2f2', border: 'none', borderRadius: '6px', padding: '4px 8px', color: '#dc2626', cursor: 'pointer' }}><Trash2 size={12} /></button>
-                                                           </div>
-                                                        </div>
-                                                     ))}
-                                                  </div>
-                                               ) : (
-                                                  <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>No components defined for this test.</div>
-                                               )}
-                                            </div>
-                                        </td>
-                                      </tr>
-                                   )}
+                                       <tr>
+                                         <td colSpan="4" style={{ padding: '0.5rem 2rem 1.5rem 4rem' }}>
+                                             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1.25rem', border: '1px solid #e2e8f0', position: 'relative', overflow: 'hidden' }}>
+                                                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: 'linear-gradient(to bottom, #6366f1, #a855f7)' }}></div>
+                                                <div style={{ paddingLeft: '0.5rem' }}>
+                                                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Component Definitions</div>
+                                                   {test.sub_tests && test.sub_tests.length > 0 ? (
+                                                      <div style={{ display: 'grid', gap: '0.25rem' }}>
+                                                         {test.sub_tests.map(sub => (
+                                                            <div key={sub.id} 
+                                                               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', opacity: sub.is_active ? 1 : 0.6, borderRadius: '8px', transition: 'background 0.2s' }}
+                                                               onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                                               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                            >
+                                                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: sub.is_active ? '#10b981' : '#cbd5e1' }}></div>
+                                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                     <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>{sub.name}</div>
+                                                                     <span style={{ background: '#e2e8f0', color: '#475569', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>{sub.code}</span>
+                                                                     <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>•</span>
+                                                                     <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>{sub.value_type} • {sub.units || 'No units'} • {sub.biological_range || 'No range'}</div>
+                                                                  </div>
+                                                               </div>
+                                                               <div style={{ display: 'flex', gap: '6px' }}>
+                                                                  <button onClick={() => {
+                                                                     setCurrentLabTest(test);
+                                                                     setCurrentSubTest(sub);
+                                                                     setSubTestForm({
+                                                                        name: sub.name,
+                                                                        code: sub.code,
+                                                                        value_type: sub.value_type,
+                                                                        input_data_type: sub.input_data_type,
+                                                                        min_chars: sub.min_chars,
+                                                                        max_chars: sub.max_chars,
+                                                                        units: sub.units,
+                                                                        biological_range: sub.biological_range,
+                                                                        description: sub.description,
+                                                                        dropdown_options: Array.isArray(sub.dropdown_options) ? sub.dropdown_options.join(', ') : sub.dropdown_options,
+                                                                        is_active: sub.is_active
+                                                                     });
+                                                                     setIsEditingSubTest(true);
+                                                                     setShowSubTestModal(true);
+                                                                  }} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '5px 8px', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Edit Component"><Edit2 size={12} /></button>
+                                                                  <button onClick={() => handleToggleSubTestStatus(sub)} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '5px 8px', color: sub.is_active ? '#ea580c' : '#059669', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={sub.is_active ? "Deactivate" : "Activate"}><Power size={12} /></button>
+                                                                  <button onClick={() => handleDeleteSubTest(sub.id, sub.name)} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '5px 8px', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Delete"><Trash2 size={12} /></button>
+                                                               </div>
+                                                            </div>
+                                                         ))}
+                                                      </div>
+                                                   ) : (
+                                                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', padding: '0.5rem 0' }}>No components defined for this test.</div>
+                                                   )}
+                                                </div>
+                                             </div>
+                                         </td>
+                                       </tr>
+                                    )}
                                 </React.Fragment>
                                ))}
                               {labTests.length === 0 && !isLoading && (
@@ -3081,13 +3162,14 @@ const AdminMasters = () => {
                   >
                     <div style={{ position: "relative", flex: 1 }}>
                       <Search
-                        size={18}
+                        size={16}
                         style={{
                           position: "absolute",
                           left: "1.25rem",
                           top: "50%",
                           transform: "translateY(-50%)",
-                          color: "var(--text-muted)",
+                          color: "#64748b",
+                          pointerEvents: "none",
                         }}
                       />
                       <input
@@ -3096,14 +3178,19 @@ const AdminMasters = () => {
                             .find((p) => p.id === exploringProtocolId)
                             ?.name?.toLowerCase() || "repository"
                           }...`}
-                        className="form-control"
                         style={{
-                          paddingLeft: "3rem",
-                          height: "52px",
-                          border: "1.5px solid var(--border)",
-                          borderRadius: "16px",
-                          background: "var(--background)",
+                          width: "100%",
+                          padding: "0.5rem 1rem 0.5rem 3.5rem",
+                          height: "48px",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: "12px",
+                          background: "#f8fafc",
                           color: "var(--text-main)",
+                          fontSize: "0.85rem",
+                          fontWeight: 500,
+                          transition: "all 0.2s",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                          outline: "none"
                         }}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -6792,9 +6879,9 @@ const AdminMasters = () => {
                   <input type="text" className="form-control" placeholder="Optional description" value={subTestForm.description} onChange={e => setSubTestForm({ ...subTestForm, description: e.target.value })} />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                   <input type="checkbox" id="sub-active" checked={subTestForm.is_active} onChange={e => setSubTestForm({ ...subTestForm, is_active: e.target.checked })} />
-                   <label htmlFor="sub-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>Active Component</label>
+                <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '0.5rem' }}>
+                   <input type="checkbox" id="sub-active" checked={subTestForm.is_active} onChange={e => setSubTestForm({ ...subTestForm, is_active: e.target.checked })} style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer' }} />
+                   <label htmlFor="sub-active" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer' }}>Active Component</label>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '2rem', justifyContent: 'flex-end' }}>

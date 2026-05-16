@@ -206,15 +206,18 @@ const BridgeHub = () => {
                     <p style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.875rem' }}>Full-spectrum telemetry and connectivity management for all clinical hardware.</p>
                 </div>
                 <button 
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/admin-masters/')}
                     style={{ 
                         display: 'flex', alignItems: 'center', gap: '8px', padding: '0.625rem 1.125rem', 
-                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', 
+                        background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', 
+                        border: 'none', 
+                        borderRadius: '12px', 
                         fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
-                        color: 'var(--text-muted)', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                        color: 'white', 
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
                     }}
                 >
-                    <ArrowLeft size={16} /> Back to Dashboard
+                    <ArrowLeft size={16} /> Back
                 </button>
             </header>
             

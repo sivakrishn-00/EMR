@@ -28,7 +28,7 @@ def send_sms(phone_number, message):
         from_number = os.getenv('TWILIO_PHONE_NUMBER')
 
         if not all([account_sid, auth_token, from_number]):
-            print("⚠️ Twilio credentials missing in environment.")
+            print(" Twilio credentials missing in environment.")
             return False
 
         # Normalize phone number to E.164 (Assuming India +91 if 10 digits)
@@ -44,44 +44,44 @@ def send_sms(phone_number, message):
             from_=from_number,
             to=target_phone
         )
-        print(f"✅ SMS sent successfully to {target_phone}")
+        print(f" SMS sent successfully to {target_phone}")
         return True
     except Exception as e:
-        print(f"❌ Twilio Error: {str(e)}")
+        print(f"Twilio Error: {str(e)}")
         return False
 
 def generate_otp(phone_number):
     otp = ''.join(random.choices(string.digits, k=6))
     cache_key = f"otp_{phone_number}"
     
-    # ⚡ RESILIENCE: Save to Global Registry & Primary Cache
+    # RESILIENCE: Save to Global Registry & Primary Cache
     OTP_BACKEND_REGISTRY[phone_number] = otp
     
     # Increased timeout to 300s (5 Minutes) per user request
     try:
         cache.set(cache_key, otp, timeout=300) 
     except Exception:
-        print(f"⚠️ INFRA: Redis Link Interrupted. Registry Fallback Active.")
+        print(f" INFRA: Redis Link Interrupted. Registry Fallback Active.")
     
     # Real SMS Delivery
     send_sms(phone_number, f"Your EMR Portal code: {otp}")
 
-    # 🚨 VIBRANT CONSOLE LOGGING (Masked for Privacy)
+    # VIBRANT CONSOLE LOGGING (Masked for Privacy)
     masked_phone = f"******{phone_number[-4:]}" if len(phone_number) > 4 else phone_number
-    print("\n" + "🚀" + "="*60)
+    print("\n" + "" + "="*60)
     print(f"  INTERNAL EMR SECURITY: PORTAL OTP FOR {masked_phone} IS [{otp}]")
-    print("🚀" + "="*60 + "\n")
+    print("" + "="*60 + "\n")
 
     return otp
 
-# 🛡️ RESILIENT OTP STORAGE (Memory Fallback if Cache Fails)
+#  RESILIENT OTP STORAGE (Memory Fallback if Cache Fails)
 OTP_BACKEND_REGISTRY = {}
 
 def verify_otp(phone_number, otp_input):
-    # 🔓 HARDENED MASTER BYPASS
+    #  HARDENED MASTER BYPASS
     clean_otp = str(otp_input).strip()
     if settings.DEBUG and clean_otp == "000000":
-        print(f"🟢 AUTH: Master bypass invoked for {phone_number}")
+        print(f"AUTH: Master bypass invoked for {phone_number}")
         return True
 
     cache_key = f"otp_{phone_number}"
@@ -93,7 +93,7 @@ def verify_otp(phone_number, otp_input):
             cache.delete(cache_key)
             return True
     except Exception:
-        print(f"⚠️ INFRA: Cache access failed. Checking Registry fallback.")
+        print(f" INFRA: Cache access failed. Checking Registry fallback.")
     
     # 2. Check Global Registry Fallback
     if OTP_BACKEND_REGISTRY.get(phone_number) == clean_otp:
@@ -101,3 +101,4 @@ def verify_otp(phone_number, otp_input):
         return True
         
     return False
+ 

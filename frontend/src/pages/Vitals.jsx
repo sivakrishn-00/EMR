@@ -38,6 +38,9 @@ const Vitals = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
   const [vitalsData, setVitalsData] = useState({
     temperature_c: '', 
     temp_unit: 'F',
@@ -293,6 +296,18 @@ const Vitals = () => {
     }
     return null;
   };
+
+  const filteredVisits = activeVisits.filter(visit => {
+    const patientName = `${visit.patient_details?.first_name} ${visit.patient_details?.last_name}`.toLowerCase();
+    const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return patientName.includes(term) || patientId.includes(term);
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentVisits = filteredVisits.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
  
   return (
     <div className="fade-in">
@@ -305,28 +320,57 @@ const Vitals = () => {
         {/* Waiting List - Only show if NO patient is selected */}
         {!selectedVisit && (
           <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Nurse Queue ({activeVisits.length})</h3>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Nurse Queue ({filteredVisits.length})</h3>
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Updated just now</p>
                </div>
-               <button onClick={() => fetchActiveVisits()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Clock size={18} color="#6366f1" />
-               </button>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="search-container" style={{ position: 'relative' }}>
+                     <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', zIndex: 10 }} />
+                     <input
+                        type="text"
+                        placeholder="Search patient..."
+                        value={searchTerm}
+                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        className="search-input"
+                        style={{ paddingRight: '2rem' }}
+                     />
+                     {searchTerm && (
+                        <button 
+                           onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                           style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                        >
+                           <X size={14} />
+                        </button>
+                     )}
+                  </div>
+                  <button onClick={() => fetchActiveVisits()} style={{ border: 'none', background: '#f1f5f9', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                     <Clock size={18} color="#6366f1" />
+                  </button>
+               </div>
             </div>
             
             <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Name</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registration</th>
-                     <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
+                  <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
+                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Patient Name</th>
+                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reason</th>
+                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Registration</th>
+                     <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {activeVisits.map(v => (
+                   {filteredVisits.length === 0 ? (
+                     <tr>
+                       <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#64748b' }}>
+                          <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No patients found</p>
+                          <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
+                       </td>
+                     </tr>
+                   ) : 
+                     currentVisits.map(v => (
                     <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -427,26 +471,32 @@ const Vitals = () => {
               </table>
             </div>
             
-            {/* Pagination */}
-            {totalCount > 10 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                          className="btn btn-secondary" disabled={page === 1} onClick={() => fetchActiveVisits(page - 1)}
-                          style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
-                      >
-                          <ChevronLeft size={16} />
-                      </button>
-                      <button 
-                          className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchActiveVisits(page + 1)}
-                          style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
-                      >
-                          <ChevronRight size={16} />
-                      </button>
+               {/* Pagination */}
+               {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
+                     <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredVisits.length)} of {filteredVisits.length} entries
+                     </p>
+                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                           disabled={currentPage === 1}
+                           className="btn btn-secondary"
+                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                        >
+                           Previous
+                        </button>
+                        <button
+                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                           disabled={currentPage === totalPages}
+                           className="btn btn-secondary"
+                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                        >
+                           Next
+                        </button>
+                     </div>
                   </div>
-              </div>
-            )}
+               )}
           </div>
         )}
 
@@ -505,7 +555,7 @@ const Vitals = () => {
             <form onSubmit={handleSaveVitals}>
                 {showVitalsSection && (
                   <div className="fade-in">
-                    <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Biometrics & BMI</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Biometrics & BMI</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
                     <div className="form-group">
                        <label><Scale size={14} /> Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
@@ -555,46 +605,45 @@ const Vitals = () => {
                    </div>
                 </div>
 
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Vital Signs</p>
+                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Vital Signs</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                    <div className="form-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                         <label style={{ margin: 0 }}><Thermometer size={14} /> Temperature {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
-                        <div style={{ display: 'flex', gap: '2px', background: '#f1f5f9', padding: '2px', borderRadius: '6px' }}>
-                          {['C', 'F'].map(u => (
-                            <button
-                              key={u}
-                              type="button"
-                              onClick={() => {
-                                const currentUnit = vitalsData.temp_unit || 'C';
-                                if (currentUnit === u) return;
-                                
-                                let newVal = vitalsData.temperature_c;
-                                if (newVal) {
-                                  if (u === 'F') {
-                                    newVal = ((parseFloat(newVal) * 9/5) + 32).toFixed(1);
-                                  } else {
-                                    newVal = ((parseFloat(newVal) - 32) * 5/9).toFixed(1);
-                                  }
-                                }
-                                setVitalsData({ ...vitalsData, temperature_c: newVal, temp_unit: u });
-                              }}
-                              style={{
-                                border: 'none',
-                                padding: '2px 8px',
-                                fontSize: '0.625rem',
-                                fontWeight: 800,
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                background: (vitalsData.temp_unit || 'C') === u ? '#6366f1' : 'transparent',
-                                color: (vitalsData.temp_unit || 'C') === u ? 'white' : '#64748b',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              °{u}
-                            </button>
-                          ))}
-                        </div>
+                       <div className="segmented-control">
+                         {['C', 'F'].map(u => (
+                           <button
+                             key={u}
+                             type="button"
+                             onClick={() => {
+                               const currentUnit = vitalsData.temp_unit || 'C';
+                               if (currentUnit === u) return;
+                               
+                               let newVal = vitalsData.temperature_c;
+                               if (newVal) {
+                                 if (u === 'F') {
+                                   newVal = ((parseFloat(newVal) * 9/5) + 32).toFixed(1);
+                                 } else {
+                                   newVal = ((parseFloat(newVal) - 32) * 5/9).toFixed(1);
+                                 }
+                               }
+                               setVitalsData({ ...vitalsData, temperature_c: newVal, temp_unit: u });
+                             }}
+                             className={(vitalsData.temp_unit || 'C') === u ? 'active' : ''}
+                             style={{
+                               border: 'none',
+                               padding: '4px 12px',
+                               fontSize: '0.65rem',
+                               fontWeight: 900,
+                               borderRadius: '6px',
+                               cursor: 'pointer',
+                               transition: 'all 0.2s ease'
+                             }}
+                           >
+                             °{u}
+                           </button>
+                         ))}
+                       </div>
                       </div>
                       <div style={{ position: 'relative' }}>
                          <input type="number" step="0.1" value={vitalsData.temperature_c} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder={ (vitalsData.temp_unit || 'C') === 'F' ? '98.6' : '36.5' } style={{ paddingRight: '2.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
@@ -655,7 +704,7 @@ const Vitals = () => {
               </div>
             )}
 
-               <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Observations</p>
+               <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Observations</p>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <label><Clipboard size={14} /> Current Symptoms</label>
                   <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during triage..."></textarea>
@@ -670,7 +719,7 @@ const Vitals = () => {
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
                   {/* Personal History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Personal History</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Personal History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Smoking (Tobacco)" value={vitalsData.smoking} onChange={val => setVitalsData({...vitalsData, smoking: val})} options={['YES', 'NO']} />
                         <ToggleField label="Alcohol" value={vitalsData.alcohol} onChange={val => setVitalsData({...vitalsData, alcohol: val})} options={['YES', 'NO']} />
@@ -683,7 +732,7 @@ const Vitals = () => {
 
                   {/* Family History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Family History (Parents/Siblings)</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Family History (Parents/Siblings)</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="DM (Diabetes)" value={vitalsData.family_dm} onChange={val => setVitalsData({...vitalsData, family_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="HTN (Hypertension)" value={vitalsData.family_htn} onChange={val => setVitalsData({...vitalsData, family_htn: val})} options={['YES', 'NO']} />
@@ -700,7 +749,7 @@ const Vitals = () => {
 
                   {/* Systemic Examination */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Systemic Examination</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Systemic Examination</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Respiratory" value={vitalsData.sys_respiratory} onChange={val => setVitalsData({...vitalsData, sys_respiratory: val})} options={['FND', 'NAD']} />
                         <ToggleField label="C.V.S" value={vitalsData.sys_cvs} onChange={val => setVitalsData({...vitalsData, sys_cvs: val})} options={['FND', 'NAD']} />
@@ -713,7 +762,7 @@ const Vitals = () => {
 
                   {/* Known History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>Known History</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Known History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Known DM" value={vitalsData.known_dm} onChange={val => setVitalsData({...vitalsData, known_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="Known HTN" value={vitalsData.known_htn} onChange={val => setVitalsData({...vitalsData, known_htn: val})} options={['YES', 'NO']} />
@@ -730,7 +779,7 @@ const Vitals = () => {
                </div>
 
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)', transition: 'all 0.3s ease' }}>
                      Complete Assessment <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>
@@ -741,22 +790,90 @@ const Vitals = () => {
       </div>
 
       <style>{`
-         .form-group label { display: flex; alignItems: center; gap: 0.5rem; color: #475569; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.8125rem; }
+         .form-group label { display: flex; alignItems: center; gap: 0.5rem; color: #475569; margin-bottom: 0.6rem; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
          input, select, textarea { 
-            border: 1px solid var(--border) !important;
-            background: var(--input-bg) !important;
-            padding: 0.75rem 1rem !important;
-            border-radius: 10px !important;
-            font-size: 0.875rem !important;
-            font-weight: 600 !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #f8fafc !important;
+            padding: 0.875rem 1.25rem !important;
+            border-radius: 14px !important;
+            font-size: 0.9375rem !important;
+            font-weight: 700 !important;
             color: var(--text-main) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
          }
          input:focus, textarea:focus {
             border-color: var(--primary) !important;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1) !important;
+            background: #ffffff !important;
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.1), 0 4px 6px -2px rgba(99, 102, 241, 0.05) !important;
             outline: none !important;
+            transform: translateY(-1px);
+         }
+         
+         /* Dark Mode Overrides */
+         .dark-theme input, .dark-theme select, .dark-theme textarea { 
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+         }
+         .dark-theme input:focus, .dark-theme textarea:focus {
+            background: #0f172a !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+         }
+         
+         .segmented-control {
+            display: flex;
+            gap: 2px;
+            background: #f1f5f9;
+            padding: 2px;
+            border-radius: 8px;
+         }
+         .segmented-control button {
+            background: transparent;
+            color: #64748b;
+         }
+         .segmented-control button.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+         
+         .dark-theme .segmented-control {
+            background: #1e293b;
+         }
+         .dark-theme .segmented-control button {
+            color: #94a3b8;
+         }
+         .dark-theme .segmented-control button.active {
+            background: var(--primary);
+            color: white;
+         }
+         
+         .search-container {
+            position: relative;
+            width: 250px;
+         }
+         .search-input {
+            padding-left: 2.5rem !important;
+            border-radius: 12px !important;
+            font-size: 0.75rem !important;
+            background: var(--background) !important;
+         }
+         
+         @media (max-width: 640px) {
+            .search-container {
+               width: 100%;
+            }
          }
          .form-group-mini label { display: block; color: #64748b; margin-bottom: 0.25rem; font-weight: 800; }
+         .card {
+            transition: all 0.3s ease;
+         }
+         .card:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+         }
       `}</style>
     </div>
   );
@@ -764,22 +881,21 @@ const Vitals = () => {
 
 const ToggleField = ({ label, value, onChange, options }) => (
    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
-      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{label}</span>
-      <div style={{ display: 'flex', gap: '2px', background: 'var(--background)', padding: '2px', borderRadius: '6px' }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)' }}>{label}</span>
+      <div className="segmented-control">
          {options.map(opt => (
             <button
                key={opt}
                type="button"
                onClick={() => onChange(opt)}
+               className={value === opt ? 'active' : ''}
                style={{
                   border: 'none',
-                  padding: '4px 10px',
-                  fontSize: '0.625rem',
-                  fontWeight: 800,
-                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  borderRadius: '6px',
                   cursor: 'pointer',
-                  background: value === opt ? 'var(--primary)' : 'transparent',
-                  color: value === opt ? 'white' : '#64748b',
                   transition: 'all 0.2s ease'
                }}
             >

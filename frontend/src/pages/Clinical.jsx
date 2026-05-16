@@ -34,6 +34,9 @@ const Clinical = () => {
   });
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
 
   const [newMed, setNewMed] = useState({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
@@ -252,6 +255,18 @@ const Clinical = () => {
     }
   };
 
+  const filteredVisits = visitsReady.filter(visit => {
+    const patientName = `${visit.patient_details?.first_name} ${visit.patient_details?.last_name}`.toLowerCase();
+    const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return patientName.includes(term) || patientId.includes(term);
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentVisits = filteredVisits.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
+
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2.5rem' }}>
@@ -263,14 +278,35 @@ const Clinical = () => {
         {/* Waiting Patients - Only show if NO patient is selected */}
         {!selectedVisit && (
           <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Consultation Queue ({totalCount})</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>Patients waiting for examination</p>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Consultation Queue ({filteredVisits.length})</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>Patients waiting for examination</p>
                </div>
-               <button onClick={() => fetchVisitsToSee()} style={{ border: 'none', background: 'var(--background)', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Clock size={18} color="#6366f1" />
-               </button>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div className="search-container" style={{ position: 'relative' }}>
+                     <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
+                     <input
+                        type="text"
+                        placeholder="Search patient..."
+                        value={searchTerm}
+                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        className="search-input"
+                        style={{ paddingRight: '2rem' }}
+                     />
+                     {searchTerm && (
+                        <button 
+                           onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                           style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                        >
+                           <X size={14} />
+                        </button>
+                     )}
+                  </div>
+                  <button onClick={() => fetchVisitsToSee()} style={{ border: 'none', background: 'var(--background)', padding: '0.625rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                     <Clock size={18} color="#6366f1" />
+                  </button>
+               </div>
             </div>
             
             <div className="table-responsive">
@@ -284,7 +320,15 @@ const Clinical = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {visitsReady.map(v => (
+                   {filteredVisits.length === 0 ? (
+                     <tr>
+                       <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#64748b' }}>
+                          <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No patients found</p>
+                          <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
+                       </td>
+                     </tr>
+                   ) : (
+                     currentVisits.map(v => (
                     <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -293,7 +337,7 @@ const Clinical = () => {
                             </div>
                             <div>
                                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
                             </div>
                          </div>
                       </td>
@@ -344,39 +388,38 @@ const Clinical = () => {
                           </button>
                       </td>
                     </tr>
-                  ))}
-                  {!isLoading && visitsReady.length === 0 && (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
-                         <CheckCircle size={40} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-                         <p style={{ fontWeight: 600 }}>No patients waiting for consultation.</p>
-                      </td>
-                    </tr>
-                  )}
+                  )))}
+
                 </tbody>
               </table>
             </div>
             
-            {/* Pagination */}
-            {totalCount > 10 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                          className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVisitsToSee(page - 1)}
-                          style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
-                      >
-                          <ChevronLeft size={16} />
-                      </button>
-                      <button 
-                          className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchVisitsToSee(page + 1)}
-                          style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
-                      >
-                          <ChevronRight size={16} />
-                      </button>
+               {/* Pagination */}
+               {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                     <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredVisits.length)} of {filteredVisits.length} entries
+                     </p>
+                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                           disabled={currentPage === 1}
+                           className="btn btn-secondary"
+                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                        >
+                           Previous
+                        </button>
+                        <button
+                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                           disabled={currentPage === totalPages}
+                           className="btn btn-secondary"
+                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                        >
+                           Next
+                        </button>
+                     </div>
                   </div>
-              </div>
-            )}
+               )}
           </div>
         )}
 
@@ -458,8 +501,8 @@ const Clinical = () => {
                                         { label: 'BMI', value: `${detailedVisit.vitals?.bmi || '--'}` }
                                     ].map((item, id) => (
                                         <div key={id} className="snapshot-item" style={{ padding: '0.5rem 0.75rem' }}>
-                                            <span className="item-label" style={{ fontSize: '0.65rem' }}>{item.label}</span>
-                                            <span className="item-value" style={{ fontSize: '0.7rem', fontWeight: 900 }}>{item.value}</span>
+                                            <span className="item-label" style={{ fontSize: '0.65rem', color: '#475569', fontWeight: 700 }}>{item.label}</span>
+                                            <span className="item-value" style={{ fontSize: '0.7rem', fontWeight: 900, color: '#0f172a' }}>{item.value}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -475,7 +518,7 @@ const Clinical = () => {
                                         {detailedVisit.prescriptions?.length > 0 ? detailedVisit.prescriptions.map((m, i) => (
                                             <div key={i} className="history-med-item" style={{ marginBottom: '8px', padding: '6px 10px', borderRadius: '8px' }}>
                                                 <p className="history-med-name" style={{ fontSize: '0.75rem', fontWeight: 800 }}>{m.medication_name}</p>
-                                                <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
+                                                <p style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
                                             </div>
                                         )) : <p className="empty-text">No medications prescribed</p>}
                                     </div>
@@ -516,7 +559,7 @@ const Clinical = () => {
                     </div>
                     <div>
                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                      <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
+                      <p style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: 'var(--background)', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
@@ -527,15 +570,15 @@ const Clinical = () => {
               {/* Patient Profile Summary */}
               <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem' }}>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
                  </div>
                   <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
@@ -560,23 +603,23 @@ const Clinical = () => {
                    <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                        <div style={{ gridColumn: 'span 2', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                            <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Vitals</p>
-                           <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 700 }}>Weight: {selectedVisit.vitals?.weight_kg}kg | Height: {selectedVisit.vitals?.height_cm}cm</span>
+                           <span style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 700 }}>Weight: {selectedVisit.vitals?.weight_kg}kg | Height: {selectedVisit.vitals?.height_cm}cm</span>
                        </div>
                        <div>
-                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Temp / Heart</p>
-                           <p style={{ fontSize: '0.875rem', fontWeight: 800 }}>{selectedVisit.vitals?.temperature_c}°C / {selectedVisit.vitals?.heart_rate} BPM</p>
+                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Temp / Heart</p>
+                           <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0f172a' }}>{selectedVisit.vitals?.temperature_c}°C / {selectedVisit.vitals?.heart_rate} BPM</p>
                        </div>
                        <div>
-                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>BP (S/D)</p>
-                           <p style={{ fontSize: '0.875rem', fontWeight: 800 }}>{selectedVisit.vitals?.blood_pressure_sys}/{selectedVisit.vitals?.blood_pressure_dia}</p>
+                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>BP (S/D)</p>
+                           <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0f172a' }}>{selectedVisit.vitals?.blood_pressure_sys}/{selectedVisit.vitals?.blood_pressure_dia}</p>
                        </div>
                        <div>
-                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>SPO2 / RR</p>
-                           <p style={{ fontSize: '0.875rem', fontWeight: 800 }}>{selectedVisit.vitals?.spo2}% / {selectedVisit.vitals?.respiratory_rate}</p>
+                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>SPO2 / RR</p>
+                           <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0f172a' }}>{selectedVisit.vitals?.spo2}% / {selectedVisit.vitals?.respiratory_rate}</p>
                        </div>
                        <div>
-                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>BMI</p>
-                           <p style={{ fontSize: '0.875rem', fontWeight: 800 }}>{selectedVisit.vitals?.bmi || '--'}</p>
+                           <p style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>BMI</p>
+                           <p style={{ fontSize: '0.875rem', fontWeight: 800, color: '#0f172a' }}>{selectedVisit.vitals?.bmi || '--'}</p>
                        </div>
                    </div>
 
@@ -674,7 +717,7 @@ const Clinical = () => {
                                                             <tr key={st.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                                                 <td style={{ padding: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>{st.name}</td>
                                                                 <td style={{ padding: '0.5rem', fontSize: '0.8125rem', fontWeight: isAbnormal ? 900 : 700, color: isAbnormal ? '#dc2626' : '#10b981' }}>
-                                                                    {val || '--'} {st.units && <span style={{ fontSize: '0.625rem', fontWeight: 600, color: '#94a3b8' }}>{st.units}</span>}
+                                                                    {val || '--'} {st.units && <span style={{ fontSize: '0.625rem', fontWeight: 600, color: '#475569' }}>{st.units}</span>}
                                                                 </td>
                                                                 <td style={{ padding: '0.5rem', fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>{st.biological_range || '-'}</td>
                                                             </tr>
@@ -686,11 +729,11 @@ const Clinical = () => {
                                     ) : (
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                             <div>
-                                                <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Value</p>
+                                                <p style={{ fontSize: '0.625rem', color: '#475569', textTransform: 'uppercase' }}>Value</p>
                                                 <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>{lr.result?.value}</p>
                                             </div>
                                             <div>
-                                                <p style={{ fontSize: '0.625rem', color: '#94a3b8', textTransform: 'uppercase' }}>Ref. Range</p>
+                                                <p style={{ fontSize: '0.625rem', color: '#475569', textTransform: 'uppercase' }}>Ref. Range</p>
                                                 <p style={{ fontSize: '0.75rem', fontWeight: 600 }}>{lr.result?.reference_range || '--'}</p>
                                             </div>
                                         </div>
@@ -777,15 +820,17 @@ const Clinical = () => {
                       <div style={{ position: 'relative' }}>
                         <div style={{ position: 'relative' }}>
                             <input 
-                              placeholder="SEARCH DRUG..." 
+                              placeholder={selectedGroup ? "SEARCH DRUG..." : "Select Group First..."} 
                               value={drugSearch || newMed.name} 
-                              onFocus={() => setShowDrugDropdown(true)}
+                              onFocus={() => selectedGroup && setShowDrugDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowDrugDropdown(false), 200)}
                               onChange={e => {
                                 setDrugSearch(e.target.value);
                                 setShowDrugDropdown(true);
                                 if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
                               }} 
-                              style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: 'var(--text-main)' }} 
+                              disabled={!selectedGroup}
+                              style={{ background: selectedGroup ? 'var(--surface)' : '#f1f5f9', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: 'var(--text-main)', cursor: selectedGroup ? 'text' : 'not-allowed' }} 
                             />
                             <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                                 <Search size={14} color="#94a3b8" />
@@ -800,7 +845,7 @@ const Clinical = () => {
                                     .map(d => (
                                         <div 
                                             key={d.id} 
-                                            onClick={() => {
+                                            onMouseDown={() => {
                                                 setNewMed({
                                                     ...newMed, 
                                                     name: d.name, 
@@ -820,7 +865,7 @@ const Clinical = () => {
                                         </div>
                                     ))}
                                 {pharmacyInventory.filter(d => (!selectedGroup || (d.category || d.item_group) === selectedGroup) && (!drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()))).length === 0 && (
-                                    <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
+                                    <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#475569', fontSize: '0.75rem', fontWeight: 600 }}>
                                         No matching drugs found in this group
                                     </div>
                                 )}
@@ -1074,7 +1119,7 @@ const Clinical = () => {
                     <div className="fade-in" style={{ marginTop: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <label style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribe Investigations (Project Masters)</label>
-                            <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8' }}>{labMasters.length} Tests Available</span>
+                            <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569' }}>{labMasters.length} Tests Available</span>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
                            <div style={{ flex: 1, position: 'relative' }}>
@@ -1094,7 +1139,7 @@ const Clinical = () => {
                                />
                                {showLabSearch && (
                                   <div className="search-dropdown" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto', borderRadius: '16px', zIndex: 1000, padding: '6px' }}>
-                                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
+                                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#475569', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
                                      {labMasters.filter(l => {
                                          const query = searchLab.toLowerCase();
                                          return l.name.toLowerCase().includes(query);
@@ -1116,7 +1161,7 @@ const Clinical = () => {
                                              <div style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{l.name}</div>
                                              <div style={{ fontSize: '0.625rem', padding: '2px 8px', background: 'var(--background)', borderRadius: '6px', fontWeight: 700, color: 'var(--text-muted)' }}>{l.code}</div>
                                           </div>
-                                          <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}>{l.test_type_name} • {l.department_name}</div>
+                                          <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>{l.test_type_name} • {l.department_name}</div>
                                         </div>
                                      ))}
                                      {labMasters.filter(l => {
@@ -1124,7 +1169,7 @@ const Clinical = () => {
                                          return l.name.toLowerCase().includes(q);
                                      }).length === 0 && (
                                         <div style={{ padding: '20px', textAlign: 'center' }}>
-                                           <p style={{ color: '#94a3b8', fontSize: '0.8125rem', fontWeight: 600 }}>No unticked investigations matching search</p>
+                                           <p style={{ color: '#475569', fontSize: '0.8125rem', fontWeight: 600 }}>No unticked investigations matching search</p>
                                         </div>
                                      )}
                                   </div>
@@ -1156,7 +1201,7 @@ const Clinical = () => {
                                                 const updated = consultData.lab_investigations.filter((_, i) => i !== idx);
                                                 setConsultData({...consultData, lab_investigations: updated});
                                             }}
-                                            style={{ border: 'none', background: 'transparent', padding: 0, color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                            style={{ border: 'none', background: 'transparent', padding: 0, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                                         >
                                             <X size={14} />
                                         </button>
@@ -1619,9 +1664,26 @@ const Clinical = () => {
         .dossier-footer { padding: 1.5rem 2.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9; text-align: right; }
         .dossier-confirm-btn { padding: 0.75rem 2.5rem; border-radius: 14px; font-weight: 800; background: #1e293b; border: none; color: white; cursor: pointer; transition: 0.2s; }
         .dossier-confirm-btn:hover { background: #000; }
-        .empty-text { font-size: 0.8125rem; color: #94a3b8; font-style: italic; }
+         .empty-text { font-size: 0.8125rem; color: #94a3b8; font-style: italic; }
 
-        @media (max-width: 1200px) {
+         .search-container {
+            position: relative;
+            width: 250px;
+         }
+         .search-input {
+            padding-left: 2.5rem !important;
+            border-radius: 12px !important;
+            font-size: 0.75rem !important;
+            background: var(--background) !important;
+         }
+         
+         @media (max-width: 640px) {
+            .search-container {
+               width: 100%;
+            }
+         }
+
+         @media (max-width: 1200px) {
             .dossier-card { right: 2rem; } /* Overlays the drawer on smaller screens */
         }
         
@@ -1653,7 +1715,7 @@ const HistoryBadge = ({ label, value, color, variant }) => {
 
     return (
         <div style={{ padding: '3px 8px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)', display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{label}:</span>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#475569' }}>{label}:</span>
             <span style={{ fontSize: '0.625rem', fontWeight: 800, color: isPositive ? (color || '#ef4444') : '#10b981' }}>{displayValue}</span>
         </div>
     );
@@ -1663,8 +1725,8 @@ const ExamItem = ({ label, value }) => {
     const isAbnormal = value === 'FND';
     return (
         <div style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-            <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '2px' }}>{label}</p>
-            <p style={{ fontSize: '0.75rem', fontWeight: 800, color: isAbnormal ? '#dc2626' : '#059669' }}>{value || '--'}</p>
+            <p style={{ fontSize: '0.55rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '2px' }}>{label}</p>
+            <p style={{ fontSize: '0.75rem', fontWeight: 800, color: isAbnormal ? '#dc2626' : '#0f5132' }}>{value || '--'}</p>
         </div>
     );
 };

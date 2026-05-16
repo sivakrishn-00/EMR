@@ -75,6 +75,9 @@ const Patients = () => {
   const [ackForm, setAckForm] = useState({ date: '', startTime: '', endTime: '' });
   const [isAcking, setIsAcking] = useState(false);
   const [isEnablingPortal, setIsEnablingPortal] = useState(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isTriaging, setIsTriaging] = useState(false);
   
   // Download Report Settings
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -346,6 +349,7 @@ const Patients = () => {
         return;
     }
 
+    setIsRegistering(true);
     const loadingToast = toast.loading('Registering patient...');
     try {
       const submitData = { ...formData };
@@ -371,6 +375,8 @@ const Patients = () => {
       fetchPatients();
     } catch (err) {
       toast.error("Error registering patient", { id: loadingToast });
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -378,6 +384,7 @@ const Patients = () => {
     e.preventDefault();
     if (!triagePatient) return;
 
+    setIsTriaging(true);
     const loadingToast = toast.loading('Initiating instant triage...');
     try {
       await api.post('clinical/visits/', {
@@ -393,6 +400,8 @@ const Patients = () => {
       fetchStats();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to start visit', { id: loadingToast });
+    } finally {
+      setIsTriaging(false);
     }
   };
 
@@ -766,13 +775,13 @@ const Patients = () => {
 
 
       <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 300px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
               placeholder="Search by ID (BHSPL0001), Name, or Mobile..." 
-              style={{ paddingLeft: '2.75rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)' }}
+              style={{ paddingLeft: '2.75rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)', width: '100%' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -780,7 +789,7 @@ const Patients = () => {
           {user?.role === 'ADMIN' && (
               <select 
                   className="form-control" 
-                  style={{ width: '250px', height: '44px', background: 'var(--surface)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
+                  style={{ flex: '1 1 200px', height: '44px', background: 'var(--surface)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
                   value={projectFilter}
                   onChange={(e) => setProjectFilter(e.target.value)}
               >
@@ -788,24 +797,22 @@ const Patients = () => {
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
           )}
-          <button className="btn btn-secondary" style={{ width: '44px', padding: 0 }}>
-            <Filter size={18} />
-          </button>
+          {/* Filter button removed */}
         </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="table-responsive">
+        <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
           <table>
-            <thead>
+            <thead style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
               <tr>
-                <th style={{ padding: '1rem 1.5rem' }}>Patient Details</th>
-                <th>Project</th>
-                <th>Gender/Age</th>
-                <th>Contact info</th>
-                <th>Patient Type</th>
-                <th>Clinic Status</th>
-                <th style={{ textAlign: 'right', paddingRight: '1.5rem' }}>Actions</th>
+                <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Patient Details</th>
+                <th style={{ padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Project</th>
+                <th style={{ padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gender/Age</th>
+                <th style={{ padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contact info</th>
+                <th style={{ padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Patient Type</th>
+                <th style={{ padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clinic Status</th>
+                <th style={{ padding: '0.75rem 1.5rem', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -982,9 +989,11 @@ const Patients = () => {
                             ) : (
                                 <button 
                                     className="btn btn-primary" 
-                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', borderRadius: '10px' }}
+                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', borderRadius: '10px', opacity: isCheckingIn === p.id ? 0.5 : 1 }}
+                                    disabled={isCheckingIn === p.id}
                                     onClick={async () => {
                                         const loading = toast.loading('Initiating Arrived Status...');
+                                        setIsCheckingIn(p.id);
                                         try {
                                             if (p.upcoming_appointment?.id) {
                                                 await api.post(`clinical/appointments/${p.upcoming_appointment.id}/check_in/`);
@@ -993,10 +1002,14 @@ const Patients = () => {
                                             }
                                             toast.success("Patient Arrived & Registered!", { id: loading });
                                             fetchPatients();
-                                        } catch (e) { toast.error("Check-in sync failed", { id: loading }); }
+                                        } catch (e) { 
+                                            toast.error("Check-in sync failed", { id: loading }); 
+                                        } finally {
+                                            setIsCheckingIn(null);
+                                        }
                                     }}
                                 >
-                                    <Check size={12} /> Start Visit
+                                    <Check size={12} /> {isCheckingIn === p.id ? 'Starting...' : 'Start Visit'}
                                 </button>
                             )
                         ) : (
@@ -1500,9 +1513,11 @@ const Patients = () => {
                         fontWeight: 800,
                         background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         border: 'none',
-                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)',
+                        opacity: isRegistering ? 0.5 : 1
                     }}
-                >Complete Registration</button>
+                    disabled={isRegistering}
+                >{isRegistering ? 'Registering...' : 'Complete Registration'}</button>
               </div>
             </form>
           </div>
@@ -1571,10 +1586,12 @@ const Patients = () => {
                   style={{ 
                     padding: '1rem', borderRadius: '18px', fontWeight: 900, letterSpacing: '0.01em',
                     background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', border: 'none',
-                    boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.2)'
+                    boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.2)',
+                    opacity: isTriaging ? 0.5 : 1
                   }}
+                  disabled={isTriaging}
                 >
-                  START CLINICAL VISIT
+                  {isTriaging ? 'Starting...' : 'START CLINICAL VISIT'}
                 </button>
                 <button 
                   type="button" 

@@ -12,6 +12,8 @@ const Pharmacy = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [itemsPerPage] = useState(5);
 
   const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
@@ -75,10 +77,10 @@ const Pharmacy = () => {
     return item ? `${item.quantity} items` : "0 items";
   };
 
-  const fetchPrescriptions = async (pageNum = 1) => {
+  const fetchPrescriptions = async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`pharmacy/prescriptions/?status=PENDING&page=${pageNum}`);
+      const res = await api.get(`pharmacy/prescriptions/?status=PENDING&page_size=1000`);
       
       const results = res.data.results || res.data;
       const count = res.data.count || res.data.length;
@@ -100,7 +102,6 @@ const Pharmacy = () => {
 
       setPrescriptions(Object.values(grouped));
       setTotalCount(count);
-      setPage(pageNum);
     } catch (err) {
       toast.error("Failed to fetch medication queue");
     } finally {
@@ -137,6 +138,17 @@ const Pharmacy = () => {
     }
   };
 
+  const filteredPrescriptions = prescriptions.filter(p => 
+    !searchTerm || 
+    p.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(p.uhid || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const indexOfLastItem = page * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentPrescriptions = filteredPrescriptions.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredPrescriptions.length / itemsPerPage);
+
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2.5rem' }}>
@@ -147,9 +159,34 @@ const Pharmacy = () => {
       <div style={{ display: 'grid', gridTemplateColumns: selectedPresc ? '1fr 1fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         {/* Prescription List */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Active Prescriptions ({totalCount})</h3>
-             <Pill size={18} color="#94a3b8" />
+          <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                 <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Active Prescriptions ({filteredPrescriptions.length})</h3>
+                 <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Total pending: {totalCount}</p>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                 <div className="search-container" style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
+                    <input
+                       type="text"
+                       placeholder="Search patient..."
+                       value={searchTerm}
+                       onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
+                       className="search-input"
+                       style={{ padding: '0.5rem 2rem 0.5rem 2.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.75rem', outline: 'none' }}
+                    />
+                    {searchTerm && (
+                       <button 
+                          onClick={() => { setSearchTerm(''); setPage(1); }}
+                          style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                       >
+                          <X size={14} />
+                       </button>
+                    )}
+                 </div>
+                 <Pill size={18} color="#94a3b8" />
+              </div>
           </div>
           
           <div className="table-responsive">
@@ -163,7 +200,15 @@ const Pharmacy = () => {
                 </tr>
               </thead>
               <tbody>
-                {prescriptions.map(p => (
+                {currentPrescriptions.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#64748b' }}>
+                         <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No prescriptions found</p>
+                         <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
+                      </td>
+                    </tr>
+                 ) : (
+                    currentPrescriptions.map(p => (
                   <tr key={p.visit_id}>
                     <td style={{ padding: '1.25rem' }}>
                        <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{p.patient_name}</p>
@@ -181,38 +226,36 @@ const Pharmacy = () => {
                       </button>
                     </td>
                   </tr>
-                ))}
-                {!isLoading && prescriptions.length === 0 && (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '3.5rem', color: '#94a3b8' }}>
-                       <CheckCircle size={40} style={{ marginBottom: '1rem', opacity: 0.1 }} />
-                       <p>All medications have been dispensed.</p>
-                    </td>
-                  </tr>
-                )}
+                )))}
               </tbody>
             </table>
           </div>
           
           {/* Pagination */}
-          {totalCount > 10 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Page {page}</span>
+          {totalPages > 1 && (
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                   Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredPrescriptions.length)} of {filteredPrescriptions.length} entries
+                </p>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                        className="btn btn-secondary" disabled={page === 1} onClick={() => fetchPrescriptions(page - 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                        className="btn btn-secondary" disabled={page * 10 >= totalCount} onClick={() => fetchPrescriptions(page + 1)}
-                        style={{ padding: '0.25rem 0.5rem', opacity: page * 10 >= totalCount ? 0.5 : 1 }}
-                    >
-                        <ChevronRight size={16} />
-                    </button>
+                   <button
+                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                      disabled={page === 1}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer' }}
+                   >
+                      Previous
+                   </button>
+                   <button
+                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={page === totalPages}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
+                   >
+                      Next
+                   </button>
                 </div>
-            </div>
+             </div>
           )}
         </div>
 
