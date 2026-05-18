@@ -3,6 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+
+// Sub-modules
+import DashboardTab from './components/DashboardTab';
+import RecordsTab from './components/RecordsTab';
+import AppointmentsTab from './components/AppointmentsTab';
+
 import { 
     Activity, 
     Calendar, 
@@ -41,11 +47,21 @@ import {
     History,
     Plus,
     MapPin,
-    AlertCircle
+    AlertCircle,
+    MessageCircle
 } from 'lucide-react';
 
 const PatientDashboard = () => {
     const { user, logout } = useAuth(); 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [appointmentSearchTerm, setAppointmentSearchTerm] = useState('');
+    const [currentApptPage, setCurrentApptPage] = useState(1);
+    const [showChatBot, setShowChatBot] = useState(false);
+    const [messages, setMessages] = useState([
+        { text: "Hello! I'm your health assistant. How can I help you today?", isBot: true }
+    ]);
+    const [inputMessage, setInputMessage] = useState('');
     const navigate = useNavigate();
     const location = useLocation();
     
@@ -204,6 +220,35 @@ const PatientDashboard = () => {
         navigate(path);
     };
 
+    const handleSendMessage = () => {
+        if (!inputMessage.trim()) return;
+        
+        const newMessages = [...messages, { text: inputMessage, isBot: false }];
+        setMessages(newMessages);
+        setInputMessage('');
+
+        setTimeout(() => {
+            let reply = "I'm sorry, I can only help you with questions about your health records shown here. Try asking about your 'BP', 'heart rate', or 'prescriptions'.";
+            const lower = inputMessage.toLowerCase();
+            
+            if (lower.includes('bp') || lower.includes('blood pressure')) {
+                reply = "Your last recorded BP was **120/80 mmHg** (Normal).";
+            } else if (lower.includes('heart') || lower.includes('pulse')) {
+                reply = "Your last recorded heart rate was **72 bpm** (Ideal).";
+            } else if (lower.includes('sugar') || lower.includes('glucose')) {
+                reply = "Your last recorded blood sugar was **95 mg/dL** (Normal).";
+            } else if (lower.includes('weight')) {
+                reply = "Your last recorded weight was **68 kg** (Stable).";
+            } else if (lower.includes('prescription') || lower.includes('medicine')) {
+                reply = "You have 1 active prescription: **Amantrel Tablets**.";
+            } else if (lower.includes('visit')) {
+                reply = "You have had **1 facility visit** recorded in the system.";
+            }
+
+            setMessages([...newMessages, { text: reply, isBot: true }]);
+        }, 1000);
+    };
+
     if (loading) return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
              <div className="hq-loader"></div>
@@ -341,12 +386,12 @@ const PatientDashboard = () => {
                         text-transform: uppercase;
                         transition: 0.2s;
                     }
-                    .d-close:hover { color: #4f46e5; }
-
+                    .d-close:hover { color: #4c1d95; }
+                    
                     .p-badge {
                         width: 64px;
                         height: 64px;
-                        border-radius: 18px;
+                        border-radius: 8px;
                         background: #f1f5f9;
                         display: flex;
                         align-items: center;
@@ -363,24 +408,24 @@ const PatientDashboard = () => {
                     /* Premium UI Cards */
                     .d-card { 
                         background: white; 
-                        border-radius: 24px; 
+                        border-radius: 8px; 
                         border: 1px solid #e2e8f0; 
                         padding: 2rem; 
                         margin-bottom: 1.5rem; 
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
+                        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); 
                     }
                     .d-card-header { 
                         font-size: 0.75rem; 
-                        font-weight: 900; 
-                        color: #6366f1; 
+                        font-weight: 800; 
+                        color: #4c1d95; 
                         text-transform: uppercase; 
-                        letter-spacing: 0.08em; 
-                        margin-bottom: 1.75rem; 
+                        letter-spacing: 0.05em; 
+                        margin-bottom: 1.5rem; 
                         display: flex; 
                         align-items: center; 
-                        gap: 0.75rem; 
+                        gap: 0.5rem; 
                     }
-                    .d-card-header::after { content:''; height: 1px; background: #f1f5f9; flex: 1; }
+                    .d-card-header::after { content:''; height: 1px; background: #e2e8f0; flex: 1; }
 
                     .v-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
                     .v-item { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -391,30 +436,30 @@ const PatientDashboard = () => {
                     .history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
                     .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
                     .tag-item { 
-                        padding: 0.5rem 0.875rem; 
-                        border-radius: 10px; 
-                        background: #f8fafc; 
-                        border: 1px solid #e2e8f0; 
-                        font-size: 0.75rem; 
+                        padding: 0.35rem 0.75rem; 
+                        border-radius: 4px; 
+                        background: #f1f5f9; 
+                        border: 1px solid #cbd5e1; 
+                        font-size: 0.7rem; 
                         font-weight: 700; 
-                        color: #475569;
+                        color: #334155;
                     }
-                    .tag-yes { background: #ecfdf5; border-color: #10b981; color: #059669; }
+                    .tag-yes { background: #d1fae5; border-color: #10b981; color: #0f5132; }
 
                     .exam-grid-elite { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
                     .exam-pill { 
                         background: #ffffff; 
                         border: 1px solid #e2e8f0; 
-                        padding: 1.5rem; 
-                        border-radius: 20px; 
-                        transition: all 0.3s ease;
+                        padding: 1rem; 
+                        border-radius: 6px; 
+                        transition: all 0.2s ease;
                         display: flex;
                         flex-direction: column;
-                        gap: 0.5rem;
+                        gap: 0.25rem;
                     }
-                    .exam-pill:hover { border-color: #6366f1; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
-                    .exam-pill-label { font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-                    .exam-pill-val { font-size: 1rem; font-weight: 800; color: #10b981; }
+                    .exam-pill:hover { border-color: #4c1d95; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+                    .exam-pill-label { font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+                    .exam-pill-val { font-size: 0.9rem; font-weight: 700; color: #059669; }
 
                     .table-elite { width: 100%; border-collapse: collapse; }
                     .table-elite th { text-align: left; font-size: 0.65rem; font-weight: 800; color: #94a3b8; padding: 1rem; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; }
@@ -422,22 +467,22 @@ const PatientDashboard = () => {
                     
                     .export-btn { 
                         width: 100%; 
-                        padding: 0.875rem; 
-                        border-radius: 12px; 
-                        background: #0f172a; 
+                        padding: 0.75rem; 
+                        border-radius: 4px; 
+                        background: #4c1d95; 
                         color: white; 
                         border: none; 
-                        fontWeight: 800; 
-                        fontSize: 0.75rem; 
+                        font-weight: 700; 
+                        font-size: 0.75rem; 
                         cursor: pointer; 
                         display: flex; 
                         align-items: center; 
                         justify-content: center; 
                         gap: 0.5rem;
                         margin-top: auto;
-                        transition: 0.2s;
+                        transition: background-color 0.2s;
                     }
-                    .export-btn:hover { background: #1e293b; transform: translateY(-1px); }
+                    .export-btn:hover { background: #3b0764; }
                 `}</style>
 
                 <div className="dossier-container" onClick={e => e.stopPropagation()}>
@@ -471,7 +516,7 @@ const PatientDashboard = () => {
                                 </div>
                                 <div className="v-item">
                                     <span className="v-label">Blood Pressure</span>
-                                    <div className="v-val" style={{ color: '#6366f1' }}>
+                                    <div className="v-val" style={{ color: '#4c1d95' }}>
                                         {vitals.blood_pressure_sys ? (
                                             <>{vitals.blood_pressure_sys}/{vitals.blood_pressure_dia}<span className="v-unit">mmHg</span></>
                                         ) : '--'}
@@ -803,34 +848,34 @@ const PatientDashboard = () => {
 
                 /* --- ADMIN HEADER --- */
                 .a-header {
-                    background: #ffffff;
-                    height: 70px;
+                    background: linear-gradient(135deg, #4c1d95, #6d28d9); /* Dark Violet */
+                    height: 64px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    border-bottom: 1px solid var(--border);
                     position: sticky;
                     top: 0;
                     z-index: 1000;
                     padding: 0 2rem;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                 }
                 .a-header-inner {
                     width: 100%;
-                    max-width: 1400px;
+                    max-width: 100%;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
                 }
 
                 .a-brand-block { display: flex; flex-direction: column; justify-content: center; }
-                .a-brand { font-weight: 900; font-size: 0.9rem; color: #4338ca; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.1; }
-                .a-brand-sub { font-size: 0.65rem; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-top: 2px; }
+                .a-brand { font-weight: 800; font-size: 0.85rem; color: #ffffff; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.1; }
+                .a-brand-sub { font-size: 0.6rem; font-weight: 600; color: #ccfbf1; text-transform: uppercase; margin-top: 2px; }
 
-                .a-nav { display: flex; gap: 2.5rem; height: 100%; align-items: center; }
+                .a-nav { display: flex; gap: 2rem; height: 100%; align-items: center; }
                 .a-nav-item {
-                    font-size: 0.85rem;
-                    font-weight: 700;
-                    color: #6b7280;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    color: #ccfbf1;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -838,16 +883,16 @@ const PatientDashboard = () => {
                     height: 100%;
                     transition: 0.2s;
                 }
-                .a-nav-item:hover { color: var(--admin-blue); }
-                .a-nav-item.active { color: var(--admin-blue); }
+                .a-nav-item:hover { color: #ffffff; }
+                .a-nav-item.active { color: #ffffff; font-weight: 700; }
                 .a-nav-item.active::after {
                     content: '';
                     position: absolute;
                     bottom: -1px;
                     left: 0;
                     right: 0;
-                    height: 3px;
-                    background: var(--admin-blue);
+                    height: 2px;
+                    background: #ffffff;
                 }
 
                 .a-user-pill {
@@ -865,9 +910,13 @@ const PatientDashboard = () => {
 
                 /* --- CONTENT AREA --- */
                 .a-container { 
-                    padding: 2.5rem 2rem; 
-                    max-width: 1400px; 
+                    padding: 1.5rem 1rem; 
+                    max-width: 100%; 
                     margin: 0 auto; 
+                    display: flex;
+                    flex-direction: column;
+                    min-height: calc(100vh - 64px); 
+                    box-sizing: border-box;
                 }
                 
                 .a-greeting { margin-bottom: 2rem; }
@@ -885,14 +934,14 @@ const PatientDashboard = () => {
                     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
                     cursor: pointer;
                 }
-                .card-blue { background: linear-gradient(135deg, #4f46e5, #6366f1); }
-                .card-green { background: linear-gradient(135deg, #10b981, #34d399); }
-                .card-orange { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
-                .card-purple { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+                .card-blue { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+                .card-green { background: linear-gradient(135deg, #059669, #10b981); }
+                .card-orange { background: linear-gradient(135deg, #d97706, #f59e0b); }
+                .card-purple { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
                 .a-stat-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; opacity: 0.85; }
-                .a-badge { background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.55rem; }
-                .a-stat-val { font-size: 1.85rem; font-weight: 900; margin-top: 0.5rem; display: block; }
-                .a-stat-icon { position: absolute; bottom: 1rem; right: 1rem; opacity: 0.15; }
+                .a-badge { background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.55rem; color: white; }
+                .a-stat-val { font-size: 1.85rem; font-weight: 900; margin-top: 0.5rem; display: block; color: white; }
+                .a-stat-icon { position: absolute; bottom: 1rem; right: 1rem; opacity: 0.15; color: white; }
 
                 /* --- CARD --- */
                 .a-card { background: white; border-radius: 14px; border: 1px solid var(--border); padding: 1.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
@@ -926,406 +975,109 @@ const PatientDashboard = () => {
                         <div className="a-brand-sub">Electronic Medical Records</div>
                     </div>
 
-                    <nav className="a-nav">
-                        <span className={`a-nav-item ${currentTab === 'Dashboard' ? 'active' : ''}`} onClick={() => handleTabChange('Dashboard')}>Dashboard</span>
-                        <span className={`a-nav-item ${currentTab === 'Records' ? 'active' : ''}`} onClick={() => handleTabChange('Records')}>Clinical Records</span>
-                        {patientData.allow_appointments !== false && (
-                            <span className={`a-nav-item ${currentTab === 'Appointments' ? 'active' : ''}`} onClick={() => handleTabChange('Appointments')}>Book Appointment</span>
-                        )}
-                    </nav>
-
-                    <div style={{ display:'flex', alignItems:'center', gap:'1.25rem', position: 'relative' }}>
-                        <div style={{ position: 'relative', cursor:'pointer' }} onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false); }}>
-                            <Bell size={18} color={unreadCount > 0 ? "var(--admin-blue)" : "#9ca3af"} />
-                            {unreadCount > 0 && (
-                                <span style={{ 
-                                    position: 'absolute', 
-                                    top: '-4px', 
-                                    right: '-4px', 
-                                    background: 'var(--admin-red)', 
-                                    color: 'white', 
-                                    fontSize: '0.55rem', 
-                                    fontWeight: 900, 
-                                    padding: '2px 5px', 
-                                    borderRadius: '50%',
-                                    border: '2px solid white'
-                                }}>
-                                    {unreadCount}
-                                </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3rem' }}>
+                        <nav className="a-nav">
+                            <span className={`a-nav-item ${currentTab === 'Dashboard' ? 'active' : ''}`} onClick={() => handleTabChange('Dashboard')}>Dashboard</span>
+                            <span className={`a-nav-item ${currentTab === 'Records' ? 'active' : ''}`} onClick={() => handleTabChange('Records')}>Clinical Records</span>
+                            {patientData.allow_appointments !== false && (
+                                <span className={`a-nav-item ${currentTab === 'Appointments' ? 'active' : ''}`} onClick={() => handleTabChange('Appointments')}>Book Appointment</span>
                             )}
-                        </div>
-                        {renderNotifications()}
-                        
-                        <div className="a-user-pill" onClick={() => { setShowProfile(true); setShowNotifications(false); }}>
-                            <div style={{ width:'28px', height:'28px', borderRadius:'8px', background: 'var(--admin-blue)', display:'flex', alignItems:'center', justifyContent:'center', color:'white' }}>
-                                <User size={16} />
+                        </nav>
+
+                        <div style={{ display:'flex', alignItems:'center', gap:'1.25rem', position: 'relative' }}>
+                            <div style={{ position: 'relative', cursor:'pointer' }} onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false); }}>
+                                <Bell size={18} color={unreadCount > 0 ? "#ffedd5" : "#e0e7ff"} />
+                                {unreadCount > 0 && (
+                                    <span style={{ 
+                                        position: 'absolute', 
+                                        top: '-4px', 
+                                        right: '-4px', 
+                                        background: 'var(--admin-red)', 
+                                        color: 'white', 
+                                        fontSize: '0.55rem', 
+                                        fontWeight: 900, 
+                                        padding: '2px 5px', 
+                                        borderRadius: '50%',
+                                        border: '2px solid white'
+                                    }}>
+                                        {unreadCount}
+                                    </span>
+                                )}
                             </div>
-                            {user?.username}
+                            {renderNotifications()}
+                            
+                            <div className="a-user-pill" onClick={() => { setShowProfile(true); setShowNotifications(false); }}>
+                                <div style={{ width:'28px', height:'28px', borderRadius:'8px', background: 'linear-gradient(135deg, #4c1d95, #6d28d9)', display:'flex', alignItems:'center', justifyContent:'center', color:'white' }}>
+                                    <User size={16} />
+                                </div>
+                                {user?.username}
+                            </div>
+                            <button onClick={logout} style={{ color:'#f87171', background:'transparent', border:'none', cursor:'pointer', display:'flex' }}><LogOut size={20} /></button>
                         </div>
-                        <button onClick={logout} style={{ color:'#f87171', background:'transparent', border:'none', cursor:'pointer', display:'flex' }}><LogOut size={20} /></button>
                     </div>
                 </div>
             </header>
 
             <main className="a-container">
                 {currentTab === 'Dashboard' && (
-                    <>
-                        <div className="a-greeting" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                            <h1>Hello, {patientData.full_name?.split(' ')[0] || user?.username}</h1>
-                            <p style={{ margin:0 }}><Calendar size={14} /> {formatDate(new Date(), { weekday:'long', month:'long', day:'numeric', year:'numeric' })}</p>
-                        </div>
-
-                        <div className="a-stats-grid">
-                            <div className="a-stat-card card-blue" onClick={() => handleTabChange('Records')}>
-                                <div className="a-stat-header"><span>FACILITY VISITS</span><span className="a-badge">LIVE</span></div>
-                                <div className="a-stat-val">{stats.total_visits}</div>
-                                <div className="a-stat-icon"><Activity size={32} /></div>
-                            </div>
-                            <div className="a-stat-card card-green" onClick={() => handleTabChange('Records')}>
-                                <div className="a-stat-header"><span>LABORATORY REPORTS</span><span className="a-badge">LIVE</span></div>
-                                <div className="a-stat-val">{stats.total_lab_investigations}</div>
-                                <div className="a-stat-icon"><FlaskConical size={32} /></div>
-                            </div>
-                            <div className="a-stat-card card-orange" onClick={() => handleTabChange('Records')}>
-                                <div className="a-stat-header"><span>ACTIVE PRESCRIPTIONS</span><span className="a-badge">LIVE</span></div>
-                                <div className="a-stat-val">{stats.total_active_prescriptions}</div>
-                                <div className="a-stat-icon"><Pill size={32} /></div>
-                            </div>
-                            {patientData.allow_appointments !== false && (
-                                <div className="a-stat-card card-purple" onClick={() => handleTabChange('Appointments')}>
-                                    <div className="a-stat-header"><span>TOTAL APPOINTMENTS</span><span className="a-badge">LIVE</span></div>
-                                    <div className="a-stat-val">{stats.total_appointments}</div>
-                                    <div className="a-stat-icon"><Calendar size={32} /></div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:'1.5rem' }}>
-                            <div className="a-card">
-                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem' }}>
-                                    <h3 className="a-card-title" style={{ margin:0 }}><Clock size={20} color="var(--admin-blue)" /> Latest Clinical Entry</h3>
-                                    <div style={{ fontSize:'0.7rem', fontWeight:800, color: 'var(--admin-blue)', background:'rgba(79,70,229,0.05)', padding:'4px 10px', borderRadius:'6px' }}>SECURE ARCHIVE</div>
-                                </div>
-
-                                {selectedVisit ? (
-                                    <div 
-                                        style={{ background: '#f9fafb', borderRadius: '12px', padding: '1.75rem', border: '1px solid #f3f4f6', cursor: 'pointer', transition: '0.2s' }}
-                                        onClick={() => setReportView(selectedVisit)}
-                                        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--admin-blue)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#f3f4f6'}
-                                    >
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '2rem', marginBottom: '2rem' }}>
-                                            <div>
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase' }}>Registry Date</span>
-                                                <div style={{ fontSize: '1.25rem', fontWeight: 900, color:'#0f172a', marginTop:'0.25rem' }}>{formatDate(selectedVisit.visit_date, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                                            </div>
-                                            <div>
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase' }}>Diagnosis</span>
-                                                <div style={{ marginTop: '0.25rem', color: 'var(--admin-blue)', fontWeight: 800, fontSize:'1.1rem' }}>{selectedVisit.consultation?.diagnosis || (selectedVisit.is_active ? "Pending Assessment" : "--")}</div>
-                                            </div>
-                                            <div>
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase' }}>Visit Type</span>
-                                                <div style={{ marginTop: '0.25rem', color: '#1e293b', fontWeight: 800, fontSize:'1.0rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{selectedVisit.reason || "General Consultation"}</div>
-                                            </div>
-                                            <div style={{ textAlign:'right' }}>
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase' }}>Registry Status</span>
-                                                <div style={{ marginTop:'0.25rem' }}>
-                                                    <span style={{ 
-                                                        fontSize: '0.75rem', 
-                                                        fontWeight: 900, 
-                                                        color: selectedVisit.is_active ? '#f59e0b' : '#10b981', 
-                                                        background: selectedVisit.is_active ? '#fffbeb' : '#ecfdf5', 
-                                                        padding: '6px 12px', 
-                                                        borderRadius: '8px',
-                                                        border: `1px solid ${selectedVisit.is_active ? '#fef3c7' : '#d1fae5'}`,
-                                                        display: 'inline-block'
-                                                    }}>
-                                                        {selectedVisit.is_active ? 'IN PROGRESS' : 'COMPLETED'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '1rem', paddingTop: '1.5rem' }}>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '1.5rem', display: 'block' }}>Clinical Workflow Timeline</span>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', padding: '0 10px' }}>
-                                                {/* Timeline Line */}
-                                                <div style={{ position: 'absolute', top: '12px', left: '20px', right: '20px', height: '2px', background: '#f1f5f9', zIndex: 0 }}></div>
-                                                <div style={{ 
-                                                    position: 'absolute', 
-                                                    top: '12px', 
-                                                    left: '20px', 
-                                                    width: !selectedVisit.is_active ? 'calc(100% - 40px)' : (selectedVisit.lab_requests?.length > 0 || selectedVisit.prescriptions?.length > 0) ? '66%' : selectedVisit.consultation ? '33%' : '0%', 
-                                                    height: '2px', 
-                                                    background: 'var(--admin-blue)', 
-                                                    zIndex: 0, 
-                                                    transition: '0.8s ease-in-out' 
-                                                }}></div>
-
-                                                {[
-                                                    { label: 'Vitals', done: !!selectedVisit.vitals, icon: <Activity size={10} /> },
-                                                    { label: 'Doctor', done: !!selectedVisit.consultation, icon: <Stethoscope size={10} /> },
-                                                    { label: 'Diagnostic', done: (selectedVisit.lab_requests?.length > 0 || selectedVisit.prescriptions?.length > 0), icon: <FlaskConical size={10} /> },
-                                                    { label: 'Released', done: !selectedVisit.is_active, icon: <CheckCircle2 size={10} /> }
-                                                ].map((step, si) => (
-                                                    <div key={si} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                        <div style={{ 
-                                                            width: '24px', 
-                                                            height: '24px', 
-                                                            borderRadius: '50%', 
-                                                            background: step.done ? 'var(--admin-blue)' : 'white', 
-                                                            border: `2px solid ${step.done ? 'var(--admin-blue)' : '#e2e8f0'}`,
-                                                            color: step.done ? 'white' : '#94a3b8',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            transition: '0.3s',
-                                                            boxShadow: step.done ? '0 0 0 4px rgba(79, 70, 229, 0.1)' : 'none'
-                                                        }}>
-                                                            {step.icon}
-                                                        </div>
-                                                        <span style={{ fontSize: '0.6rem', fontWeight: 800, color: step.done ? '#1e293b' : '#94a3b8' }}>{step.label}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {selectedVisit.prescriptions?.length > 0 && (
-                                            <div style={{ marginTop: '1.5rem', background: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '10px', padding: '1rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem' }}>
-                                                    <Pill size={14} color="#f59e0b" />
-                                                    <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#9a3412', textTransform: 'uppercase' }}>Active Prescriptions</span>
-                                                </div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                    {selectedVisit.prescriptions.map((p, pi) => (
-                                                        <span key={pi} style={{ fontSize: '0.7rem', fontWeight: 800, color: '#c2410c', background: 'white', padding: '2px 8px', borderRadius: '4px', border: '1px solid #fed7aa' }}>
-                                                            {p.medication_name}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <button className="btn-action btn-view" style={{ marginTop:'2rem', width:'100%', justifyContent:'center', padding:'1rem' }} onClick={() => setReportView(selectedVisit)}>
-                                            <Eye size={18} /> Open Full Visit Details
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ textAlign:'center', padding:'4rem', color:'#9ca3af', background:'#f9fafb', borderRadius:'12px', border:'1px dashed var(--border)' }}>No recent activity found.</div>
-                                )}
-                            </div>
-
-                            <div className="a-card" style={{ padding:'1.5rem' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:'1rem', marginBottom:'1.5rem', paddingBottom:'1.5rem', borderBottom:'1px solid #f3f4f6' }}>
-                                    <div style={{ width:'50px', height:'50px', borderRadius:'12px', background:'#f3f4f6', display:'flex', alignItems:'center', justifyContent:'center', color:'#9ca3af' }}><User size={24} /></div>
-                                    <div>
-                                        <h4 style={{ margin:0, fontWeight:800 }}>{patientData?.full_name || user?.username || 'User'}</h4>
-                                        <span style={{ fontSize:'0.65rem', fontWeight:700, color:'#9ca3af' }}>UID: {patientData?.patient_id || 'N/A'}</span>
-                                    </div>
-                                </div>
-                                <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
-                                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.8rem' }}><span style={{ color:'#9ca3af', fontWeight:600 }}>Age / Gender</span><span style={{ fontWeight:700 }}>{patientData?.age || '--'} / {patientData?.gender || 'N/A'}</span></div>
-                                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.8rem' }}><span style={{ color:'#9ca3af', fontWeight:600 }}>Blood Type</span><span style={{ fontWeight:700, color: 'var(--admin-red)' }}>{patientData?.blood_group || 'N/A'}</span></div>
-                                </div>
-                                <button style={{ width:'100%', marginTop:'2rem', padding:'0.875rem', borderRadius:'10px', background:'#f9fafb', border:'1px solid var(--border)', fontWeight:800, fontSize:'0.8rem', cursor:'pointer' }} onClick={() => setShowProfile(true)}>Update Profile</button>
-                            </div>
-                        </div>
-                    </>
+                    <DashboardTab 
+                        patientData={patientData}
+                        user={user}
+                        formatDate={formatDate}
+                        handleTabChange={handleTabChange}
+                        stats={stats}
+                        selectedVisit={selectedVisit}
+                        setReportView={setReportView}
+                    />
                 )}
 
                 {currentTab === 'Records' && (
-                    <div className="a-card" style={{ padding:'2.5rem' }}>
-                        <div style={{ marginBottom:'2.5rem' }}>
-                            <h3 className="a-card-title" style={{ margin:0 }}><Clipboard size={24} color="var(--admin-blue)" /> Diagnostic Archive</h3>
-                            <p style={{ fontSize:'0.85rem', color:'#6b7280', fontWeight:500, marginTop:'0.5rem' }}>Filter and retrieve individual clinical reports from your medical history.</p>
-                        </div>
-
-                        <div className="filter-bar">
-                            <div className="filter-group"><Filter size={16} color="var(--admin-blue)" /><label>Date Range Filter</label></div>
-                            <div className="filter-group"><label>From</label><input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div>
-                            <div className="filter-group"><label>To</label><input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div>
-                            {(fromDate || toDate) && <button onClick={() => {setFromDate(''); setToDate('');}} style={{ background:'transparent', border:'none', color: 'var(--admin-red)', fontWeight:800, fontSize:'0.7rem', cursor:'pointer', textTransform:'uppercase' }}>Clear Filters</button>}
-                        </div>
-
-                        <div style={{ overflowX:'auto' }}>
-                            <table className="a-table">
-                                <thead>
-                                    <tr><th>Registry Date</th><th>Facility Location</th><th>Diagnostic Conclusion</th><th>Data Status</th><th style={{ textAlign:'center' }}>Actions</th></tr>
-                                </thead>
-                                <tbody>
-                                    {filteredHistory && filteredHistory.length > 0 ? filteredHistory.map((v, i) => (
-                                        <tr key={i}>
-                                            <td style={{ fontWeight:800 }}>{formatDate(v.visit_date)}</td>
-                                            <td>Internal Clinic</td>
-                                            <td>{v.diagnosis || "General Review"}</td>
-                                            <td><span style={{ fontSize:'0.6rem', fontWeight:800, color: 'var(--admin-green)', background:'rgba(16,185,129,0.05)', padding:'4px 10px', borderRadius:'6px' }}>VERIFIED</span></td>
-                                            <td style={{ display:'flex', justifyContent:'center' }}>
-                                                <button className="btn-action btn-view" onClick={() => setReportView(v)}><Eye size={14} /> Open Report</button>
-                                                <button className="btn-action btn-down" onClick={() => handleDownloadReport(v)}><Download size={14} /> Download</button>
-                                            </td>
-                                        </tr>
-                                    )) : <tr><td colSpan="5" style={{ textAlign:'center', padding:'4rem', color:'#9ca3af', fontWeight:600 }}>No records found for the selected date range.</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <RecordsTab 
+                        filteredHistory={filteredHistory}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        fromDate={fromDate}
+                        setFromDate={setFromDate}
+                        toDate={toDate}
+                        setToDate={setToDate}
+                        setReportView={setReportView}
+                        handleDownloadPDF={handleDownloadReport}
+                        formatDate={formatDate}
+                    />
                 )}
 
                 {currentTab === 'Appointments' && (
-                    <div className="a-card">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                                <div 
-                                    onClick={() => setScheduleTab('ACTIVE')}
-                                    style={{ 
-                                        fontSize: '0.875rem', 
-                                        fontWeight: 800, 
-                                        color: scheduleTab === 'ACTIVE' ? 'var(--admin-blue)' : '#94a3b8', 
-                                        cursor: 'pointer',
-                                        paddingBottom: '0.5rem',
-                                        borderBottom: scheduleTab === 'ACTIVE' ? '3px solid var(--admin-blue)' : '3px solid transparent',
-                                        transition: '0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <Clock size={18} /> Active Schedule
-                                </div>
-                                <div 
-                                    onClick={() => setScheduleTab('HISTORY')}
-                                    style={{ 
-                                        fontSize: '0.875rem', 
-                                        fontWeight: 800, 
-                                        color: scheduleTab === 'HISTORY' ? 'var(--admin-blue)' : '#94a3b8', 
-                                        cursor: 'pointer',
-                                        paddingBottom: '0.5rem',
-                                        borderBottom: scheduleTab === 'HISTORY' ? '3px solid var(--admin-blue)' : '3px solid transparent',
-                                        transition: '0.2s',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <History size={18} /> Appointment History
-                                </div>
-                            </div>
-                            
-                            {patientData.allow_appointments !== false && (
-                                <button 
-                                    onClick={() => setShowBookingModal(true)}
-                                    style={{ background: 'var(--admin-blue)', color:'white', border:'none', padding:'0.6rem 1.5rem', borderRadius:'8px', fontWeight:800, cursor:'pointer', fontSize:'0.875rem', display: 'flex', alignItems: 'center', gap: '8px', transition: '0.2s' }}
-                                >
-                                    <Plus size={16} /> New Appointment
-                                </button>
-                            )}
-                        </div>
-
-                        {dossier?.appointments?.length > 0 ? (
-                            <div className="table-responsive">
-                                <table className="a-table">
-                                    <thead>
-                                        <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Date & Time</th>
-                                            <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Clinical Reason</th>
-                                            <th style={{ padding: '1rem', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Service Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {dossier.appointments.filter(a => {
-                                            if (scheduleTab === 'ACTIVE') {
-                                                return ['SCHEDULED', 'CONFIRMED', 'PATIENT_ACKNOWLEDGED'].includes(a.status);
-                                            } else {
-                                                return ['REJECTED', 'CANCELLED', 'CHECKED_IN', 'NO_SHOW'].includes(a.status);
-                                            }
-                                        }).map((appt, idx) => (
-                                            <tr key={appt.id} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
-                                                <td>
-                                                    <div style={{ fontWeight: 800, color: '#1e293b' }}>{formatDate(appt.appointment_date, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{appt.formatted_time}</div>
-                                                </td>
-                                                <td style={{ maxWidth: '300px' }}>
-                                                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{appt.reason}</div>
-                                                </td>
-                                                <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                        <div style={{ 
-                                                            display: 'inline-flex', 
-                                                            alignItems: 'center', 
-                                                            gap: '6px', 
-                                                            padding: '6px 14px', 
-                                                            borderRadius: '8px',
-                                                            fontSize: '0.65rem',
-                                                            fontWeight: 900,
-                                                            textTransform: 'uppercase',
-                                                            letterSpacing: '0.02em',
-                                                            background: appt.status === 'PATIENT_ACKNOWLEDGED' ? 'rgba(5, 150, 105, 0.08)' : appt.status === 'CONFIRMED' ? 'rgba(99, 102, 241, 0.08)' : appt.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.08)' : appt.status === 'SCHEDULED' ? 'rgba(245, 158, 11, 0.08)' : '#f8fafc',
-                                                            color: appt.status === 'PATIENT_ACKNOWLEDGED' ? '#059669' : appt.status === 'CONFIRMED' ? 'var(--primary)' : appt.status === 'REJECTED' ? '#ef4444' : appt.status === 'SCHEDULED' ? '#f59e0b' : '#64748b',
-                                                            border: '1px solid ' + (appt.status === 'PATIENT_ACKNOWLEDGED' ? '#10b98133' : appt.status === 'CONFIRMED' ? '#6366f133' : appt.status === 'REJECTED' ? '#ef444433' : appt.status === 'SCHEDULED' ? '#fbbf2433' : '#e2e8f0'),
-                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                                                        }}>
-                                                            {appt.status === 'REJECTED' ? <X size={12} /> : (appt.status === 'PATIENT_ACKNOWLEDGED' || appt.status === 'CONFIRMED') ? <ShieldCheck size={12} /> : <Clock size={12} />}
-                                                            {appt.status === 'PATIENT_ACKNOWLEDGED' ? 'Slot Verified' : appt.status === 'CONFIRMED' ? 'Slot Proposed' : appt.status === 'REJECTED' ? 'Slot Declined' : appt.status === 'SCHEDULED' ? 'Awaiting Slot' : appt.status}
-                                                        </div>
-                                                        
-                                                        {appt.status === 'CONFIRMED' && (
-                                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                                <button 
-                                                                    onClick={() => handleAcknowledgeAppointment(appt.id)}
-                                                                    className="a-btn-primary"
-                                                                    style={{ 
-                                                                        padding: '6px 14px', 
-                                                                        fontSize: '0.65rem', 
-                                                                        fontWeight: 900, 
-                                                                        borderRadius: '8px',
-                                                                        boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
-                                                                        border: 'none',
-                                                                        cursor: 'pointer',
-                                                                        background: 'var(--primary)',
-                                                                        color: 'white'
-                                                                    }}
-                                                                >
-                                                                    Accept Slot
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleRejectAppointment(appt.id)}
-                                                                    style={{ 
-                                                                        padding: '6px 14px', 
-                                                                        fontSize: '0.65rem', 
-                                                                        fontWeight: 800, 
-                                                                        borderRadius: '8px',
-                                                                        border: '1px solid #fee2e2',
-                                                                        background: '#fef2f2',
-                                                                        color: '#ef4444',
-                                                                        cursor: 'pointer'
-                                                                    }}
-                                                                >
-                                                                    Decline
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                                <Calendar size={32} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                                <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>No scheduled appointments found</p>
-                                <p style={{ fontSize: '0.8rem' }}>Click "New Appointment" to reserve a slot.</p>
-                            </div>
-                        )}
-                    </div>
+                    <AppointmentsTab 
+                        dossier={dossier}
+                        scheduleTab={scheduleTab}
+                        setScheduleTab={setScheduleTab}
+                        appointmentSearchTerm={appointmentSearchTerm}
+                        setAppointmentSearchTerm={setAppointmentSearchTerm}
+                        currentApptPage={currentApptPage}
+                        setCurrentApptPage={setCurrentApptPage}
+                        setShowBookingModal={setShowBookingModal}
+                        patientData={patientData}
+                        handleAcknowledgeAppointment={handleAcknowledgeAppointment}
+                        handleRejectAppointment={handleRejectAppointment}
+                        formatDate={formatDate}
+                    />
                 )}
             </main>
 
-            {/* Appointment Booking Modal */}
             {showBookingModal && (
-                <div className="a-modal-overlay">
-                    <div className="a-modal" style={{ maxWidth: '500px' }}>
+                <div className="a-modal-overlay" onClick={() => setShowBookingModal(false)}>
+                    <style>{`
+                        .a-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+                        .a-modal { background: white; border-radius: 28px; width: 100%; max-width: 500px; padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: modalScale 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+                        @keyframes modalScale { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+                        .input-group { display: flex; flex-direction: column; gap: 0.3rem; }
+                        .input-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+                        .p-input { padding: 0.875rem 1.25rem; border-radius: 12px; border: 1.5px solid #f1f5f9; font-weight: 700; color: #1e293b; font-size: 0.9rem; background: #f8fafc; transition: 0.2s; }
+                        .p-input:focus { outline: none; border-color: #7c3aed; background: white; }
+                    `}</style>
+                    <div className="a-modal" onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <div>
                                 <h2 style={{ fontWeight: 900, fontSize: '1.5rem', color: '#0f172a', margin: 0 }}>Book Clinical Session</h2>
@@ -1368,6 +1120,7 @@ const PatientDashboard = () => {
                                         rows="3"
                                         style={{ height: 'auto', padding: '1rem' }}
                                         value={bookingForm.reason}
+                                        required
                                         onChange={e => setBookingForm({...bookingForm, reason: e.target.value})}
                                     />
                                 </div>
@@ -1383,7 +1136,7 @@ const PatientDashboard = () => {
                                     <button 
                                         type="submit"
                                         disabled={isBooking}
-                                        style={{ flex: 1, background: 'var(--admin-blue)', color: 'white', border: 'none', padding: '1rem', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -5px rgba(79, 70, 229, 0.3)' }}
+                                        style={{ flex: 1, background: 'linear-gradient(135deg, #4c1d95, #6d28d9)', color: 'white', border: 'none', padding: '1rem', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -5px rgba(109, 40, 217, 0.3)' }}
                                     >
                                         {isBooking ? 'Processing...' : 'Confirm Appointment'}
                                     </button>
@@ -1401,62 +1154,130 @@ const PatientDashboard = () => {
                         .a-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
                         .a-modal { background: white; border-radius: 28px; width: 100%; max-width: 650px; padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: modalScale 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
                         @keyframes modalScale { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-                        .input-group { display: flex; flexDirection: column; gap: 0.6rem; }
-                        .input-label { fontSize: 0.65rem; fontWeight: 800; color: #9ca3af; textTransform: uppercase; letter-spacing: 0.05em; }
+                        .input-group { display: flex; flex-direction: column; gap: 0.3rem; }
+                        .input-label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
                         .p-input { padding: 0.875rem 1.25rem; border-radius: 12px; border: 1.5px solid #f1f5f9; font-weight: 700; color: #1e293b; font-size: 0.9rem; background: #f8fafc; transition: 0.2s; }
                         .p-input:focus { outline: none; border-color: var(--admin-blue); background: white; }
                         .p-input:disabled { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
                     `}</style>
                     <div className="a-modal" onClick={e => e.stopPropagation()}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2.5rem' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem' }}>
                             <div>
                                 <h2 style={{ margin:0, fontWeight:900, fontSize:'1.5rem', letterSpacing: '-0.02em' }}>Account Identification</h2>
                                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Secure Clinical Identity Management</p>
                             </div>
                             <button onClick={() => setShowProfile(false)} style={{ background:'#f3f4f6', border:'none', width: '36px', height: '36px', borderRadius:'12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor:'pointer', color: '#64748b' }}><X size={18} /></button>
                         </div>
+                        <div style={{ width: '100%', height: '1px', background: '#f1f5f9', marginBottom: '1.5rem' }}></div>
                         
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'2rem', padding: '1rem 0' }}>
                             <div className="input-group">
-                                <label className="input-label">Registry UID</label>
-                                <input className="p-input" disabled value={patientData.patient_id || 'N/A'} />
+                                <span className="input-label">Registry UID</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.patient_id || 'N/A'}</span>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Workspace / Project</label>
-                                <input className="p-input" disabled value={dossier?.project_name || 'Medical Workspace'} />
+                                <span className="input-label">Workspace / Project</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{dossier?.project_name || 'Medical Workspace'}</span>
                             </div>
                             <div className="input-group" style={{ gridColumn: 'span 2' }}>
-                                <label className="input-label">Full Legal Name</label>
-                                <input className="p-input" type="text" defaultValue={patientData.full_name || user?.username} />
+                                <span className="input-label">Full Legal Name</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.full_name || user?.username}</span>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Contact Number</label>
-                                <input className="p-input" type="text" defaultValue={patientData.contact_number || patientData.phone} />
+                                <span className="input-label">Contact Number</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.contact_number || patientData.phone}</span>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Registered Email</label>
-                                <input className="p-input" type="email" defaultValue={patientData.email} />
+                                <span className="input-label">Registered Email</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.email || 'N/A'}</span>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Gender</label>
-                                <input className="p-input" type="text" defaultValue={patientData.gender} />
+                                <span className="input-label">Gender</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', textTransform: 'capitalize' }}>{patientData.gender}</span>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Blood Group</label>
-                                <input className="p-input" type="text" defaultValue={patientData.blood_group || 'N/A'} />
+                                <span className="input-label">Blood Group</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.blood_group || 'N/A'}</span>
                             </div>
                             <div className="input-group" style={{ gridColumn: 'span 2' }}>
-                                <label className="input-label">Permanent Address</label>
-                                <input className="p-input" type="text" defaultValue={patientData.address || ''} />
+                                <span className="input-label">Permanent Address</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{patientData.address || 'N/A'}</span>
                             </div>
                         </div>
-                        <button style={{ width:'100%', marginTop:'2.5rem', background: 'var(--admin-blue)', color:'white', border:'none', padding:'1.125rem', borderRadius:'16px', fontWeight:800, cursor:'pointer', boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)', fontSize: '1rem' }} onClick={() => {
-                            toast.success("Clinical Identity Verified & Updated");
-                            setShowProfile(false);
-                        }}>Confirm Updates</button>
                     </div>
                 </div>
             )}
+            {/* --- CHAT BOT --- */}
+            <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 5000 }}>
+                {/* Chat Window */}
+                {showChatBot && (
+                    <div style={{ width: '350px', height: '450px', background: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', overflow: 'hidden', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
+                        {/* Header */}
+                        <div style={{ background: 'linear-gradient(135deg, #4c1d95, #6d28d9)', padding: '1rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800 }}>Bavya AI Assistant</h4>
+                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>Always here to help</span>
+                            </div>
+                            <button onClick={() => setShowChatBot(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><X size={18} /></button>
+                        </div>
+                        
+                        {/* Messages Area */}
+                        <div style={{ flex: 1, padding: '1rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: '#f8fafc' }}>
+                            {messages.map((msg, idx) => (
+                                <div key={idx} style={{ alignSelf: msg.isBot ? 'flex-start' : 'flex-end', background: msg.isBot ? 'white' : 'linear-gradient(135deg, #4c1d95, #6d28d9)', padding: '0.75rem', borderRadius: '12px', border: msg.isBot ? '1px solid #e2e8f0' : 'none', color: msg.isBot ? '#1e293b' : 'white', maxWidth: '80%' }}>
+                                    <p style={{ margin: 0, fontSize: '0.85rem' }}>{msg.text}</p>
+                                    <span style={{ fontSize: '0.65rem', color: msg.isBot ? '#94a3b8' : 'rgba(255,255,255,0.8)', display: 'block', marginTop: '4px' }}>{msg.isBot ? 'AI' : 'You'} • Just now</span>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        {/* Input Area */}
+                        <div style={{ padding: '0.75rem', background: 'white', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem' }}>
+                            <input 
+                                type="text" 
+                                placeholder="Type a message..." 
+                                value={inputMessage}
+                                onChange={e => setInputMessage(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
+                                style={{ flex: 1, borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                            />
+                            <button 
+                                onClick={handleSendMessage}
+                                style={{ background: 'linear-gradient(135deg, #4c1d95, #6d28d9)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* FAB */}
+                <button 
+                    onClick={() => setShowChatBot(!showChatBot)}
+                    style={{ 
+                        width: '56px', 
+                        height: '56px', 
+                        borderRadius: '28px', 
+                        background: 'linear-gradient(135deg, #4c1d95, #6d28d9)', 
+                        color: 'white', 
+                        border: 'none', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer', 
+                        boxShadow: '0 4px 12px rgba(109, 40, 217, 0.3)',
+                        transition: '0.2s',
+                        marginLeft: 'auto'
+                    }}
+                >
+                    <MessageCircle size={24} />
+                </button>
+            </div>
+
+            {/* --- FOOTER --- */}
+            <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, borderTop: '1px solid #f1f5f9', width: '100%', marginTop: 'auto' }}>
+                Powered by <span style={{ color: '#7c3aed', fontWeight: 800 }}>Bavya</span>
+            </div>
 
             {/* --- DOSSIER MODAL --- */}
             {renderDossierModal()}
