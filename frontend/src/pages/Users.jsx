@@ -94,12 +94,16 @@ const Users = () => {
         e.preventDefault();
         const loadingToast = toast.loading(editingUser ? 'Updating user...' : 'Creating staff member...');
         try {
+            const dataToSubmit = { ...formData };
+            if (editingUser && !dataToSubmit.password) {
+                delete dataToSubmit.password;
+            }
+            
             if (editingUser) {
-                // For editing, we might need a specific patch endpoint if it's not DRF modelviewset default 
-                await api.put(`accounts/users/${editingUser.id}/`, formData);
+                await api.put(`accounts/users/${editingUser.id}/`, dataToSubmit);
                 toast.success("User updated successfully", { id: loadingToast });
             } else {
-                await api.post('accounts/register/', formData);
+                await api.post('accounts/register/', dataToSubmit);
                 toast.success("User created successfully", { id: loadingToast });
             }
             setShowModal(false);
@@ -568,25 +572,20 @@ const Users = () => {
                                     </select>
                                 </div>
 
-                                {!editingUser ? (
-                                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                        <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Temporary Password</label>
-                                        <input 
-                                            type="password" 
-                                            required 
-                                            className="form-control"
-                                            style={{ height: '52px', borderRadius: '16px' }}
-                                            onChange={e => setFormData({...formData, password: e.target.value})} 
-                                            placeholder="••••••••" 
-                                        />
-                                    </div>
-                                ) : (
-                                    <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                            Editing user permissions. Security identifiers are locked.
-                                        </p>
-                                    </div>
-                                )}
+                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+                                        {editingUser ? 'New Password (Leave blank to keep current)' : 'Temporary Password'}
+                                    </label>
+                                    <input 
+                                        type="password" 
+                                        required={!editingUser} 
+                                        className="form-control"
+                                        style={{ height: '52px', borderRadius: '16px' }}
+                                        value={formData.password}
+                                        onChange={e => setFormData({...formData, password: e.target.value})} 
+                                        placeholder="••••••••" 
+                                    />
+                                </div>
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
