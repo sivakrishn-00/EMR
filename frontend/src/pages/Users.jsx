@@ -25,6 +25,7 @@ const Users = () => {
     const [provisionSearch, setProvisionSearch] = useState('');
     const [selectedPatients, setSelectedPatients] = useState([]);
     const [isProvisioning, setIsProvisioning] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         fetchUsers();
@@ -247,26 +248,55 @@ const Users = () => {
             </header>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', gap: '2rem', padding: '0 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-                    {[
-                        { id: 'CLINICAL', label: 'Clinical Team', roles: ['DOCTOR', 'NURSE', 'LAB_TECH'] },
-                        { id: 'MANAGEMENT', label: 'Admin & Operations', roles: ['ADMIN', 'DEO', 'PHARMACIST'] },
-                        { id: 'PATIENTS', label: 'Patient Portal Users', roles: ['PATIENT'] }
-                    ].map(tab => (
-                        <button 
-                            key={tab.id}
-                            onClick={() => setViewMode(tab.id)}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                    <div style={{ display: 'flex', gap: '2rem' }}>
+                        {[
+                            { id: 'CLINICAL', label: 'Clinical Team', roles: ['DOCTOR', 'NURSE', 'LAB_TECH'] },
+                            { id: 'MANAGEMENT', label: 'Admin & Operations', roles: ['ADMIN', 'DEO', 'PHARMACIST'] },
+                            { id: 'PATIENTS', label: 'Patient Portal Users', roles: ['PATIENT'] }
+                        ].map(tab => (
+                            <button 
+                                key={tab.id}
+                                onClick={() => {
+                                    setViewMode(tab.id);
+                                    setSearchQuery('');
+                                }}
+                                style={{ 
+                                    padding: '1rem 0.5rem', background: 'none', border: 'none',
+                                    borderBottom: viewMode === tab.id ? '3px solid var(--primary)' : '3px solid transparent',
+                                    fontWeight: 800, color: viewMode === tab.id ? 'var(--primary)' : 'var(--text-muted)',
+                                    cursor: 'pointer', transition: '0.3s', fontSize: '0.85rem', textTransform: 'uppercase'
+                                }}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    
+                    {/* Search Bar */}
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                            type="text" 
+                            placeholder="Search by name, email or username..." 
                             style={{ 
-                                padding: '1rem 0.5rem', background: 'none', border: 'none',
-                                borderBottom: viewMode === tab.id ? '3px solid var(--primary)' : '3px solid transparent',
-                                fontWeight: 800, color: viewMode === tab.id ? 'var(--primary)' : 'var(--text-muted)',
-                                cursor: 'pointer', transition: '0.3s', fontSize: '0.85rem', textTransform: 'uppercase'
+                                width: '100%', 
+                                padding: '0.5rem 1rem 0.5rem 2.2rem', 
+                                borderRadius: '10px', 
+                                border: '1px solid var(--border)', 
+                                background: 'var(--background)', 
+                                color: 'var(--text-main)', 
+                                fontSize: '0.8rem', 
+                                fontWeight: 600, 
+                                outline: 'none',
+                                transition: '0.2s'
                             }}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
                 </div>
+
                 <div className="table-responsive">
                     <table>
                         <thead>
@@ -285,9 +315,23 @@ const Users = () => {
                                 if (!matchesStatus) return false;
 
                                 // Then Filter by Tab
-                                if (viewMode === 'CLINICAL') return ['DOCTOR', 'NURSE', 'LAB_TECH'].includes(u.role);
-                                if (viewMode === 'MANAGEMENT') return ['ADMIN', 'DEO', 'PHARMACIST'].includes(u.role);
-                                if (viewMode === 'PATIENTS') return u.role === 'PATIENT';
+                                let matchesTab = true;
+                                if (viewMode === 'CLINICAL') matchesTab = ['DOCTOR', 'NURSE', 'LAB_TECH'].includes(u.role);
+                                if (viewMode === 'MANAGEMENT') matchesTab = ['ADMIN', 'DEO', 'PHARMACIST'].includes(u.role);
+                                if (viewMode === 'PATIENTS') matchesTab = u.role === 'PATIENT';
+                                if (!matchesTab) return false;
+
+                                // Then Filter by Search
+                                if (searchQuery) {
+                                    const query = searchQuery.toLowerCase();
+                                    const matchesSearch = 
+                                        u.username?.toLowerCase().includes(query) ||
+                                        `${u.first_name} ${u.last_name}`.toLowerCase().includes(query) ||
+                                        u.email?.toLowerCase().includes(query) ||
+                                        u.phone?.toLowerCase().includes(query);
+                                    if (!matchesSearch) return false;
+                                }
+
                                 return true;
                             }).map(u => (
                                 <tr key={u.id}>
