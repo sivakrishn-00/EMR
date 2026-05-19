@@ -3398,7 +3398,7 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                DESIGNATION
+                                RELATIONSHIP
                               </th>
                               {activeProjectFields.map((field) => (
                                 <th

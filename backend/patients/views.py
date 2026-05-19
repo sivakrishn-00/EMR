@@ -740,7 +740,10 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
         def get_val(data, *keys):
             for k in keys:
                 for d_key in data.keys():
-                    if d_key.lower().strip().replace(' ', '_').replace('/', '_') == k.lower():
+                    # Strip dots and normalize spaces/slashes to ensure matching with headers like "Mobile No." or "Aadhar No."
+                    clean_d_key = d_key.lower().strip().replace(' ', '_').replace('/', '_').replace('.', '')
+                    clean_k = k.lower().replace('.', '')
+                    if clean_d_key == clean_k:
                         return data[d_key]
             return None
 
@@ -751,6 +754,10 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                 try:
                     card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                     if not card_no: raise Exception("Missing Card Number")
+                    if card_no.endswith('.0'):
+                        card_no = card_no[:-2]
+                    if card_no.isdigit():
+                        card_no = card_no.zfill(4)
                     
                     name = get_val(data, 'name', 'employee_name')
                     gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
@@ -767,8 +774,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                             'name': name,
                             'dob': dob,
                             'gender': gender,
-                            'aadhar_no': get_val(data, 'aadhar_no', 'aadhar', 'aadhaar'),
-                            'mobile_no': get_val(data, 'mobile_no', 'mobile', 'phone'),
+                            'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
+                            'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
                             'address': get_val(data, 'address', 'addr') or '',
                             'designation': get_val(data, 'designation', 'desig') or '',
                         }
@@ -785,9 +792,14 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                 try:
                     full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                     if not full_card_no: raise Exception("Missing Card Number")
+                    if full_card_no.endswith('.0'):
+                        full_card_no = full_card_no[:-2]
                     
                     parent_card_no = full_card_no.split('/')[0] if '/' in full_card_no else full_card_no
                     suffix = '/' + full_card_no.split('/')[1] if '/' in full_card_no else '/1'
+                    
+                    if parent_card_no.isdigit():
+                        parent_card_no = parent_card_no.zfill(4)
                     
                     employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
                     if not employee: raise Exception(f"Parent employee {parent_card_no} not found")
@@ -806,8 +818,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                             'name': get_val(data, 'name', 'family_name'),
                             'dob': dob,
                             'gender': gender,
-                            'aadhar_no': get_val(data, 'aadhar_no', 'aadhar', 'aadhaar'),
-                            'mobile_no': get_val(data, 'mobile_no', 'mobile', 'phone'),
+                            'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
+                            'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
                             'relationship': rel
                         }
                     )
