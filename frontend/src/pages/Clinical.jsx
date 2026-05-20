@@ -1145,7 +1145,7 @@ const Clinical = () => {
                   {consultData.next_step === 'PENDING_LAB' && (
                     <div className="fade-in" style={{ marginTop: '1rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <label style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribe Investigations (Project Masters)</label>
+                            <label style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribe Investigations</label>
                             <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#475569' }}>{labMasters.length} Tests Available</span>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
@@ -1165,24 +1165,37 @@ const Clinical = () => {
                                    }}
                                />
                                {showLabSearch && (
-                                  <div className="search-dropdown" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto', borderRadius: '16px', zIndex: 1000, padding: '6px' }}>
-                                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#475569', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Available Diagnostic Protocols</div>
+                                  <div className="search-dropdown" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, width: '100%', maxHeight: '280px', overflowY: 'auto', borderRadius: '16px', zIndex: 1000, padding: '6px', background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+                                     <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#475569', padding: '8px 12px', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>Available Diagnostic Tests</div>
+                                     
+                                     <style>{`
+                                        .search-item-hover:hover {
+                                            background: ${projectConfig?.primary_color ? projectConfig.primary_color + '14' : 'rgba(59, 130, 246, 0.08)'} !important;
+                                        }
+                                     `}</style>
+
                                      {labMasters.filter(l => {
                                          const query = searchLab.toLowerCase();
-                                         return l.name.toLowerCase().includes(query);
+                                         const isAlreadySelected = consultData.lab_investigations.some(inv => inv.id === l.id) ||
+                                             (selectedVisit?.lab_requests || []).some(req => req.test_name === l.name);
+                                         return l.name.toLowerCase().includes(query) && !isAlreadySelected;
                                      }).map(l => (
                                         <div key={l.id} 
                                              onMouseDown={(e) => {
                                                 // 🎯 onMouseDown fires before onBlur, ensuring the selection is captured
                                                 e.preventDefault(); 
-                                                setConsultData({
-                                                    ...consultData, 
-                                                    lab_investigations: [...consultData.lab_investigations, { id: l.id, name: l.name, code: l.code }]
-                                                });
+                                                const isAlreadySelected = consultData.lab_investigations.some(inv => inv.id === l.id) ||
+                                                    (selectedVisit?.lab_requests || []).some(req => req.test_name === l.name);
+                                                if (!isAlreadySelected) {
+                                                    setConsultData({
+                                                        ...consultData, 
+                                                        lab_investigations: [...consultData.lab_investigations, { id: l.id, name: l.name, code: l.code }]
+                                                    });
+                                                }
                                                 setSearchLab("");
                                                 setShowLabSearch(false);
                                              }}
-                                             className="search-item"
+                                             className="search-item search-item-hover"
                                              style={{ padding: '12px 15px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', transition: 'all 0.2s' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                              <div style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{l.name}</div>
@@ -1193,17 +1206,19 @@ const Clinical = () => {
                                      ))}
                                      {labMasters.filter(l => {
                                          const q = searchLab.toLowerCase();
-                                         return l.name.toLowerCase().includes(q);
+                                         const isAlreadySelected = consultData.lab_investigations.some(inv => inv.id === l.id) ||
+                                             (selectedVisit?.lab_requests || []).some(req => req.test_name === l.name);
+                                         return l.name.toLowerCase().includes(q) && !isAlreadySelected;
                                      }).length === 0 && (
                                         <div style={{ padding: '20px', textAlign: 'center' }}>
-                                           <p style={{ color: '#475569', fontSize: '0.8125rem', fontWeight: 600 }}>No unticked investigations matching search</p>
+                                           <p style={{ color: '#475569', fontSize: '0.8125rem', fontWeight: 600 }}>All available tests selected</p>
                                         </div>
                                      )}
                                   </div>
-                               )}
-                            </div>
-                         </div>
-
+                                )}
+                           </div>
+                        </div>
+ 
                         {/* Investigations 'Falling' List */}
                         {(consultData.lab_investigations.length > 0 || (selectedVisit?.lab_requests || []).length > 0) && (
                             <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -1215,12 +1230,12 @@ const Clinical = () => {
                                         <span style={{ fontSize: '0.55rem', padding: '1px 5px', background: 'var(--background)', color: 'var(--text-muted)', borderRadius: '4px', fontWeight: 900 }}>FIXED</span>
                                     </div>
                                 ))}
-
+ 
                                 {/* New Additions */}
                                 {consultData.lab_investigations.map((inv, idx) => (
-                                    <div key={`new-${idx}`} className="fade-in new-lab-badge" style={{ padding: '6px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.1)' }}>
-                                        <FlaskConical size={12} color="#2563eb" />
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af' }}>{inv.name}</span>
+                                    <div key={`new-${idx}`} className="fade-in new-lab-badge" style={{ padding: '6px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px', background: projectConfig?.primary_color ? projectConfig.primary_color + '0a' : '#f0f7ff', border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}40` : '1px solid #3b82f640', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
+                                        <FlaskConical size={12} color={projectConfig?.primary_color || "#2563eb"} />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: projectConfig?.primary_color || '#1e40af' }}>{inv.name}</span>
                                         <button 
                                             type="button" 
                                             onMouseDown={(e) => {
@@ -1228,7 +1243,7 @@ const Clinical = () => {
                                                 const updated = consultData.lab_investigations.filter((_, i) => i !== idx);
                                                 setConsultData({...consultData, lab_investigations: updated});
                                             }}
-                                            style={{ border: 'none', background: 'transparent', padding: 0, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                                            style={{ border: 'none', background: 'transparent', padding: 0, color: projectConfig?.primary_color || '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                                         >
                                             <X size={14} />
                                         </button>
