@@ -17,8 +17,11 @@ import {
   RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Laboratory = () => {
+  const { user } = useAuth();
+  const [projectConfig, setProjectConfig] = useState(null);
   const [labRequests, setLabRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +48,23 @@ const Laboratory = () => {
   useEffect(() => {
     fetchLabRequests();
   }, []);
+
+  useEffect(() => {
+    if (user?.project) {
+      fetchProjectConfig(user.project);
+    } else {
+      setProjectConfig(null);
+    }
+  }, [user]);
+
+  const fetchProjectConfig = async (projectId) => {
+    try {
+        const res = await api.get(`patients/projects/${projectId}/`);
+        setProjectConfig(res.data);
+    } catch (err) {
+        console.error("Failed to fetch project config:", err);
+    }
+  };
 
   const fetchLabRequests = async () => {
     setIsLoading(true);
@@ -358,7 +378,7 @@ const Laboratory = () => {
           <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ padding: '0.75rem', background: '#92400e', borderRadius: '14px', color: 'white' }}>
+                  <div style={{ padding: '0.75rem', background: projectConfig?.primary_color || '#92400e', borderRadius: '14px', color: 'white' }}>
                      <FlaskConical size={24} />
                   </div>
                   <div>
@@ -490,7 +510,7 @@ const Laboratory = () => {
                       </div>
 
                       {selectedRequest.status !== 'COMPLETED' ? (
-                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: 'var(--primary)', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
+                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: projectConfig?.primary_color || 'var(--primary)', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
                               Finalize & Transmit <ArrowRight size={18} style={{ marginLeft: '8px' }} />
                           </button>
                       ) : (

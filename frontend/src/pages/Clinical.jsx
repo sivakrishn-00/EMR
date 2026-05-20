@@ -19,8 +19,11 @@ import {
   Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Clinical = () => {
+  const { user } = useAuth();
+  const [projectConfig, setProjectConfig] = useState(null);
   const [visitsReady, setVisitsReady] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +80,24 @@ const Clinical = () => {
       fetchPharmacyInventory(pid);
     }
   }, [selectedVisit]);
+
+  useEffect(() => {
+    if (user?.project) {
+      fetchProjectConfig(user.project);
+    } else {
+      setProjectConfig(null);
+    }
+  }, [user]);
+
+  const fetchProjectConfig = async (projectId) => {
+    if (!projectId) return;
+    try {
+        const res = await api.get(`patients/projects/${projectId}/`);
+        setProjectConfig(res.data);
+    } catch (err) {
+        console.error("Failed to fetch project config:", err);
+    }
+  };
 
   const fetchProjectLabMasters = async (projectId) => {
     try {
@@ -369,7 +390,7 @@ const Clinical = () => {
                               setShowHistoryDashboard(false);
                             }} 
                             style={{ 
-                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                              background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                               color: 'white',
                               border: 'none',
                               padding: '0.625rem 1.5rem',
@@ -380,7 +401,7 @@ const Clinical = () => {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.5rem',
-                              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                              boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.25)',
                               transition: 'all 0.2s ease'
                             }}
                           >
@@ -428,10 +449,10 @@ const Clinical = () => {
         <div className="workspace-split" style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* TOP: HISTORICAL REFERENCE PANEL (Unified MNC View) */}
           {showHistoryDashboard && (detailedVisit || isLoadingHistory) && (
-            <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed var(--border)' : '1.5px solid var(--primary)', marginBottom: '2rem' }}>
+            <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed var(--border)' : `1.5px solid ${projectConfig?.primary_color || 'var(--primary)'}`, marginBottom: '2rem' }}>
                 <div className="reference-header" style={{ padding: '0.75rem 1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' }}>
+                        <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : (projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)') }}>
                             <History size={16} color={isLoadingHistory ? '#94a3b8' : 'white'} />
                         </div>
                         <h2 className="dossier-title" style={{ fontSize: '0.9rem', color: isLoadingHistory ? '#94a3b8' : '#1e293b' }}>
@@ -492,7 +513,7 @@ const Clinical = () => {
                             <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 1fr', gap: '1.5rem' }}>
                                 {/* Column 1: Vitals Timeline Snapshot */}
                                 <div className="snapshot-list">
-                                    <p className="section-label-alt" style={{ color: '#6366f1', marginBottom: '10px' }}>Physical Parameters</p>
+                                    <p className="section-label-alt" style={{ color: projectConfig?.primary_color || '#6366f1', marginBottom: '10px' }}>Physical Parameters</p>
                                     {[
                                         { label: 'Weight', value: `${detailedVisit.vitals?.weight_kg || '--'} kg` },
                                         { label: 'BP', value: `${detailedVisit.vitals?.blood_pressure_sys || '--'}/${detailedVisit.vitals?.blood_pressure_dia || '--'}` },
@@ -514,7 +535,7 @@ const Clinical = () => {
                                         <p className="diagnosis-text" style={{ fontSize: '0.85rem', color: '#78350f' }}>{detailedVisit.consultation?.diagnosis || 'No diagnosis recorded'}</p>
                                     </div>
                                     <div style={{ background: 'var(--surface)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', flex: 1, overflowY: 'auto' }}>
-                                        <p style={{ fontSize: '0.65rem', fontWeight: 950, color: '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
+                                        <p style={{ fontSize: '0.65rem', fontWeight: 950, color: projectConfig?.primary_color || '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
                                         {detailedVisit.prescriptions?.length > 0 ? detailedVisit.prescriptions.map((m, i) => (
                                             <div key={i} className="history-med-item" style={{ marginBottom: '8px', padding: '6px 10px', borderRadius: '8px' }}>
                                                 <p className="history-med-name" style={{ fontSize: '0.75rem', fontWeight: 800 }}>{m.medication_name}</p>
@@ -551,10 +572,10 @@ const Clinical = () => {
             </div>
           )}
 
-          <div className="active-consult-panel card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+          <div className="active-consult-panel card fade-in" style={{ border: `1px solid ${projectConfig?.primary_color || 'var(--primary)'}`, borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '0.5rem' }}>
                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                    <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                    <div style={{ padding: '0.875rem', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
                        <Stethoscope size={24} color="white" />
                     </div>
                     <div>
@@ -602,7 +623,7 @@ const Clinical = () => {
                    {/* Vitals Summary */}
                    <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                        <div style={{ gridColumn: 'span 2', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Vitals</p>
+                           <p style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Vitals</p>
                            <span style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 700 }}>Weight: {selectedVisit.vitals?.weight_kg}kg | Height: {selectedVisit.vitals?.height_cm}cm</span>
                        </div>
                        <div>
@@ -625,7 +646,7 @@ const Clinical = () => {
 
                    {/* Personal History */}
                    <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Personal History</p>
+                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Personal History</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                            <HistoryBadge label="Smoke" value={selectedVisit.vitals?.smoking} />
                            <HistoryBadge label="Alcohol" value={selectedVisit.vitals?.alcohol} />
@@ -638,7 +659,7 @@ const Clinical = () => {
 
                    {/* Family History */}
                    <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Family History</p>
+                       <p style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Family History</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                            <HistoryBadge label="DM" value={selectedVisit.vitals?.family_dm} />
                            <HistoryBadge label="HTN" value={selectedVisit.vitals?.family_htn} />
@@ -650,8 +671,8 @@ const Clinical = () => {
                    </div>
 
                    {/* Known History */}
-                   <div className="known-history-box" style={{ gridColumn: 'span 2', background: '#eff6ff', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dbeafe' }}>
-                       <p className="known-history-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Known History / Co-morbidities</p>
+                   <div className="known-history-box" style={{ gridColumn: 'span 2', background: projectConfig?.primary_color ? `${projectConfig.primary_color}0a` : '#eff6ff', padding: '1.25rem', borderRadius: '16px', border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}26` : '1px solid #dbeafe' }}>
+                       <p className="known-history-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || '#1e40af', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Known History / Co-morbidities</p>
                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
                            <HistoryBadge label="Known DM" value={selectedVisit.vitals?.known_dm} variant="filled" />
                            <HistoryBadge label="Known HTN" value={selectedVisit.vitals?.known_htn} variant="filled" />
@@ -663,8 +684,8 @@ const Clinical = () => {
                    </div>
 
                    {/* Systemic Examination */}
-                   <div className="systemic-exam-box" style={{ gridColumn: 'span 2', background: '#f0fdf4', padding: '1.25rem', borderRadius: '16px', border: '1px solid #dcfce7' }}>
-                       <p className="systemic-exam-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Systemic Examination (Clinical Notes)</p>
+                   <div className="systemic-exam-box" style={{ gridColumn: 'span 2', background: projectConfig?.primary_color ? `${projectConfig.primary_color}0a` : '#f0fdf4', padding: '1.25rem', borderRadius: '16px', border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}26` : '1px solid #dcfce7' }}>
+                       <p className="systemic-exam-title" style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || '#166534', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Systemic Examination (Clinical Notes)</p>
                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                            <ExamItem label="Respiratory" value={selectedVisit.vitals?.sys_respiratory} />
                            <ExamItem label="C.V.S" value={selectedVisit.vitals?.sys_cvs} />
@@ -754,7 +775,7 @@ const Clinical = () => {
 
             <form onSubmit={handleConsultation}>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                  <label><ClipboardList size={14} /> Chief Complaint & History</label>
+                  <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}><ClipboardList size={14} /> Chief Complaint & History</label>
                   <textarea 
                     rows="3" 
                     required 
@@ -766,12 +787,12 @@ const Clinical = () => {
                
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                   <div className="form-group">
-                    <label>Diagnosis</label>
+                    <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Diagnosis</label>
                     <textarea rows="3" required value={consultData.diagnosis} onChange={e => setConsultData({...consultData, diagnosis: e.target.value})} placeholder="Differential or final diagnosis..."></textarea>
                   </div>
                   {consultData.next_step !== 'PENDING_LAB' && (
                      <div className="form-group fade-in">
-                       <label>Treatment / Plan</label>
+                       <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Treatment / Plan</label>
                        <textarea rows="3" required={consultData.next_step !== 'PENDING_LAB'} value={consultData.plan} onChange={e => setConsultData({...consultData, plan: e.target.value})} placeholder="Instructions, follow-up, lifestyle changes..."></textarea>
                      </div>
                    )}
@@ -784,7 +805,7 @@ const Clinical = () => {
                       style={{
                         fontSize: "0.75rem",
                         fontWeight: 800,
-                        color: "#4338ca",
+                        color: projectConfig?.primary_color || "#4338ca",
                         marginBottom: "1rem",
                         display: "flex",
                         alignItems: "center",
@@ -1071,7 +1092,7 @@ const Clinical = () => {
                )}
 
                <div className="next-workflow-box" style={{ background: '#f1f5f9', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem', border: !consultData.next_step ? '1.5px solid #fed7d7' : '1.5px solid transparent', transition: 'all 0.3s ease' }}>
-                  <p className="next-workflow-title" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                  <p className="next-workflow-title" style={{ fontSize: '0.75rem', fontWeight: 800, color: projectConfig?.primary_color || '#4338ca', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <AlertCircle size={14} /> Select Next Workflow Action
                      </span>
@@ -1086,7 +1107,9 @@ const Clinical = () => {
                        className={`workflow-btn ${consultData.next_step === 'PENDING_LAB' ? 'active-lab' : ''}`}
                        style={{ 
                          padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
-                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                         background: consultData.next_step === 'PENDING_LAB' ? (projectConfig?.primary_color || '#1d4ed8') : undefined,
+                         color: consultData.next_step === 'PENDING_LAB' ? 'white' : undefined
                        }}
                      >
                        <FlaskConical size={14} /> Request Lab
@@ -1097,7 +1120,9 @@ const Clinical = () => {
                         className={`workflow-btn ${consultData.next_step === 'PENDING_PHARMACY' ? 'active-pharmacy' : ''}`}
                         style={{ 
                           padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
-                          fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                          fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                          background: consultData.next_step === 'PENDING_PHARMACY' ? (projectConfig?.primary_color || '#1d4ed8') : undefined,
+                          color: consultData.next_step === 'PENDING_PHARMACY' ? 'white' : undefined
                         }}
                       >
                         <Pill size={14} /> Pharmacy ({consultData.medications.length})
@@ -1108,7 +1133,9 @@ const Clinical = () => {
                        className={`workflow-btn ${consultData.next_step === 'COMPLETED' ? 'active-completed' : ''}`}
                        style={{ 
                          padding: '0.75rem', border: '2px solid transparent', borderRadius: '12px', 
-                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' 
+                         fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                         background: consultData.next_step === 'COMPLETED' ? (projectConfig?.primary_color || '#059669') : undefined,
+                         color: consultData.next_step === 'COMPLETED' ? 'white' : undefined
                        }}
                      >
                        <CheckCircle size={14} /> Discharge
@@ -1214,7 +1241,7 @@ const Clinical = () => {
                </div>
 
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
                      Confirm and Transfer Case <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>
@@ -1264,16 +1291,10 @@ const Clinical = () => {
           background: #f8fafc;
         }
         .workflow-btn.active-lab {
-          background: #1d4ed8 !important;
-          color: white !important;
         }
         .workflow-btn.active-pharmacy {
-          background: #1d4ed8 !important;
-          color: white !important;
         }
         .workflow-btn.active-completed {
-          background: #059669 !important;
-          color: white !important;
         }
 
         :root.dark-theme .workflow-btn {
@@ -1285,16 +1306,10 @@ const Clinical = () => {
           color: var(--text-main);
         }
         :root.dark-theme .workflow-btn.active-lab {
-          background: #2563eb !important;
-          color: white !important;
         }
         :root.dark-theme .workflow-btn.active-pharmacy {
-          background: #2563eb !important;
-          color: white !important;
         }
         :root.dark-theme .workflow-btn.active-completed {
-          background: #10b981 !important;
-          color: white !important;
         }
 
         .patient-avatar-placeholder {

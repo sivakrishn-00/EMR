@@ -437,7 +437,7 @@ const Vitals = () => {
                               }
                           }}
                           style={{ 
-                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '0.625rem 1.5rem',
@@ -448,7 +448,7 @@ const Vitals = () => {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                            boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.25)',
                             transition: 'all 0.2s ease'
                           }}
                           onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
@@ -503,10 +503,10 @@ const Vitals = () => {
         {/* Vitals & Observations Form - Only show if a patient is selected */}
         {selectedVisit && (
           <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-            <div className="card fade-in" style={{ border: '1px solid var(--primary)', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+            <div className="card fade-in" style={{ border: `1px solid ${projectConfig?.primary_color || 'var(--primary)'}`, borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '0.5rem' }}>
                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                    <div style={{ padding: '0.875rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2) ' }}>
+                    <div style={{ padding: '0.875rem', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2) ' }}>
                        <Activity size={24} color="white" />
                     </div>
                     <div>
@@ -555,7 +555,7 @@ const Vitals = () => {
             <form onSubmit={handleSaveVitals}>
                 {showVitalsSection && (
                   <div className="fade-in">
-                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Biometrics & BMI</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Biometrics & BMI</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
                     <div className="form-group">
                        <label><Scale size={14} /> Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
@@ -605,7 +605,7 @@ const Vitals = () => {
                    </div>
                 </div>
 
-                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Vital Signs</p>
+                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Vital Signs</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                    <div className="form-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -704,7 +704,7 @@ const Vitals = () => {
               </div>
             )}
 
-               <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Observations</p>
+               <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Observations</p>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <label><Clipboard size={14} /> Current Symptoms</label>
                   <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during triage..."></textarea>
@@ -719,7 +719,7 @@ const Vitals = () => {
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
                   {/* Personal History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Personal History</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Personal History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Smoking (Tobacco)" value={vitalsData.smoking} onChange={val => setVitalsData({...vitalsData, smoking: val})} options={['YES', 'NO']} />
                         <ToggleField label="Alcohol" value={vitalsData.alcohol} onChange={val => setVitalsData({...vitalsData, alcohol: val})} options={['YES', 'NO']} />
@@ -732,7 +732,7 @@ const Vitals = () => {
 
                   {/* Family History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Family History (Parents/Siblings)</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Family History (Parents/Siblings)</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="DM (Diabetes)" value={vitalsData.family_dm} onChange={val => setVitalsData({...vitalsData, family_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="HTN (Hypertension)" value={vitalsData.family_htn} onChange={val => setVitalsData({...vitalsData, family_htn: val})} options={['YES', 'NO']} />
@@ -749,7 +749,7 @@ const Vitals = () => {
 
                   {/* Systemic Examination */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Systemic Examination</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Systemic Examination</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Respiratory" value={vitalsData.sys_respiratory} onChange={val => setVitalsData({...vitalsData, sys_respiratory: val})} options={['FND', 'NAD']} />
                         <ToggleField label="C.V.S" value={vitalsData.sys_cvs} onChange={val => setVitalsData({...vitalsData, sys_cvs: val})} options={['FND', 'NAD']} />
@@ -762,7 +762,7 @@ const Vitals = () => {
 
                   {/* Known History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
-                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Known History</p>
+                     <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Known History</p>
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <ToggleField label="Known DM" value={vitalsData.known_dm} onChange={val => setVitalsData({...vitalsData, known_dm: val})} options={['YES', 'NO']} />
                         <ToggleField label="Known HTN" value={vitalsData.known_htn} onChange={val => setVitalsData({...vitalsData, known_htn: val})} options={['YES', 'NO']} />
@@ -779,7 +779,7 @@ const Vitals = () => {
                </div>
 
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.3)', transition: 'all 0.3s ease' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', boxShadow: projectConfig?.primary_color ? `0 10px 15px -3px ${projectConfig.primary_color}4d` : '0 10px 15px -3px rgba(79, 70, 229, 0.3)', transition: 'all 0.3s ease' }}>
                      Complete Assessment <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>

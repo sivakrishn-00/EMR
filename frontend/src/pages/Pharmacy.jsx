@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Pharmacy = () => {
   const { user } = useAuth();
+  const [projectConfig, setProjectConfig] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
   const [selectedPresc, setSelectedPresc] = useState(null);
   const [dispenseData, setDispenseData] = useState({ quantity: 1, remarks: '' });
@@ -42,7 +43,21 @@ const Pharmacy = () => {
   useEffect(() => {
     fetchPrescriptions();
     fetchPharmacyInventory();
+    if (user?.project) {
+      fetchProjectConfig(user.project.id || user.project);
+    } else {
+      setProjectConfig(null);
+    }
   }, [user]);
+
+  const fetchProjectConfig = async (projectId) => {
+    try {
+        const res = await api.get(`patients/projects/${projectId}/`);
+        setProjectConfig(res.data);
+    } catch (err) {
+        console.error("Failed to fetch project config:", err);
+    }
+  };
 
   const fetchPharmacyInventory = async () => {
     setIsInventoryLoading(true);
@@ -264,7 +279,7 @@ const Pharmacy = () => {
           <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--primary)', borderRadius: '12px' }}>
+                  <div style={{ padding: '0.75rem', background: projectConfig?.primary_color || 'var(--primary)', borderRadius: '12px' }}>
                      <Package size={24} color="white" />
                   </div>
                   <div>
@@ -278,7 +293,7 @@ const Pharmacy = () => {
             </div>
 
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
-               <p style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Prescription List</p>
+               <p style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Prescription List</p>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                    {selectedPresc.items.map(item => (
                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
@@ -286,7 +301,7 @@ const Pharmacy = () => {
                                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                                    {item.frequency} | {item.duration} days
-                                   <span style={{ background: 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                                   <span style={{ background: projectConfig?.primary_color || 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                                        Total: {(['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group) 
                                                ? getDoseCount(item.frequency, item.duration, item.item_group) 
                                                : (item.total_units || 1)} units
@@ -328,7 +343,7 @@ const Pharmacy = () => {
 
             <form onSubmit={(e) => { e.preventDefault(); handleDispenseVisit(selectedPresc.visit_id); }}>
                <div className="form-group" style={{ marginBottom: '2rem' }}>
-                  <label>Pharmacist Notes / Counseling</label>
+                  <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Pharmacist Notes / Counseling</label>
                   <textarea rows="3" onChange={e => setDispenseData({...dispenseData, remarks: e.target.value})} placeholder="Caution: Take after food. Avoid driving..."></textarea>
                </div>
 
@@ -337,7 +352,7 @@ const Pharmacy = () => {
                   <p style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 500 }}>Confirming this will finalize the patient visit and mark all items as dispensed.</p>
                </div>
 
-               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: '#4c1d95', borderColor: '#4c1d95', fontSize: '1rem' }}>
+               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: projectConfig?.primary_color || '#4c1d95', borderColor: projectConfig?.primary_color || '#4c1d95', fontSize: '1rem' }}>
                   Dispense All & Finalize <ArrowRight size={18} style={{ marginLeft: '10px' }} />
                </button>
             </form>

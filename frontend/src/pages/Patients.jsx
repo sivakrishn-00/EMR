@@ -114,7 +114,7 @@ const Patients = () => {
   };
 
   const openMasterOnboarding = () => {
-    const currentProject = projects.find(p => p.id === (projectFilter || user?.project));
+    const currentProject = projects.find(p => p.id == (projectFilter || user?.project));
     if (currentProject && currentProject.use_registry_for_personnel) {
       setMasterFormData(prev => ({ ...prev, project: currentProject.id }));
       fetchNextCardNo(currentProject.id);
@@ -697,6 +697,9 @@ const Patients = () => {
     return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
   });
 
+  const currentProject = projects.find(p => p.id == (projectFilter || user?.project));
+  const activeRegProject = projects.find(p => p.id == (formData.project || user?.project));
+
   return (
     <div className="fade-in">
       {renderAckModal()}
@@ -708,7 +711,7 @@ const Patients = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           
-          {projects.find(p => p.id === (projectFilter || user?.project))?.use_registry_for_personnel && (
+          {currentProject?.use_registry_for_personnel && (
             <>
               <button className="btn" onClick={openMasterOnboarding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                 <ShieldCheck size={18} /> Employee Registry
@@ -719,7 +722,7 @@ const Patients = () => {
             </>
           )}
 
-          <button className="btn" onClick={() => { resetForm(); setShowModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+          <button className="btn" onClick={() => { resetForm(); setShowModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
             <UserPlus size={18} /> Register New Patient
           </button>
         </div>
@@ -1126,9 +1129,9 @@ const Patients = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 <div style={{ 
                     padding: '0.75rem', 
-                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                    background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
                     borderRadius: '16px', 
-                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' 
+                    boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)' 
                 }}>
                   <UserPlus size={24} color="white" />
                 </div>
@@ -1162,29 +1165,29 @@ const Patients = () => {
                 {/* Visit Information */}
                 <div style={{ gridColumn: 'span 2' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 800, color: activeRegProject?.primary_color || '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Engagement</p>
                     <div style={{ display: 'flex', gap: '8px', background: 'var(--background)', padding: '4px', borderRadius: '12px' }}>
-                        {(!formData.project || (projects.find(p => p.id === formData.project)?.category_mappings?.some(m => m.category === 'GENERAL')) || projects.find(p => p.id === formData.project)?.use_registry_for_personnel) && (
+                        {(!formData.project || (projects.find(p => p.id == formData.project)?.category_mappings?.some(m => m.category === 'GENERAL')) || projects.find(p => p.id == formData.project)?.use_registry_for_personnel) && (
                         <button 
                             type="button"
                             onClick={() => setFormData({...formData, is_employee_linked: false})}
                             style={{ 
                                 padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
                                 background: !formData.is_employee_linked ? 'var(--surface)' : 'transparent',
-                                color: !formData.is_employee_linked ? 'var(--primary)' : '#64748b',
+                                color: !formData.is_employee_linked ? (activeRegProject?.primary_color || 'var(--primary)') : '#64748b',
                                 boxShadow: !formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                 cursor: 'pointer', transition: '0.3s'
                             }}
                         >General</button>
                         )}
-                        {(user?.role === 'ADMIN' || !formData.project || projects.find(p => p.id === formData.project)?.use_registry_for_personnel) && (
+                        {(user?.role === 'ADMIN' || !formData.project || projects.find(p => p.id == formData.project)?.use_registry_for_personnel) && (
                         <button 
                              type="button"
                              onClick={() => setFormData({...formData, is_employee_linked: true})}
                              style={{ 
                                  padding: '6px 20px', borderRadius: '10px', border: 'none', fontSize: '0.75rem', fontWeight: 800,
                                  background: formData.is_employee_linked ? 'var(--surface)' : 'transparent',
-                                 color: formData.is_employee_linked ? 'var(--primary)' : '#64748b',
+                                 color: formData.is_employee_linked ? (activeRegProject?.primary_color || 'var(--primary)') : '#64748b',
                                  boxShadow: formData.is_employee_linked ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
                                  cursor: 'pointer', transition: '0.3s'
                              }}
@@ -1206,7 +1209,7 @@ const Patients = () => {
 
                 {formData.is_employee_linked && (
                     <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
-                        <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Link Employee Record</p>
+                        <p style={{ fontSize: '0.625rem', fontWeight: 900, color: activeRegProject?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Link Employee Record</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                             <div className="form-group" style={{ position: 'relative' }}>
                                 <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Search Employee (Name/Card No)</label>
@@ -1314,7 +1317,7 @@ const Patients = () => {
                                         }}
                                     >
                                         <option value="">Self (Primary)</option>
-                                        {employeeMasters.find(emp => emp.id === formData.employee_master)?.family_members.map(fam => (
+                                        {employeeMasters.find(emp => emp.id == formData.employee_master)?.family_members.map(fam => (
                                             <option key={fam.id} value={fam.id}>{fam.relationship}: {fam.name}</option>
                                         ))}
                                     </select>
@@ -1340,7 +1343,7 @@ const Patients = () => {
                             gap: '10px'
                         }}>
                             <ShieldCheck size={18} color="#6366f1" />
-                            {projects.find(p => p.id === user.project)?.name || 'Mapped Project'}
+                            {projects.find(p => p.id == user.project)?.name || 'Mapped Project'}
                             <span style={{ fontSize: '0.625rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', marginLeft: 'auto', fontWeight: 900 }}>LOCKED</span>
                         </div>
                     ) : (
@@ -1362,7 +1365,7 @@ const Patients = () => {
 
                 {/* Personal Information */}
                 <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Basic Details</p>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: activeRegProject?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Basic Details</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
                       <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><User size={14} /> First Name <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1389,7 +1392,7 @@ const Patients = () => {
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Identity Verification (Primary ID)</p>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 900, color: activeRegProject?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em' }}>Identity Verification (Primary ID)</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Fingerprint size={14} /> ID Proof Type *</label>
@@ -1445,7 +1448,7 @@ const Patients = () => {
 
                 {/* Contact Information */}
                 <div style={{ gridColumn: 'span 2' }}>
-                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Contact & Address</p>
+                  <p style={{ fontSize: '0.75rem', fontWeight: 900, color: activeRegProject?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>Contact & Address</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div className="form-group">
                       <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Phone size={14} /> Mobile Number <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1511,9 +1514,9 @@ const Patients = () => {
                         padding: '0.75rem 2.5rem', 
                         borderRadius: '16px', 
                         fontWeight: 800,
-                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         border: 'none',
-                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)',
+                        boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)',
                         opacity: isRegistering ? 0.5 : 1
                     }}
                     disabled={isRegistering}
@@ -1661,10 +1664,10 @@ const Patients = () => {
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginTop: "2rem" }}>
-                <button type="button" className="btn" onClick={() => { setShowMasterModal(false); setShowBulkEnrollModal(true); }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: 'var(--primary)', fontWeight: 800, borderRadius: '14px', padding: '0.75rem 1.5rem' }}>BULK LINK FROM MASTER</button>
+                <button type="button" className="btn" onClick={() => { setShowMasterModal(false); setShowBulkEnrollModal(true); }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: activeRegProject?.primary_color || 'var(--primary)', fontWeight: 800, borderRadius: '14px', padding: '0.75rem 1.5rem' }}>BULK LINK FROM MASTER</button>
                 <div style={{ display: "flex", gap: "1rem" }}>
                     <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" style={{ background: '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
+                    <button type="submit" className="btn btn-primary" style={{ background: activeRegProject?.primary_color || '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
                 </div>
               </div>
             </form>
@@ -1803,7 +1806,7 @@ const Patients = () => {
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowFamilyModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#4f46e5', color: 'white', padding: '0.75rem 2rem' }}>Save Family Member</button>
+                <button type="submit" className="btn btn-primary" style={{ background: activeRegProject?.primary_color || '#4f46e5', color: 'white', padding: '0.75rem 2rem' }}>Save Family Member</button>
               </div>
             </form>
           </div>

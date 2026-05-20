@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User as UserIcon, 
   Mail, 
@@ -8,11 +8,33 @@ import {
   Building2, 
   Calendar, 
   CheckCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 const Profile = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [projectConfig, setProjectConfig] = useState(null);
+
+  useEffect(() => {
+    if (user?.project) {
+      fetchProjectConfig(user.project.id || user.project);
+    } else {
+      setProjectConfig(null);
+    }
+  }, [user]);
+
+  const fetchProjectConfig = async (projectId) => {
+    try {
+        const res = await api.get(`patients/projects/${projectId}/`);
+        setProjectConfig(res.data);
+    } catch (err) {
+        console.error("Failed to fetch project config:", err);
+    }
+  };
 
   if (!user) return null;
 
@@ -24,7 +46,41 @@ const Profile = () => {
   ];
 
   return (
-    <div className="fade-in" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+    <div className="fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      {/* Back to Dashboard Button */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <button 
+          onClick={() => navigate('/dashboard')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'var(--surface)',
+            border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}` : '1px solid var(--primary)',
+            padding: '0.625rem 1.25rem',
+            borderRadius: '12px',
+            fontSize: '0.8125rem',
+            fontWeight: 700,
+            color: projectConfig?.primary_color || 'var(--primary)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+          }}
+          className="back-btn-hover"
+        >
+          <ArrowLeft size={16} /> Back to Dashboard
+        </button>
+      </div>
+
+      <style>{`
+        .back-btn-hover:hover {
+          background: ${projectConfig?.primary_color || 'var(--primary)'} !important;
+          border-color: ${projectConfig?.primary_color || 'var(--primary)'} !important;
+          color: white !important;
+          transform: translateX(-2px);
+        }
+      `}</style>
+
       {/* Top Banner: Identity Quick View */}
       <div className="card" style={{ 
         padding: '2.5rem', 
@@ -86,105 +142,26 @@ const Profile = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Identity Card */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <UserIcon size={18} color="var(--primary)" /> Employment Identity
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-              {personalInfo.map((info, i) => (
-                <div key={i}>
-                  <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{info.label}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <info.icon size={16} color="#cbd5e1" />
-                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{info.value || 'Not Disclosed'}</p>
-                  </div>
-                </div>
-              ))}
-              <div style={{ gridColumn: 'span 2' }}>
-                <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Residency/Location Address</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <MapPin size={16} color="#cbd5e1" />
-                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{user.address || 'No location data mapped to this account.'}</p>
-                </div>
+      {/* Identity Card */}
+      <div className="card" style={{ padding: '2.5rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 850, color: 'var(--text-main)', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+          <UserIcon size={20} color="var(--primary)" /> Employment Identity
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          {personalInfo.map((info, i) => (
+            <div key={i} style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>{info.label}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <info.icon size={18} color="var(--primary)" />
+                <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{info.value || 'Not Disclosed'}</p>
               </div>
             </div>
-          </div>
-
-          {/* Security & Access transparency */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Shield size={18} color="var(--primary)" /> Corporate Access Scope
-            </h3>
-            <div style={{ padding: '1.5rem', borderRadius: '16px', background: 'var(--background)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>Data Governance Model</p>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                  {user.data_isolation 
-                    ? 'Strict Isolation Enabled: Access limited to personally registered records.' 
-                    : 'Global Visibility Enabled: Access to cross-facility organizational data.'}
-                </p>
-              </div>
-              <span style={{ 
-                background: user.data_isolation ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)', 
-                color: 'white', padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 800 
-              }}>
-                {user.data_isolation ? 'ISOLATED' : 'ADMINISTRATIVE'}
-              </span>
-            </div>
-            
-            <div style={{ marginTop: '1.5rem' }}>
-                <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Module Authorizations</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem' }}>
-                    {(user.permissions || []).map((perm, i) => (
-                        <div key={i} style={{ padding: '0.5rem 0.875rem', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)' }}></div>
-                            {perm.replace('/', '').toUpperCase() || 'ROOT'}
-                        </div>
-                    ))}
-                    {(!user.permissions || user.permissions.length === 0) && (
-                        <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No granular modules explicitly assigned. Falling back to basic role permissions.</p>
-                    )}
-                </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Facility Display */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: '#0f172a', color: 'white' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ width: '40px', height: '40px', background: 'rgba(99, 102, 241, 0.2)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Building2 size={20} color="var(--primary)" />
-              </div>
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 800 }}>Primary Facility</h3>
-            </div>
-            
-            <div style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.04)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'white' }}>{user.project_name || 'Corporate Head Office'}</p>
-              <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>Project Code: {user.project ? `#PRJ-${user.project.toString().padStart(3, '0')}` : 'SYS-GLOBAL'}</p>
-            </div>
-            <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1.5rem', fontStyle: 'italic', textAlign: 'center' }}>You are currently assigned to this clinical unit.</p>
-          </div>
-
-          {/* Account Status / Metadata */}
-          <div className="card" style={{ padding: '2rem', borderRadius: '24px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1.5rem' }}>Account Integrity</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Security Clearance</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--success)' }}>VERIFIED</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Authentication Method</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--text-main)' }}>SSO / JWT TOKEN</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Account Scope</p>
-                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--primary)' }}>FACILITY SCOPED</span>
-              </div>
+          ))}
+          <div style={{ gridColumn: 'span 2', background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Residency/Location Address</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <MapPin size={18} color="var(--primary)" />
+                <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{user.address || 'No location data mapped to this account.'}</p>
             </div>
           </div>
         </div>
