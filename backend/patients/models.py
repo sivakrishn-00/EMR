@@ -157,8 +157,12 @@ class Patient(models.Model):
     def save(self, *args, **kwargs):
         if not self.patient_id:
             # Generate BHSPLXXXX
-            # Correctly find the highest current BHSPL ID
-            last_patient = Patient.objects.filter(patient_id__startswith='BHSPL').order_by('patient_id').last()
+            # Correctly find the highest current BHSPL ID using length and value descending
+            from django.db.models.functions import Length
+            last_patient = Patient.objects.filter(patient_id__startswith='BHSPL')\
+                                          .annotate(plen=Length('patient_id'))\
+                                          .order_by('-plen', '-patient_id')\
+                                          .first()
             if not last_patient:
                 self.patient_id = 'BHSPL0001'
             else:

@@ -101,6 +101,30 @@ const Patients = () => {
   const [showBulkEnrollModal, setShowBulkEnrollModal] = useState(false);
   const [bulkEnrollData, setBulkEnrollData] = useState('');
   const [isBulkEnrolling, setIsBulkEnrolling] = useState(false);
+  const [bulkEnrollStatus, setBulkEnrollStatus] = useState({
+    isProcessing: false,
+    total: 0,
+    current: 0,
+    success: 0,
+    errors: 0,
+    failedRecords: [],
+    completed: false
+  });
+
+  const downloadFailedEnrollmentCards = () => {
+    if (bulkEnrollStatus.failedRecords.length === 0) return;
+    const headers = ["Card Number", "Error Reason"];
+    const rows = bulkEnrollStatus.failedRecords.map(r => [r.card_no, `"${r.error}"`]);
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `failed_activation_cards_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const fetchNextCardNo = async (projectId) => {
     try {
@@ -162,25 +186,73 @@ const Patients = () => {
       return;
     }
 
+    setBulkEnrollStatus({
+      isProcessing: true,
+      total: cardNumbers.length,
+      current: 0,
+      success: 0,
+      errors: 0,
+      failedRecords: [],
+      completed: false
+    });
     setIsBulkEnrolling(true);
-    const loadId = toast.loading(`Enrolling ${cardNumbers.length} personnel...`);
+
+    const CHUNK_SIZE = 50;
+    let localSuccess = 0;
+    let localErrors = 0;
+    let failedList = [];
+
     try {
-      const res = await api.post(`patients/projects/${currentProjectId}/bulk-link-employees/`, {
-        card_numbers: cardNumbers
-      });
-      
-      if (res.data.status === 'success') {
-        toast.success(`Activated ${res.data.linked} personnel records!`, { id: loadId });
-        if (res.data.errors.length > 0) {
-          toast.error(`${res.data.errors.length} cards were not found in Global Master.`);
+      for (let i = 0; i < cardNumbers.length; i += CHUNK_SIZE) {
+        const chunk = cardNumbers.slice(i, i + CHUNK_SIZE);
+        
+        try {
+          const res = await api.post(`patients/projects/${currentProjectId}/bulk-link-employees/`, {
+            card_numbers: chunk
+          });
+          
+          if (res.data.status === 'success') {
+            localSuccess += res.data.linked || 0;
+            if (res.data.errors && res.data.errors.length > 0) {
+              localErrors += res.data.errors.length;
+              res.data.errors.forEach(errStr => {
+                const match = errStr.match(/(?:Card|Dependent|Error linking)\s+([^\s]+)/i);
+                const cardNo = match ? match[1] : errStr;
+                failedList.push({
+                  card_no: cardNo,
+                  error: errStr
+                });
+              });
+            }
+          } else {
+            localErrors += chunk.length;
+            chunk.forEach(c => failedList.push({ card_no: c, error: 'Batch activation rejected by backend' }));
+          }
+        } catch (err) {
+          localErrors += chunk.length;
+          chunk.forEach(c => failedList.push({ card_no: c, error: err.response?.data?.error || err.message || 'Network request failed' }));
         }
-        setShowBulkEnrollModal(false);
-        setBulkEnrollData('');
-        fetchEmployeeMasters();
-        fetchPatients();
+
+        setBulkEnrollStatus(prev => ({
+          ...prev,
+          current: Math.min(i + chunk.length, cardNumbers.length),
+          success: localSuccess,
+          errors: localErrors,
+          failedRecords: [...failedList]
+        }));
       }
-    } catch (err) {
-      toast.error("Bulk enrollment failed. Check connection.", { id: loadId });
+
+      setBulkEnrollStatus(prev => ({
+        ...prev,
+        completed: true
+      }));
+
+      toast.success(`Bulk activation completed! Succeeded: ${localSuccess}, Failed: ${localErrors}`);
+      fetchEmployeeMasters();
+      fetchPatients();
+    } catch (globalErr) {
+      console.error(globalErr);
+      toast.error("Bulk activation failed");
     } finally {
       setIsBulkEnrolling(false);
     }
@@ -687,11 +759,24 @@ const Patients = () => {
   };
 
   const filteredPatients = (patients || []).filter(p => {
-    const searchLow = searchQuery.toLowerCase();
+    const searchLow = searchQuery.toLowerCase().trim();
+    if (!searchLow) return true;
+
+    // Smart card group matching: check if search term is a card base/suffix and extract the base
+    const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
+    if (cardMatch) {
+      const baseCard = cardMatch[1].padStart(4, '0');
+      const pCard = String(p.card_no || '').toLowerCase();
+      const pCardMatch = pCard.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || pCard.match(/(\d+)(?:\/\d+)?/);
+      if (pCardMatch && pCardMatch[1].padStart(4, '0') === baseCard) {
+        return true;
+      }
+    }
+
     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
     const phone = String(p.phone || '');
     const idProof = String(p.id_proof_number || '');
-    const cardNo = String(p.card_no || '');
+    const cardNo = String(p.card_no || '').toLowerCase();
     const patientID = String(p.patient_id || '').toLowerCase();
 
     return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
@@ -1060,7 +1145,7 @@ const Patients = () => {
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                 Showing <span style={{ color: 'var(--primary)' }}>{filteredPatients.length}</span> of {totalCount} patients
             </p>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <button 
                     className="btn btn-secondary" 
                     disabled={page === 1}
@@ -1070,26 +1155,92 @@ const Patients = () => {
                     <ChevronLeft size={18} />
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    {Array.from({ length: Math.ceil(totalCount / 10) }).map((_, i) => (
-                        <button 
-                            key={i} 
-                            onClick={() => fetchPatients(i + 1)}
-                            style={{ 
-                                width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-                                background: page === i + 1 ? 'var(--primary)' : 'transparent',
-                                color: page === i + 1 ? 'white' : 'var(--text-muted)',
-                                fontWeight: 700, cursor: 'pointer', transition: '0.3s'
-                            }}
-                        >
-                            {i + 1}
-                        </button>
-                    ))}
+                    {(() => {
+                        const totalPages = Math.ceil(totalCount / 100);
+                        if (totalPages <= 1) return null;
+
+                        const buttons = [];
+                        const maxVisiblePages = 5;
+                        
+                        // Always show page 1
+                        buttons.push(
+                            <button 
+                                key={1} 
+                                onClick={() => fetchPatients(1)}
+                                style={{ 
+                                    width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                    background: page === 1 ? 'var(--primary)' : 'transparent',
+                                    color: page === 1 ? 'white' : 'var(--text-muted)',
+                                    fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                }}
+                            >
+                                1
+                            </button>
+                        );
+
+                        let startPage = Math.max(2, page - 1);
+                        let endPage = Math.min(totalPages - 1, page + 1);
+
+                        if (page <= 3) {
+                            endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
+                        }
+                        if (page >= totalPages - 2) {
+                            startPage = Math.max(2, totalPages - maxVisiblePages + 2);
+                        }
+
+                        if (startPage > 2) {
+                            buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                        }
+
+                        for (let i = startPage; i <= endPage; i++) {
+                            if (i > 1 && i < totalPages) {
+                                buttons.push(
+                                    <button 
+                                        key={i} 
+                                        onClick={() => fetchPatients(i)}
+                                        style={{ 
+                                            width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                            background: page === i ? 'var(--primary)' : 'transparent',
+                                            color: page === i ? 'white' : 'var(--text-muted)',
+                                            fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                        }}
+                                    >
+                                        {i}
+                                    </button>
+                                );
+                            }
+                        }
+
+                        if (endPage < totalPages - 1) {
+                            buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                        }
+
+                        // Always show last page
+                        if (totalPages > 1) {
+                            buttons.push(
+                                <button 
+                                    key={totalPages} 
+                                    onClick={() => fetchPatients(totalPages)}
+                                    style={{ 
+                                        width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                        background: page === totalPages ? 'var(--primary)' : 'transparent',
+                                        color: page === totalPages ? 'white' : 'var(--text-muted)',
+                                        fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                    }}
+                                >
+                                    {totalPages}
+                                </button>
+                            );
+                        }
+
+                        return buttons;
+                    })()}
                 </div>
                 <button 
                     className="btn btn-secondary" 
-                    disabled={page >= Math.ceil(totalCount / 10)}
+                    disabled={page >= Math.ceil(totalCount / 100)}
                     onClick={() => fetchPatients(page + 1)}
-                    style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
+                    style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1 }}
                 >
                     <ChevronRight size={18} />
                 </button>
@@ -1898,62 +2049,150 @@ const Patients = () => {
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    Paste Card Numbers
-                  </label>
-                  <label style={{ 
-                    cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', 
-                    background: 'rgba(99, 102, 241, 0.05)', padding: '4px 10px', borderRadius: '8px',
-                    display: 'flex', alignItems: 'center', gap: '4px'
-                  }}>
-                    <Download size={12} /> Upload CSV
-                    <input 
-                      type="file" 
-                      accept=".csv,.txt" 
-                      style={{ display: 'none' }} 
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const text = event.target.result;
-                            const numbers = text.split(/[\n,]+/).map(c => c.trim()).filter(c => c);
-                            setBulkEnrollData(numbers.join('\n'));
-                            toast.success(`Extracted ${numbers.length} card numbers from file!`);
-                          };
-                          reader.readAsText(file);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <textarea 
-                  className="form-control" 
-                  rows="8"
-                  placeholder="e.g.&#10;2254&#10;2255&#10;2256"
-                  style={{ background: '#f8fafc', borderRadius: '16px', fontSize: '1rem', padding: '1rem', fontFamily: 'monospace' }}
-                  value={bulkEnrollData}
-                  onChange={(e) => setBulkEnrollData(e.target.value)}
-                />
-              </div>
+              {bulkEnrollStatus.isProcessing ? (
+                <div style={{ padding: '0.5rem 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>
+                      {bulkEnrollStatus.completed ? 'Activation Finished!' : 'Activating & Syncing Records...'}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 900, color: 'var(--primary)' }}>
+                      {Math.round((bulkEnrollStatus.current / bulkEnrollStatus.total) * 100)}%
+                    </span>
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button 
-                  className="btn btn-primary"
-                  disabled={isBulkEnrolling}
-                  onClick={handleBulkEnrollSubmit}
-                  style={{ padding: '1rem', borderRadius: '14px', fontWeight: 900, background: 'var(--primary)', border: 'none', color: 'white' }}
-                >
-                  {isBulkEnrolling ? 'ACTIVATING...' : 'ACTIVATE & SYNC RECORDS'}
-                </button>
-                <button 
-                  className="btn" 
-                  onClick={() => setShowBulkEnrollModal(false)}
-                  style={{ padding: '0.75rem', fontWeight: 800, color: '#64748b' }}
-                >Cancel</button>
-              </div>
+                  <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+                    <div style={{ 
+                      width: `${(bulkEnrollStatus.current / bulkEnrollStatus.total) * 100}%`, 
+                      height: '100%', 
+                      background: 'linear-gradient(90deg, var(--primary) 0%, #4f46e5 100%)', 
+                      transition: 'width 0.3s ease',
+                      borderRadius: '4px'
+                    }} />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Total</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>{bulkEnrollStatus.total}</div>
+                    </div>
+                    <div style={{ background: 'rgba(34, 197, 94, 0.05)', padding: '0.75rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#22c55e', textTransform: 'uppercase', marginBottom: '4px' }}>Linked</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#16a34a' }}>{bulkEnrollStatus.success}</div>
+                    </div>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '0.75rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', marginBottom: '4px' }}>Failed</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626' }}>{bulkEnrollStatus.errors}</div>
+                    </div>
+                  </div>
+
+                  {bulkEnrollStatus.failedRecords.length > 0 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444' }}>
+                          Encountered Errors ({bulkEnrollStatus.failedRecords.length})
+                        </span>
+                        {bulkEnrollStatus.completed && (
+                          <button 
+                            onClick={downloadFailedEnrollmentCards}
+                            style={{ 
+                              background: 'none', border: 'none', color: '#dc2626', fontSize: '0.7rem', 
+                              fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(220, 38, 38, 0.05)'
+                            }}
+                          >
+                            <Download size={10} /> Download Failed CSV
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ 
+                        maxHeight: '120px', overflowY: 'auto', background: '#fef2f2', 
+                        borderRadius: '12px', padding: '0.75rem', fontSize: '0.75rem', color: '#991b1b',
+                        border: '1px solid rgba(239, 68, 68, 0.1)'
+                      }}>
+                        {bulkEnrollStatus.failedRecords.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(239, 68, 68, 0.05)' }}>
+                            <span style={{ fontWeight: 800 }}>Card: {item.card_no}</span>
+                            <span style={{ opacity: 0.85 }}>{item.error}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {bulkEnrollStatus.completed && (
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setShowBulkEnrollModal(false);
+                        setBulkEnrollData('');
+                        setBulkEnrollStatus(prev => ({ ...prev, isProcessing: false, completed: false }));
+                      }}
+                      style={{ width: '100%', padding: '1rem', borderRadius: '14px', fontWeight: 900, background: 'var(--primary)', border: 'none', color: 'white' }}
+                    >
+                      Done & Close
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
+                        Paste Card Numbers
+                      </label>
+                      <label style={{ 
+                        cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', 
+                        background: 'rgba(99, 102, 241, 0.05)', padding: '4px 10px', borderRadius: '8px',
+                        display: 'flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <Download size={12} /> Upload CSV
+                        <input 
+                          type="file" 
+                          accept=".csv,.txt" 
+                          style={{ display: 'none' }} 
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const text = event.target.result;
+                                const numbers = text.split(/[\n,]+/).map(c => c.trim()).filter(c => c);
+                                setBulkEnrollData(numbers.join('\n'));
+                                toast.success(`Extracted ${numbers.length} card numbers from file!`);
+                              };
+                              reader.readAsText(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <textarea 
+                      className="form-control" 
+                      rows="8"
+                      placeholder="e.g.&#10;2254&#10;2255&#10;2256"
+                      style={{ background: '#f8fafc', borderRadius: '16px', fontSize: '1rem', padding: '1rem', fontFamily: 'monospace' }}
+                      value={bulkEnrollData}
+                      onChange={(e) => setBulkEnrollData(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <button 
+                      className="btn btn-primary"
+                      disabled={isBulkEnrolling}
+                      onClick={handleBulkEnrollSubmit}
+                      style={{ padding: '1rem', borderRadius: '14px', fontWeight: 900, background: 'var(--primary)', border: 'none', color: 'white' }}
+                    >
+                      {isBulkEnrolling ? 'ACTIVATING...' : 'ACTIVATE & SYNC RECORDS'}
+                    </button>
+                    <button 
+                      className="btn" 
+                      onClick={() => setShowBulkEnrollModal(false)}
+                      style={{ padding: '0.75rem', fontWeight: 800, color: '#64748b' }}
+                    >Cancel</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>,

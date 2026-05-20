@@ -1235,33 +1235,61 @@ const AdminMasters = () => {
   const downloadFailedRecords = () => {
     if (bulkStatus.failedRecords.length === 0) return;
 
-    const headers = [
-      "CardNo",
-      "Name",
-      "Age/Gender",
-      "Aadhar",
-      "Mobile",
-      "Address",
-      "Relationship",
-      "Error Reason",
-    ];
-    const rows = bulkStatus.failedRecords.map((r) => [
-      r.card_no,
-      `"${r.name}"`,
-      r.age_gender,
-      r.aadhar_no,
-      r.mobile_no,
-      `"${r.address?.replace(/\n/g, " ")}"`,
-      r.relationship,
-      `"${r.error}"`,
-    ]);
+    const failed = bulkStatus.failedRecords;
+    const isStandard = ["employee_master", "family_member"].includes(exploringProtocolId) || 
+                       (String(bulkProject) === "1" && (exploringProtocolId === "employee_master" || exploringProtocolId === "family_member"));
+
+    let headers = [];
+    let rows = [];
+
+    if (isStandard) {
+      headers = [
+        "CardNo",
+        "Name",
+        "Age/Gender",
+        "Aadhar",
+        "Mobile",
+        "Address",
+        "Relationship",
+        "Error Reason",
+      ];
+      rows = failed.map((r) => [
+        r.card_no || r.card_no_suffix || "",
+        `"${(r.name || "").replace(/"/g, '""')}"`,
+        r.age_gender || "",
+        r.aadhar_no || "",
+        r.mobile_no || "",
+        `"${(r.address || "").replace(/\n/g, " ").replace(/"/g, '""')}"`,
+        r.relationship || "",
+        `"${(r.error || "").replace(/"/g, '""')}"`,
+      ]);
+    } else {
+      const allKeysSet = new Set();
+      failed.forEach(r => {
+        Object.keys(r).forEach(k => {
+          if (k !== 'error') {
+            allKeysSet.add(k);
+          }
+        });
+      });
+      const dataKeys = Array.from(allKeysSet);
+      headers = [...dataKeys, "Error Reason"];
+      rows = failed.map(r => {
+        const row = dataKeys.map(k => {
+          const val = r[k] !== undefined && r[k] !== null ? String(r[k]) : "";
+          return `"${val.replace(/"/g, '""').replace(/\n/g, " ")}"`;
+        });
+        row.push(`"${(r.error || "").replace(/"/g, '""')}"`);
+        return row;
+      });
+    }
 
     const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `failed_records_${new Date().getTime()}.csv`);
+    link.setAttribute("download", `failed_records_${exploringProtocolId || "bulk"}_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -5539,52 +5567,76 @@ const AdminMasters = () => {
                       </div>
                     </>
                   ) : bulkStatus.isUploading ? (
-                    <div style={{ textAlign: "center", padding: "4rem 0" }}>
+                    <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
                       <div
                         className="spinner"
                         style={{
-                          width: "48px",
-                          height: "48px",
-                          border: "4px solid #f3f3f3",
+                          width: "56px",
+                          height: "56px",
+                          border: "4px solid rgba(99, 102, 241, 0.1)",
                           borderTop: "4px solid #6366f1",
                           borderRadius: "50%",
                           animation: "spin 1s linear infinite",
-                          margin: "0 auto 2rem auto",
+                          margin: "0 auto 1.5rem auto",
                         }}
                       ></div>
-                      <h3 style={{ fontSize: "1.25rem", fontWeight: 900 }}>
-                        Processing Batch Payload...
+                      
+                      <h3 style={{ fontSize: "1.35rem", fontWeight: 900, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
+                        Integrating Master Registries
                       </h3>
-                      <p
-                        style={{
-                          fontSize: "0.875rem",
-                          color: "#64748b",
-                          fontWeight: 600,
-                          marginTop: "0.5rem",
-                        }}
-                      >
-                        Uploaded {bulkStatus.current} of {bulkStatus.total}{" "}
-                        records
+                      <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", fontWeight: 500, marginTop: "0.25rem" }}>
+                        Please remain on this screen. Database transaction savepoints are active.
                       </p>
-                      <div
-                        style={{
-                          width: "100%",
-                          maxWidth: "300px",
-                          height: "6px",
-                          background: "#f1f5f9",
-                          borderRadius: "10px",
-                          margin: "2rem auto 0 auto",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${(bulkStatus.current / bulkStatus.total) * 100}%`,
-                            height: "100%",
-                            background: "#6366f1",
-                            transition: "width 0.3s ease",
-                          }}
-                        ></div>
+
+                      {/* Premium Progress Bar */}
+                      <div style={{ width: "100%", maxWidth: "380px", margin: "2rem auto 1rem auto" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#6366f1", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ display: "inline-block", width: "6px", height: "6px", background: "#6366f1", borderRadius: "50%", animation: "pulse 1.5s infinite" }} />
+                            BATCH {Math.min(Math.ceil(bulkStatus.current / 500) || 1, Math.ceil(bulkStatus.total / 500))} OF {Math.ceil(bulkStatus.total / 500) || 1}
+                          </span>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "var(--text-main)" }}>
+                            {Math.round((bulkStatus.current / bulkStatus.total) * 100) || 0}%
+                          </span>
+                        </div>
+                        
+                        <div style={{ width: "100%", height: "8px", background: "#f1f5f9", borderRadius: "20px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                          <div
+                            style={{
+                              width: `${(bulkStatus.current / bulkStatus.total) * 100}%`,
+                              height: "100%",
+                              background: "linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)",
+                              borderRadius: "20px",
+                              transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Detailed Metric Grid */}
+                      <div style={{ 
+                        display: "grid", 
+                        gridTemplateColumns: "repeat(3, 1fr)", 
+                        gap: "0.75rem", 
+                        maxWidth: "420px", 
+                        margin: "1.5rem auto 0 auto",
+                        background: "#f8fafc",
+                        padding: "1rem",
+                        borderRadius: "16px",
+                        border: "1px solid #e2e8f0"
+                      }}>
+                        <div style={{ textAlign: "center", borderRight: "1px solid #e2e8f0" }}>
+                          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Processed</span>
+                          <span style={{ fontSize: "1rem", fontWeight: 900, color: "var(--text-main)" }}>{bulkStatus.current} <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 700 }}>/ {bulkStatus.total}</span></span>
+                        </div>
+                        <div style={{ textAlign: "center", borderRight: "1px solid #e2e8f0" }}>
+                          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "#10b981", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Succeeded</span>
+                          <span style={{ fontSize: "1rem", fontWeight: 900, color: "#10b981" }}>{bulkStatus.success}</span>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "#ef4444", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Failed</span>
+                          <span style={{ fontSize: "1rem", fontWeight: 900, color: "#ef4444" }}>{bulkStatus.errors}</span>
+                        </div>
                       </div>
                     </div>
                   ) : (

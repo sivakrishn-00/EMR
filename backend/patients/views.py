@@ -2,6 +2,9 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
+import threading
+
+_sync_lock = threading.Lock()
 from rest_framework.response import Response
 from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo
 from .serializers import (
@@ -165,83 +168,102 @@ class ProjectViewSet(viewsets.ModelViewSet):
         errors = []
         
         from .models import EmployeeMaster, FamilyMember, Patient
+        from django.db import transaction
         
-        for idx, card_no_input in enumerate(card_numbers):
-            try:
-                card_no_input = str(card_no_input).strip()
-                if not card_no_input: continue
-                
-                if '/' in card_no_input:
-                    # 1. Family Member Granular Case (e.g. 2254/1)
-                    parts = card_no_input.split('/')
-                    parent_card = parts[0]
-                    suffix = '/' + parts[1]
+        with transaction.atomic():
+            for idx, card_no_input in enumerate(card_numbers):
+                sid = transaction.savepoint()
+                try:
+                    card_no_input = str(card_no_input).strip()
+                    if not card_no_input: continue
                     
-                    member = FamilyMember.objects.filter(employee__card_no=parent_card, card_no_suffix=suffix).first()
-                    if not member:
-                        errors.append(f"Dependent {card_no_input} not found in Master Registry.")
-                        continue
+                    # Pad card base to 4 digits if numeric (e.g. 157 -> 0157, 1/2 -> 0001/2)
+                    if '/' in card_no_input:
+                        parts = card_no_input.split('/')
+                        parent_card = parts[0].strip()
+                        suffix = '/' + parts[1].strip()
+                        if parent_card.isdigit():
+                            parent_card = parent_card.zfill(4)
+                        card_no_input = f"{parent_card}{suffix}"
+                    else:
+                        if card_no_input.isdigit():
+                            card_no_input = card_no_input.zfill(4)
                     
-                    employee = member.employee
-                    # Sync parent project link if needed (Metadata sync)
-                    if employee.project != project:
+                    if '/' in card_no_input:
+                        # 1. Family Member Granular Case (e.g. 0157/1)
+                        parts = card_no_input.split('/')
+                        parent_card = parts[0]
+                        suffix = '/' + parts[1]
+                        
+                        member = FamilyMember.objects.filter(employee__card_no=parent_card, card_no_suffix=suffix).first()
+                        if not member:
+                            errors.append(f"Dependent {card_no_input} not found in Master Registry.")
+                            transaction.savepoint_rollback(sid)
+                            continue
+                        
+                        employee = member.employee
+                        # Sync parent project link if needed (Metadata sync)
+                        if employee.project != project:
+                            employee.project = project
+                            employee.save()
+                            
+                        # Create/Update Patient Profile for the SPECIFIC Family Member
+                        Patient.objects.update_or_create(
+                            card_no=card_no_input,
+                            project=project,
+                            defaults={
+                                'first_name': member.name.split(' ')[0],
+                                'last_name': " ".join(member.name.split(' ')[1:]) if " " in member.name else "",
+                                'dob': member.dob,
+                                'gender': member.gender,
+                                'phone': member.mobile_no or employee.mobile_no,
+                                'address': employee.address,
+                                'id_proof_type': 'EMPLOYEE_CARD',
+                                'id_proof_number': card_no_input,
+                                'is_employee_linked': True,
+                                'employee_master': employee,
+                                'family_member': member,
+                                'relationship': member.relationship
+                            }
+                        )
+                        linked_count += 1
+                    else:
+                        # 2. Primary Employee Case (e.g. 2254)
+                        employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                        if not employee:
+                            errors.append(f"Card {card_no_input} not found in Global Master List.")
+                            transaction.savepoint_rollback(sid)
+                            continue
+                        
+                        # Link to this project (Metadata)
                         employee.project = project
                         employee.save()
                         
-                    # Create/Update Patient Profile for the SPECIFIC Family Member
-                    Patient.objects.update_or_create(
-                        card_no=card_no_input,
-                        project=project,
-                        defaults={
-                            'first_name': member.name.split(' ')[0],
-                            'last_name': " ".join(member.name.split(' ')[1:]) if " " in member.name else "",
-                            'dob': member.dob,
-                            'gender': member.gender,
-                            'phone': member.mobile_no or employee.mobile_no,
-                            'address': employee.address,
-                            'id_proof_type': 'EMPLOYEE_CARD',
-                            'id_proof_number': card_no_input,
-                            'is_employee_linked': True,
-                            'employee_master': employee,
-                            'family_member': member,
-                            'relationship': member.relationship
-                        }
-                    )
-                    linked_count += 1
-                else:
-                    # 2. Primary Employee Case (e.g. 2254)
-                    employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
-                    if not employee:
-                        errors.append(f"Card {card_no_input} not found in Global Master List.")
-                        continue
+                        # Create/Update Patient Profile for Primary Employee ONLY
+                        Patient.objects.update_or_create(
+                            card_no=card_no_input,
+                            project=project,
+                            defaults={
+                                'first_name': employee.name.split(' ')[0],
+                                'last_name': " ".join(employee.name.split(' ')[1:]) if " " in employee.name else "",
+                                'dob': employee.dob,
+                                'gender': employee.gender,
+                                'phone': employee.mobile_no,
+                                'address': employee.address,
+                                'id_proof_type': 'EMPLOYEE_CARD',
+                                'id_proof_number': card_no_input,
+                                'is_employee_linked': True,
+                                'employee_master': employee,
+                                'relationship': 'PRIMARY CARD HOLDER'
+                            }
+                        )
+                        linked_count += 1
                     
-                    # Link to this project (Metadata)
-                    employee.project = project
-                    employee.save()
+                    transaction.savepoint_commit(sid)
+                except Exception as e:
+                    transaction.savepoint_rollback(sid)
+                    errors.append(f"Error linking {card_no_input}: {str(e)}")
                     
-                    # Create/Update Patient Profile for Primary Employee ONLY
-                    Patient.objects.update_or_create(
-                        card_no=card_no_input,
-                        project=project,
-                        defaults={
-                            'first_name': employee.name.split(' ')[0],
-                            'last_name': " ".join(employee.name.split(' ')[1:]) if " " in employee.name else "",
-                            'dob': employee.dob,
-                            'gender': employee.gender,
-                            'phone': employee.mobile_no,
-                            'address': employee.address,
-                            'id_proof_type': 'EMPLOYEE_CARD',
-                            'id_proof_number': card_no_input,
-                            'is_employee_linked': True,
-                            'employee_master': employee,
-                            'relationship': 'PRIMARY CARD HOLDER'
-                        }
-                    )
-                    linked_count += 1
-                
-            except Exception as e:
-                errors.append(f"Error linking {card_no_input}: {str(e)}")
-                
         return Response({
             "status": "success",
             "linked": linked_count,
@@ -505,179 +527,186 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         # Track cleared item batches per bulk upload session
         cleared_batches = set()
         success_count = 0
+        failed_records = []
         
-        for data in records:
-            try:
-                # Normalize keys: convert keys to lowercase, replace spaces with underscores,
-                # and strip any "_(optional)" or "(optional)" suffixes so they match cleanly!
-                clean_data = {}
-                for k, v in data.items():
-                    clean_k = str(k).strip().lower().replace(' ', '_')
-                    if clean_k.endswith('_(optional)'):
-                        clean_k = clean_k[:-11]
-                    elif clean_k.endswith('(optional)'):
-                        clean_k = clean_k[:-10]
-                    clean_data[clean_k] = v
+        from django.db import transaction
+        
+        with transaction.atomic():
+            for data in records:
+                try:
+                    with transaction.atomic():
+                        # Normalize keys: convert keys to lowercase, replace spaces with underscores,
+                        # and strip any "_(optional)" or "(optional)" suffixes so they match cleanly!
+                        clean_data = {}
+                        for k, v in data.items():
+                            clean_k = str(k).strip().lower().replace(' ', '_')
+                            if clean_k.endswith('_(optional)'):
+                                clean_k = clean_k[:-11]
+                            elif clean_k.endswith('(optional)'):
+                                clean_k = clean_k[:-10]
+                            clean_data[clean_k] = v
 
-                # Skip blank/empty rows in Excel/CSV
-                if not clean_data or not any(str(val).strip() for val in clean_data.values() if val is not None):
-                    continue
+                        # Skip blank/empty rows in Excel/CSV
+                        if not clean_data or not any(str(val).strip() for val in clean_data.values() if val is not None):
+                            continue
 
-                # Resolve ucode/primary key
-                ucode = clean_data.get('ucode') or clean_data.get('card_no') or clean_data.get('item_code') or next(iter(clean_data.values()))
-                name = clean_data.get('name') or clean_data.get('item_name') or clean_data.get('label') or ""
-                
-                if not str(ucode).strip() or not str(name).strip():
-                    continue
-                
-                # Case-insensitive mapping of CSV headers to schema slugs
-                additional = {}
-                slug_map = {s.lower(): s for s in field_slugs} 
-                
-                for key, val in clean_data.items():
-                    clean_key = str(key).strip().lower()
-                    if clean_key in slug_map:
-                        additional[slug_map[clean_key]] = val
-                    elif key in field_slugs:
-                        additional[key] = val
-                
-                existing_item = RegistryData.objects.filter(registry_type_id=active_type_id, ucode=str(ucode).strip()).first()
-                qty_input = int(clean_data.get('quantity') or clean_data.get('qty') or 0)
-                cost_input = float(clean_data.get('cost') or clean_data.get('price') or 0.0)
-                if cost_input == 0.0 and existing_item and existing_item.cost:
-                    cost_input = float(existing_item.cost)
-
-                obj, created = RegistryData.objects.get_or_create(
-                    registry_type_id=active_type_id,
-                    ucode=str(ucode).strip(),
-                    defaults={
-                        'name': str(name).strip(),
-                        'category': clean_data.get('category') or clean_data.get('item_group', ''),
-                        'description': str(clean_data.get('description') or ''),
-                        'quantity': qty_input,
-                        'cost': cost_input,
-                        'additional_fields': additional
-                    }
-                )
-
-                if not created:
-                    # Update fields
-                    obj.name = str(name).strip() or obj.name
-                    obj.category = clean_data.get('category') or clean_data.get('item_group', obj.category)
-                    
-                    # Prevent overriding parent cost during refill/increment uploads
-                    if mode != 'INCREMENT' and mode != 'ADD':
-                        obj.cost = cost_input or obj.cost
+                        # Resolve ucode/primary key
+                        ucode = clean_data.get('ucode') or clean_data.get('card_no') or clean_data.get('item_code') or next(iter(clean_data.values()))
+                        name = clean_data.get('name') or clean_data.get('item_name') or clean_data.get('label') or ""
                         
-                    obj.additional_fields.update(additional)
-                    
-                    if mode == 'INCREMENT' or mode == 'ADD':
-                        obj.quantity += qty_input
-                    else:
-                        obj.quantity = qty_input
-                    
-                    obj.save()
+                        if not str(ucode).strip() or not str(name).strip():
+                            raise Exception("Missing primary key/code or name")
+                        
+                        # Case-insensitive mapping of CSV headers to schema slugs
+                        additional = {}
+                        slug_map = {s.lower(): s for s in field_slugs} 
+                        
+                        for key, val in clean_data.items():
+                            clean_key = str(key).strip().lower()
+                            if clean_key in slug_map:
+                                additional[slug_map[clean_key]] = val
+                            elif key in field_slugs:
+                                additional[key] = val
+                        
+                        existing_item = RegistryData.objects.filter(registry_type_id=active_type_id, ucode=str(ucode).strip()).first()
+                        qty_input = int(clean_data.get('quantity') or clean_data.get('qty') or 0)
+                        cost_input = float(clean_data.get('cost') or clean_data.get('price') or 0.0)
+                        if cost_input == 0.0 and existing_item and existing_item.cost:
+                            cost_input = float(existing_item.cost)
 
-                # Sync drug batches for pharmacy registries
-                is_pharmacy = (
-                    rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
-                    'pharmacy' in rt.slug.lower() or
-                    'pharmacy' in rt.name.lower() or
-                    'drug' in rt.slug.lower() or
-                    'drug' in rt.name.lower()
-                )
+                        obj, created = RegistryData.objects.get_or_create(
+                            registry_type_id=active_type_id,
+                            ucode=str(ucode).strip(),
+                            defaults={
+                                'name': str(name).strip(),
+                                'category': clean_data.get('category') or clean_data.get('item_group', ''),
+                                'description': str(clean_data.get('description') or ''),
+                                'quantity': qty_input,
+                                'cost': cost_input,
+                                'additional_fields': additional
+                            }
+                        )
 
-                if is_pharmacy:
-                    from pharmacy.models import DrugBatch
-                    from django.utils import timezone
-                    
-                    batch_number = clean_data.get('batch_number') or clean_data.get('batch') or clean_data.get('batch_no')
-                    if not batch_number:
-                        batch_number = "DEFAULT"
-                        
-                    mfg_raw = clean_data.get('mfg_date') or clean_data.get('mfg') or clean_data.get('manufacturing_date') or clean_data.get('mfg_dt')
-                    exp_raw = clean_data.get('expiry_date') or clean_data.get('expiry') or clean_data.get('expiry_dt') or clean_data.get('exp_date') or clean_data.get('expire')
-                    
-                    mfg_date = parse_date_safely(mfg_raw)
-                    expiry_date = parse_date_safely(exp_raw)
-                    
-                    if not mfg_date:
-                        mfg_date = timezone.localdate()
-                    if not expiry_date:
-                        expiry_date = timezone.localdate() + timezone.timedelta(days=365) # 1 year default
-                        
-                    # Self-Healing Sync: If parent medicine has stock but NO physical batches exist in the DB,
-                    # convert the existing parent stock into a real physical DEFAULT batch first.
-                    # This recovers historical stock entries that were created when backend triggers were crashed.
-                    if not DrugBatch.objects.filter(registry_item=obj).exists():
-                        pre_existing_qty = obj.quantity
-                        if mode == 'INCREMENT' or mode == 'ADD':
-                            pre_existing_qty = max(0, obj.quantity - qty_input)
-                        
-                        if pre_existing_qty > 0:
-                            DrugBatch.objects.create(
-                                registry_item=obj,
-                                batch_number='DEFAULT',
-                                mfg_date=timezone.localdate() - timezone.timedelta(days=45),
-                                expiry_date=timezone.localdate() + timezone.timedelta(days=320),
-                                initial_qty=pre_existing_qty,
-                                quantity=pre_existing_qty,
-                                unit_cost=obj.cost
-                            )
-                        
-                    # Clean/Overwrite existing batches only once per unique medication in the bulk upload
-                    if mode == 'OVERWRITE' or mode == 'REPLACE':
-                        if obj.id not in cleared_batches:
-                            DrugBatch.objects.filter(registry_item=obj).delete()
-                            cleared_batches.add(obj.id)
+                        if not created:
+                            # Update fields
+                            obj.name = str(name).strip() or obj.name
+                            obj.category = clean_data.get('category') or clean_data.get('item_group', obj.category)
                             
-                    base_batch_number = str(batch_number).strip()
-                    
-                    # Cost variations support: if there's an existing batch with this name but with a DIFFERENT unit cost,
-                    # we should create a separate batch with a suffix so the different costs/prices are preserved!
-                    # This is especially true for default/blank batches during refills.
-                    existing_batches = DrugBatch.objects.filter(registry_item=obj, batch_number=base_batch_number)
-                    if existing_batches.exists():
-                        first_existing = existing_batches.first()
-                        if float(first_existing.unit_cost) != float(cost_input):
-                            # Append the cost suffix to make it a distinct, isolated batch card!
-                            batch_number = f"{base_batch_number} (₹{cost_input:.2f})"
+                            # Prevent overriding parent cost during refill/increment uploads
+                            if mode != 'INCREMENT' and mode != 'ADD':
+                                obj.cost = cost_input or obj.cost
+                                
+                            obj.additional_fields.update(additional)
+                            
+                            if mode == 'INCREMENT' or mode == 'ADD':
+                                obj.quantity += qty_input
+                            else:
+                                obj.quantity = qty_input
+                            
+                            obj.save()
 
-                    # Update/Create the specific drug batch
-                    batch_obj, b_created = DrugBatch.objects.get_or_create(
-                        registry_item=obj,
-                        batch_number=str(batch_number).strip(),
-                        defaults={
-                            'mfg_date': mfg_date,
-                            'expiry_date': expiry_date,
-                            'initial_qty': qty_input,
-                            'quantity': qty_input,
-                            'unit_cost': cost_input
-                        }
-                    )
-                    
-                    if not b_created:
-                        batch_obj.mfg_date = mfg_date
-                        batch_obj.expiry_date = expiry_date
-                        if mode == 'INCREMENT' or mode == 'ADD':
-                            batch_obj.quantity += qty_input
-                        else:
-                            batch_obj.quantity = qty_input
-                        batch_obj.unit_cost = cost_input or batch_obj.unit_cost
-                        batch_obj.save()
-                        
-                    # Sync parent quantity to the total of active batches
-                    from django.db.models import Sum
-                    total_qty = DrugBatch.objects.filter(registry_item=obj).aggregate(total=Sum('quantity'))['total'] or 0
-                    obj.quantity = total_qty
-                    obj.save()
+                        # Sync drug batches for pharmacy registries
+                        is_pharmacy = (
+                            rt.type_category in ['CLINICAL_DRUGS', 'PHARMACY'] or
+                            'pharmacy' in rt.slug.lower() or
+                            'pharmacy' in rt.name.lower() or
+                            'drug' in rt.slug.lower() or
+                            'drug' in rt.name.lower()
+                        )
 
-                success_count += 1
-            except Exception as e:
-                print(f"Schema Mapping Error: {e}")
-        
+                        if is_pharmacy:
+                            from pharmacy.models import DrugBatch
+                            from django.utils import timezone
+                            
+                            batch_number = clean_data.get('batch_number') or clean_data.get('batch') or clean_data.get('batch_no')
+                            if not batch_number:
+                                batch_number = "DEFAULT"
+                                
+                            mfg_raw = clean_data.get('mfg_date') or clean_data.get('mfg') or clean_data.get('manufacturing_date') or clean_data.get('mfg_dt')
+                            exp_raw = clean_data.get('expiry_date') or clean_data.get('expiry') or clean_data.get('expiry_dt') or clean_data.get('exp_date') or clean_data.get('expire')
+                            
+                            mfg_date = parse_date_safely(mfg_raw)
+                            expiry_date = parse_date_safely(exp_raw)
+                            
+                            if not mfg_date:
+                                mfg_date = timezone.localdate()
+                            if not expiry_date:
+                                expiry_date = timezone.localdate() + timezone.timedelta(days=365) # 1 year default
+                                
+                            # Self-Healing Sync: If parent medicine has stock but NO physical batches exist in the DB,
+                            # convert the existing parent stock into a real physical DEFAULT batch first.
+                            if not DrugBatch.objects.filter(registry_item=obj).exists():
+                                pre_existing_qty = obj.quantity
+                                if mode == 'INCREMENT' or mode == 'ADD':
+                                    pre_existing_qty = max(0, obj.quantity - qty_input)
+                                
+                                if pre_existing_qty > 0:
+                                    DrugBatch.objects.create(
+                                        registry_item=obj,
+                                        batch_number='DEFAULT',
+                                        mfg_date=timezone.localdate() - timezone.timedelta(days=45),
+                                        expiry_date=timezone.localdate() + timezone.timedelta(days=320),
+                                        initial_qty=pre_existing_qty,
+                                        quantity=pre_existing_qty,
+                                        unit_cost=obj.cost
+                                    )
+                                
+                            # Clean/Overwrite existing batches only once per unique medication in the bulk upload
+                            if mode == 'OVERWRITE' or mode == 'REPLACE':
+                                if obj.id not in cleared_batches:
+                                    DrugBatch.objects.filter(registry_item=obj).delete()
+                                    cleared_batches.add(obj.id)
+                                    
+                            base_batch_number = str(batch_number).strip()
+                            
+                            # Cost variations support: if there's an existing batch with this name but with a DIFFERENT unit cost,
+                            # we should create a separate batch with a suffix so the different costs/prices are preserved!
+                            existing_batches = DrugBatch.objects.filter(registry_item=obj, batch_number=base_batch_number)
+                            if existing_batches.exists():
+                                first_existing = existing_batches.first()
+                                if float(first_existing.unit_cost) != float(cost_input):
+                                    # Append the cost suffix to make it a distinct, isolated batch card!
+                                    batch_number = f"{base_batch_number} (₹{cost_input:.2f})"
+
+                            # Update/Create the specific drug batch
+                            batch_obj, b_created = DrugBatch.objects.get_or_create(
+                                registry_item=obj,
+                                batch_number=str(batch_number).strip(),
+                                defaults={
+                                    'mfg_date': mfg_date,
+                                    'expiry_date': expiry_date,
+                                    'initial_qty': qty_input,
+                                    'quantity': qty_input,
+                                    'unit_cost': cost_input
+                                }
+                            )
+                            
+                            if not b_created:
+                                batch_obj.mfg_date = mfg_date
+                                batch_obj.expiry_date = expiry_date
+                                if mode == 'INCREMENT' or mode == 'ADD':
+                                    batch_obj.quantity += qty_input
+                                else:
+                                    batch_obj.quantity = qty_input
+                                batch_obj.unit_cost = cost_input or batch_obj.unit_cost
+                                batch_obj.save()
+                                
+                            # Sync parent quantity to the total of active batches
+                            from django.db.models import Sum
+                            total_qty = DrugBatch.objects.filter(registry_item=obj).aggregate(total=Sum('quantity'))['total'] or 0
+                            obj.quantity = total_qty
+                            obj.save()
+
+                        success_count += 1
+                except Exception as e:
+                    failed_records.append({**data, "error": str(e)})
+
         log_action(request.user, 'Registry', 'Bulk Upload', f"Processed {success_count} records ({mode}) into registry type {registry_type_id}")
-        return Response({"success": success_count})
+        return Response({
+            "success": success_count,
+            "errors": len(failed_records),
+            "failed_records": failed_records
+        })
 
 
 class ProjectCategoryMappingViewSet(viewsets.ModelViewSet):
@@ -747,86 +776,91 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                         return data[d_key]
             return None
 
-        # 1. Process Primary Employees
-        for data in records:
-            rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
-            if not rel or 'PRIMARY' in rel or 'HOLDER' in rel:
-                try:
-                    card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
-                    if not card_no: raise Exception("Missing Card Number")
-                    if card_no.endswith('.0'):
-                        card_no = card_no[:-2]
-                    if card_no.isdigit():
-                        card_no = card_no.zfill(4)
-                    
-                    name = get_val(data, 'name', 'employee_name')
-                    gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
-                    gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
-                    
-                    dob = get_val(data, 'dob', 'date_of_birth')
-                    if not dob:
-                        dob = calculate_dob(get_val(data, 'age', 'age_gender'))
+        from django.db import transaction
 
-                    EmployeeMaster.objects.update_or_create(
-                        card_no=card_no,
-                        defaults={
-                            'project_id': data.get('project'),
-                            'name': name,
-                            'dob': dob,
-                            'gender': gender,
-                            'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
-                            'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
-                            'address': get_val(data, 'address', 'addr') or '',
-                            'designation': get_val(data, 'designation', 'desig') or '',
-                        }
-                    )
-                    success_count += 1
-                except Exception as e:
-                    error_count += 1
-                    failed_records.append({**data, 'error': str(e)})
+        with transaction.atomic():
+            # 1. Process Primary Employees
+            for data in records:
+                rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
+                if not rel or 'PRIMARY' in rel or 'HOLDER' in rel:
+                    try:
+                        with transaction.atomic():
+                            card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
+                            if not card_no: raise Exception("Missing Card Number")
+                            if card_no.endswith('.0'):
+                                card_no = card_no[:-2]
+                            if card_no.isdigit():
+                                card_no = card_no.zfill(4)
+                            
+                            name = get_val(data, 'name', 'employee_name')
+                            gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
+                            gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
+                            
+                            dob = get_val(data, 'dob', 'date_of_birth')
+                            if not dob:
+                                dob = calculate_dob(get_val(data, 'age', 'age_gender'))
 
-        # 2. Process Dependents
-        for data in records:
-            rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
-            if rel and 'PRIMARY' not in rel and 'HOLDER' not in rel:
-                try:
-                    full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
-                    if not full_card_no: raise Exception("Missing Card Number")
-                    if full_card_no.endswith('.0'):
-                        full_card_no = full_card_no[:-2]
-                    
-                    parent_card_no = full_card_no.split('/')[0] if '/' in full_card_no else full_card_no
-                    suffix = '/' + full_card_no.split('/')[1] if '/' in full_card_no else '/1'
-                    
-                    if parent_card_no.isdigit():
-                        parent_card_no = parent_card_no.zfill(4)
-                    
-                    employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
-                    if not employee: raise Exception(f"Parent employee {parent_card_no} not found")
+                            EmployeeMaster.objects.update_or_create(
+                                card_no=card_no,
+                                defaults={
+                                    'project_id': data.get('project'),
+                                    'name': name,
+                                    'dob': dob,
+                                    'gender': gender,
+                                    'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
+                                    'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
+                                    'address': get_val(data, 'address', 'addr') or '',
+                                    'designation': get_val(data, 'designation', 'desig') or '',
+                                }
+                            )
+                            success_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        failed_records.append({**data, 'error': str(e)})
 
-                    gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
-                    gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
-                    
-                    dob = get_val(data, 'dob', 'date_of_birth')
-                    if not dob:
-                        dob = calculate_dob(get_val(data, 'age', 'age_gender'))
+            # 2. Process Dependents
+            for data in records:
+                rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
+                if rel and 'PRIMARY' not in rel and 'HOLDER' not in rel:
+                    try:
+                        with transaction.atomic():
+                            full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
+                            if not full_card_no: raise Exception("Missing Card Number")
+                            if full_card_no.endswith('.0'):
+                                full_card_no = full_card_no[:-2]
+                            
+                            parent_card_no = full_card_no.split('/')[0] if '/' in full_card_no else full_card_no
+                            suffix = '/' + full_card_no.split('/')[1] if '/' in full_card_no else '/1'
+                            
+                            if parent_card_no.isdigit():
+                                parent_card_no = parent_card_no.zfill(4)
+                            
+                            employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
+                            if not employee: raise Exception(f"Parent employee {parent_card_no} not found")
 
-                    FamilyMember.objects.update_or_create(
-                        employee=employee,
-                        card_no_suffix=suffix,
-                        defaults={
-                            'name': get_val(data, 'name', 'family_name'),
-                            'dob': dob,
-                            'gender': gender,
-                            'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
-                            'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
-                            'relationship': rel
-                        }
-                    )
-                    success_count += 1
-                except Exception as e:
-                    error_count += 1
-                    failed_records.append({**data, 'error': str(e)})
+                            gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
+                            gender = 'FEMALE' if 'F' in gender_str else ('OTHER' if 'O' in gender_str else 'MALE')
+                            
+                            dob = get_val(data, 'dob', 'date_of_birth')
+                            if not dob:
+                                dob = calculate_dob(get_val(data, 'age', 'age_gender'))
+
+                            FamilyMember.objects.update_or_create(
+                                employee=employee,
+                                card_no_suffix=suffix,
+                                defaults={
+                                    'name': get_val(data, 'name', 'family_name'),
+                                    'dob': dob,
+                                    'gender': gender,
+                                    'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
+                                    'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
+                                    'relationship': rel
+                                }
+                            )
+                            success_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        failed_records.append({**data, 'error': str(e)})
         
         log_action(request.user, 'Governance', 'Bulk Upload', f"Imported {success_count} personnel records (Errors: {error_count})")
         return Response({"success": success_count, "errors": error_count, "failed_records": failed_records})
@@ -1185,7 +1219,9 @@ from django.http import HttpResponse
 class PatientViewSet(viewsets.ModelViewSet):
 
     serializer_class = PatientSerializer
-    search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no']
+    pagination_class = LargeResultsPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no', 'patient_id']
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
@@ -1195,6 +1231,34 @@ class PatientViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated()]
         # Actions restricted to Staff/Admin
         return [permissions.IsAuthenticated(), IsStaffUser()]
+
+    def filter_queryset(self, queryset):
+        search_query = self.request.query_params.get('search', '').strip()
+        card_ids = []
+        if search_query:
+            import re
+            match = re.search(r'\b(?:BHSPL)?(\d{4})(?:/\d+)?\b', search_query, re.IGNORECASE)
+            if not match:
+                match = re.search(r'\b(\d+)(?:/\d+)?\b', search_query)
+            
+            if match:
+                base_card = match.group(1)
+                if base_card.isdigit():
+                    base_card = base_card.zfill(4)
+                
+                card_matches = self.get_base_queryset().filter(
+                    Q(card_no=base_card) | Q(card_no__startswith=f"{base_card}/")
+                )
+                card_ids = list(card_matches.values_list('id', flat=True))
+
+        queryset = super().filter_queryset(queryset)
+
+        if card_ids:
+            queryset_ids = list(queryset.values_list('id', flat=True))
+            combined_ids = list(set(card_ids + queryset_ids))
+            queryset = self.get_base_queryset().filter(id__in=combined_ids)
+            
+        return queryset
 
     def get_base_queryset(self):
         queryset = Patient.objects.all().order_by('-created_at')
@@ -1215,11 +1279,131 @@ class PatientViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def sync_missing_family_members(self):
+        # 0. Thread-safe lock to prevent concurrent execution from parallel API calls
+        if not _sync_lock.acquire(blocking=False):
+            return
+        try:
+            from django.db import transaction
+            from django.db.models import Count
+            from patients.models import Patient, EmployeeMaster, FamilyMember
+            
+            # A. Dynamic Duplicate Cleanup: Clean up any duplicate Patient records sharing the same family_member or employee_master
+            try:
+                # Dup Family Members
+                dup_families = Patient.objects.filter(family_member__isnull=False).values('family_member').annotate(cnt=Count('id')).filter(cnt__gt=1)
+                for dup in dup_families:
+                    fm_id = dup['family_member']
+                    pats = list(Patient.objects.filter(family_member_id=fm_id).order_by('id'))
+                    for p in pats[1:]:
+                        p.delete()
+
+                # Dup Employees (Primary)
+                dup_employees = Patient.objects.filter(employee_master__isnull=False, family_member__isnull=True).values('employee_master').annotate(cnt=Count('id')).filter(cnt__gt=1)
+                for dup in dup_employees:
+                    emp_id = dup['employee_master']
+                    pats = list(Patient.objects.filter(employee_master_id=emp_id, family_member__isnull=True).order_by('id'))
+                    for p in pats[1:]:
+                        p.delete()
+            except Exception as clean_err:
+                print("Failed during duplicate Patient cleanup:", clean_err)
+
+            # 1. Sync Employee Masters that do not have a Patient record
+            missing_employees = EmployeeMaster.objects.filter(patients__isnull=True)
+            for emp in missing_employees:
+                try:
+                    with transaction.atomic():
+                        # Strict double check: Ensure no Patient record already exists
+                        if Patient.objects.filter(employee_master=emp, family_member__isnull=True).exists():
+                            continue
+                        if Patient.objects.filter(card_no=emp.card_no).exists():
+                            continue
+                            
+                        # Determine unique id_proof_number
+                        aadhaar = emp.aadhar_no or emp.mobile_no or f"EMP-{emp.card_no}"
+                        if Patient.objects.filter(id_proof_number=aadhaar).exists():
+                            aadhaar = f"EMP-{emp.card_no}-{emp.id}"
+                        
+                        parts = emp.name.strip().split(' ', 1)
+                        first_name = parts[0]
+                        last_name = parts[1] if len(parts) > 1 else 'Employee'
+                        
+                        Patient.objects.create(
+                            first_name=first_name,
+                            last_name=last_name,
+                            dob=emp.dob,
+                            gender=emp.gender if emp.gender in ['MALE', 'FEMALE', 'OTHER'] else 'MALE',
+                            phone=emp.mobile_no,
+                            address=emp.address,
+                            id_proof_type='AADHAAR' if emp.aadhar_no else 'EMPLOYEE_CARD',
+                            id_proof_number=aadhaar,
+                            card_no=emp.card_no,
+                            relationship='PRIMARY CARD HOLDER',
+                            is_employee_linked=True,
+                            employee_master=emp,
+                            project=emp.project
+                        )
+                except Exception as ex:
+                    print(f"Error syncing employee {emp.card_no}:", ex)
+            
+            # 2. Sync Family Members that do not have a Patient record
+            missing_families = FamilyMember.objects.filter(patients__isnull=True)
+            for fm in missing_families:
+                try:
+                    with transaction.atomic():
+                        # Strict double check: Ensure no Patient record already exists for this fm
+                        if Patient.objects.filter(family_member=fm).exists():
+                            continue
+                        
+                        emp = fm.employee
+                        card_no_val = f"{emp.card_no}{fm.card_no_suffix}"
+                        if Patient.objects.filter(card_no=card_no_val).exists():
+                            continue
+                            
+                        # Determine unique id_proof_number
+                        aadhaar = fm.aadhar_no or fm.mobile_no or f"CARD-{emp.card_no}{fm.card_no_suffix}"
+                        if Patient.objects.filter(id_proof_number=aadhaar).exists():
+                            aadhaar = f"CARD-{emp.card_no}{fm.card_no_suffix}-{fm.id}"
+                        
+                        parts = fm.name.strip().split(' ', 1)
+                        first_name = parts[0]
+                        last_name = parts[1] if len(parts) > 1 else 'Family'
+                        
+                        Patient.objects.create(
+                            first_name=first_name,
+                            last_name=last_name,
+                            dob=fm.dob,
+                            gender=fm.gender if fm.gender in ['MALE', 'FEMALE', 'OTHER'] else 'MALE',
+                            phone=fm.mobile_no or emp.mobile_no,
+                            address=emp.address,
+                            id_proof_type='AADHAAR' if fm.aadhar_no else 'EMPLOYEE_CARD',
+                            id_proof_number=aadhaar,
+                            card_no=card_no_val,
+                            relationship=fm.relationship,
+                            is_employee_linked=True,
+                            employee_master=emp,
+                            family_member=fm,
+                            project=emp.project
+                        )
+                except Exception as ex:
+                    print(f"Error syncing family member {fm.card_no_suffix}:", ex)
+        except Exception as e:
+            print("Failed during dynamic Patient sync:", e)
+        finally:
+            _sync_lock.release()
+
     def get_queryset(self):
+        self.sync_missing_family_members()
         queryset = self.get_base_queryset()
             
         # --- Workflow Tab Filtering ---
         view_mode = self.request.query_params.get('view', 'all').lower()
+        search_query = self.request.query_params.get('search', '').strip()
+        
+        # If searching, bypass workflow filters to search across all patients
+        if search_query:
+            return queryset.distinct()
+
         if view_mode == 'active':
             # Only show patients with a currently active clinical visit
             queryset = queryset.filter(visits__is_active=True).distinct()
