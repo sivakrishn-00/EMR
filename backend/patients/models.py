@@ -286,6 +286,40 @@ def sync_employee_to_registry(sender, instance, **kwargs):
     except Exception as e:
         print(f"Sync Primary Registry Error: {e}")
 
+    # Propagate primary employee updates to dynamic registry dependents using fallbacks
+    try:
+        dependents = RegistryData.objects.filter(
+            registry_type__type_category='PERSONNEL_DEPENDENT',
+            additional_fields__parent_card_no=instance.card_no
+        )
+        for dep in dependents:
+            suffix = '/' + dep.ucode.split('/')[1] if '/' in dep.ucode else '/1'
+            fm = FamilyMember.objects.filter(employee=instance, card_no_suffix=suffix).first()
+            if fm:
+                fm.save()
+    except Exception as e_dep:
+        print(f"Propagate Employee Master to Dependents Error: {e_dep}")
+
+    # Auto-resolve and link/update any Patient profiles matching this employee card_no
+    try:
+        from .models import Patient
+        patients = Patient.objects.filter(
+            card_no=instance.card_no
+        )
+        for p in patients:
+            p.first_name = instance.name.split(' ')[0]
+            p.last_name = " ".join(instance.name.split(' ')[1:]) if " " in instance.name else ""
+            p.dob = instance.dob
+            p.gender = instance.gender
+            p.phone = instance.mobile_no
+            p.address = instance.address
+            p.employee_master = instance
+            p.is_employee_linked = True
+            p.relationship = 'PRIMARY CARD HOLDER'
+            p.save()
+    except Exception as ex:
+        print(f"Auto-link Patient Primary Error: {ex}")
+
 @receiver(post_save, sender=FamilyMember)
 def sync_family_to_registry(sender, instance, **kwargs):
     if not instance.employee:
@@ -306,14 +340,36 @@ def sync_family_to_registry(sender, instance, **kwargs):
                         'parent_card_no': instance.employee.card_no,
                         'dob': str(instance.dob) if instance.dob else '',
                         'gender': instance.gender,
-                        'aadhar_no': instance.aadhar_no or '',
-                        'mobile_no': instance.mobile_no or '',
+                        'aadhar_no': instance.aadhar_no or instance.employee.aadhar_no or '',
+                        'mobile_no': instance.mobile_no or instance.employee.mobile_no or '',
                         'relationship': instance.relationship,
                     }
                 }
             )
     except Exception as e:
         print(f"Sync Dependent Registry Error: {e}")
+
+    # Auto-resolve and link/update any Patient profiles matching this family member's card_no
+    try:
+        from .models import Patient
+        full_card_no = f"{instance.employee.card_no}{instance.card_no_suffix}"
+        patients = Patient.objects.filter(
+            card_no=full_card_no
+        )
+        for p in patients:
+            p.first_name = instance.name.split(' ')[0]
+            p.last_name = " ".join(instance.name.split(' ')[1:]) if " " in instance.name else ""
+            p.dob = instance.dob
+            p.gender = instance.gender
+            p.phone = instance.mobile_no or instance.employee.mobile_no
+            p.address = instance.employee.address
+            p.employee_master = instance.employee
+            p.family_member = instance
+            p.is_employee_linked = True
+            p.relationship = instance.relationship
+            p.save()
+    except Exception as ex:
+        print(f"Auto-link Patient Dependent Error: {ex}")
 
 @receiver(post_delete, sender=EmployeeMaster)
 def delete_employee_from_registry(sender, instance, **kwargs):

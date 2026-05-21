@@ -217,6 +217,26 @@ const AdminMasters = () => {
      is_active: true
    });
 
+  // Batch Stock Ledger State
+  const [selectedBatchForLedger, setSelectedBatchForLedger] = useState(null);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+  const [ledgerRecords, setLedgerRecords] = useState([]);
+  const [isLedgerLoading, setIsLedgerLoading] = useState(false);
+
+  const openBatchLedger = async (batch) => {
+    setSelectedBatchForLedger(batch);
+    setIsLedgerModalOpen(true);
+    setIsLedgerLoading(true);
+    try {
+      const response = await api.get(`/api/pharmacy/dispensing/?batch=${batch.id}`);
+      setLedgerRecords(response.data);
+    } catch (err) {
+      console.error("Error fetching batch dispensing records:", err);
+    } finally {
+      setIsLedgerLoading(false);
+    }
+  };
+
    const resetLabForm = () => {
      setLabTestForm({ name: "", code: "", test_type: "", department: "", description: "", is_active: true });
      setIsEditingLabTest(false);
@@ -2186,16 +2206,16 @@ const AdminMasters = () => {
                                                  roleBorder = "1px solid rgba(234, 88, 12, 0.15)";
                                               }
 
-                                              const statusColor = b.status === 'EXPIRED' ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#f59e0b' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#3b82f6' : '#10b981';
-                                              const statusBg = b.status === 'EXPIRED' ? 'rgba(239, 68, 68, 0.15)' : b.status === 'EXPIRING_SOON' ? 'rgba(245, 158, 11, 0.15)' : b.status === 'LOW_STOCK' ? 'rgba(249, 115, 22, 0.15)' : b.status === 'HIGH_STOCK' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)';
-                                              const statusLabel = b.status === 'EXPIRED' ? 'EXPIRED' : b.status === 'EXPIRING_SOON' ? 'EXPIRING' : b.status === 'LOW_STOCK' ? 'LOW' : b.status === 'HIGH_STOCK' ? 'HIGH' : 'SAFE';
+                                              const statusColor = isExpired ? '#ef4444' : isDepleted ? '#ef4444' : b.status === 'EXPIRING_SOON' ? '#f59e0b' : b.status === 'LOW_STOCK' ? '#f97316' : b.status === 'HIGH_STOCK' ? '#3b82f6' : '#10b981';
+                                              const statusBg = isExpired ? 'rgba(239, 68, 68, 0.15)' : isDepleted ? 'rgba(239, 68, 68, 0.15)' : b.status === 'EXPIRING_SOON' ? 'rgba(245, 158, 11, 0.15)' : b.status === 'LOW_STOCK' ? 'rgba(249, 115, 22, 0.15)' : b.status === 'HIGH_STOCK' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+                                              const statusLabel = isExpired ? 'EXPIRED' : isDepleted ? 'DEPLETED' : b.status === 'EXPIRING_SOON' ? 'EXPIRING' : b.status === 'LOW_STOCK' ? 'LOW' : b.status === 'HIGH_STOCK' ? 'HIGH' : 'SAFE';
 
                                               return (
                                                  <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--surface)", padding: "0.75rem 1rem", borderRadius: "12px", border: "1px solid var(--border)", borderLeft: isConsuming ? "4px solid #ea580c" : "1px solid var(--border)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)", transition: "all 0.2s" }} className="hover-lift">
                                                     <div>
                                                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                                                           <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-main)" }}>{b.medication_name}</span>
-                                                          <span style={{ fontSize: "0.625rem", background: "#f1f5f9", color: "var(--text-main)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>B {b.batch_number}</span>
+                                                          <span style={{ fontSize: "0.625rem", background: "rgba(148, 163, 184, 0.12)", color: "var(--text-main)", border: "1px solid var(--border)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>B {b.batch_number}</span>
                                                           <span style={{ fontSize: "0.625rem", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>₹{b.unit_cost !== undefined ? Number(b.unit_cost).toFixed(2) : "0.00"}</span>
                                                           
                                                           <span style={{ 
@@ -2246,6 +2266,30 @@ const AdminMasters = () => {
                                                        }}>
                                                           {statusLabel}
                                                        </span>
+                                                       
+                                                       {/* Beautiful Ledger History Trigger */}
+                                                       <button
+                                                          title="View Stock Deduction History"
+                                                          onClick={() => openBatchLedger(b)}
+                                                          style={{
+                                                             background: "var(--surface)",
+                                                             border: "1px solid var(--border)",
+                                                             borderRadius: "8px",
+                                                             width: "30px",
+                                                             height: "30px",
+                                                             cursor: "pointer",
+                                                             display: "flex",
+                                                             alignItems: "center",
+                                                             justifyContent: "center",
+                                                             transition: "all 0.2s"
+                                                          }}
+                                                          className="hover-lift"
+                                                       >
+                                                          <svg width="14" height="14" fill="none" stroke="var(--primary)" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                             <path d="M12 8v4l3 3" stroke="var(--primary)" />
+                                                             <circle cx="12" cy="12" r="9" stroke="var(--primary)" />
+                                                          </svg>
+                                                       </button>
                                                     </div>
                                                  </div>
                                               );
@@ -2315,8 +2359,8 @@ const AdminMasters = () => {
                                           fontSize: "0.75rem",
                                           fontWeight: 600,
                                           borderRadius: "8px",
-                                          border: "1px solid #cbd5e1",
-                                          background: "#f8fafc",
+                                          border: "1px solid var(--border)",
+                                          background: "var(--background)",
                                           outline: "none",
                                           transition: "all 0.2s",
                                           color: "var(--text-main)"
@@ -2337,10 +2381,10 @@ const AdminMasters = () => {
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                   <thead>
                                     <tr style={{ background: "var(--background)", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, zIndex: 10 }}>
-                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Medication Name</th>
-                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Facility Project</th>
-                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Quantity Left</th>
-                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "#f8fafc" }}>Depletion Status</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "var(--background)" }}>Medication Name</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "var(--background)" }}>Facility Project</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "var(--background)" }}>Quantity Left</th>
+                                      <th style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "left", padding: "1rem 1.25rem", letterSpacing: "0.05em", background: "var(--background)" }}>Depletion Status</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2401,7 +2445,7 @@ const AdminMasters = () => {
                                                    transition: "all 0.2s ease",
                                                    background: "transparent"
                                                  }}
-                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+                                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(148, 163, 184, 0.08)"; }}
                                                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                                                >
                                                  <td style={{ padding: "1rem 1.25rem", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2410,13 +2454,13 @@ const AdminMasters = () => {
                                                  </td>
                                                  <td style={{ padding: "1rem 1.25rem" }}>
                                                    <span style={{ 
-                                                     background: "#eef2ff", 
-                                                     color: "#4f46e5", 
+                                                     background: "rgba(99, 102, 241, 0.08)", 
+                                                     color: "var(--primary)", 
                                                      padding: "4px 10px", 
                                                      borderRadius: "12px", 
                                                      fontWeight: 700, 
                                                      fontSize: "0.75rem", 
-                                                     border: "1px solid #c7d2fe",
+                                                     border: "1px solid rgba(99, 102, 241, 0.15)",
                                                      display: "inline-block"
                                                    }}>
                                                      {item.registry_type_project_name || "Global"}
@@ -2433,7 +2477,7 @@ const AdminMasters = () => {
                                                  </td>
                                                  <td style={{ padding: "1rem 1.25rem" }}>
                                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                                     <div style={{ flex: 1, minWidth: "80px", height: "8px", background: "#f1f5f9", borderRadius: "4px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                                                     <div style={{ flex: 1, minWidth: "80px", height: "8px", background: "var(--background)", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border)" }}>
                                                        <div style={{ 
                                                          width: `${Math.min(100, pct)}%`, 
                                                          height: "100%", 
@@ -3576,7 +3620,7 @@ const AdminMasters = () => {
                             return (
                               <React.Fragment key={m.id}>
                                 <tr style={{ background: "transparent" }}>
-                                  {["employee", "family", "health", "employee_master", "family_member"].includes(
+                                  {["employee", "family", "health", "employee_master"].includes(
                                     exploringProtocolId,
                                   ) ? (
                                     <>
@@ -3684,29 +3728,41 @@ const AdminMasters = () => {
                                             getCurrentProtocols().find(
                                               (p) => p.id === exploringProtocolId,
                                             )?.fields || []
-                                          ).map((f) => (
-                                            <td
-                                              key={f.id || f.slug}
-                                              style={{
-                                                padding: "1.5rem 1.5rem",
-                                                fontWeight: 700,
-                                                color: "var(--text-main)",
-                                                fontSize: "0.875rem",
-                                              }}
-                                            >
-                                              {String(
-                                                m.additional_fields?.[f.slug] ||
-                                                m.additional_fields?.[
-                                                f.slug.toLowerCase()
-                                                ] ||
-                                                m.additional_fields?.[
-                                                f.slug.toUpperCase()
-                                                ] ||
-                                                m[f.slug.toLowerCase()] ||
-                                                "--",
-                                              )}
-                                            </td>
-                                          ))
+                                          ).map((f) => {
+                                            const slugLower = f.slug?.toLowerCase();
+                                            let displayVal = m.additional_fields?.[f.slug] ||
+                                                             m.additional_fields?.[slugLower] ||
+                                                             m.additional_fields?.[f.slug.toUpperCase()] ||
+                                                             m[slugLower];
+
+                                            // Special overrides for dependent registry
+                                            if (slugLower === 'card_no') {
+                                              displayVal = m.ucode || displayVal;
+                                            } else if (slugLower === 'gender') {
+                                              const dob = m.additional_fields?.dob || m.additional_fields?.DOB;
+                                              const genderVal = m.additional_fields?.gender || m.additional_fields?.GENDER || displayVal || "--";
+                                              if (dob) {
+                                                const ageVal = new Date().getFullYear() - new Date(dob).getFullYear();
+                                                displayVal = `${ageVal} / ${genderVal?.[0] || genderVal}`;
+                                              } else {
+                                                displayVal = genderVal;
+                                              }
+                                            }
+
+                                            return (
+                                              <td
+                                                key={f.id || f.slug}
+                                                style={{
+                                                  padding: "1.5rem 1.5rem",
+                                                  fontWeight: 700,
+                                                  color: "var(--text-main)",
+                                                  fontSize: "0.875rem",
+                                                }}
+                                              >
+                                                {String(displayVal || "--")}
+                                              </td>
+                                            );
+                                          })
                                         )}
                                       </>
                                   )}
@@ -6987,6 +7043,174 @@ const AdminMasters = () => {
                 onClick={confirmModal.onConfirm}
               >
                 Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isLedgerModalOpen && createPortal(
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.6)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999999,
+          padding: "1rem"
+        }}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: "700px",
+            background: "var(--surface)",
+            borderRadius: "24px",
+            border: "1px solid var(--border)",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "85vh",
+            animation: "pulse 0.15s ease-out"
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "1.5rem",
+              background: "linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                  <Pill size={20} color="var(--primary)" />
+                  <span>Stock Deduction History</span>
+                </h3>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", margin: 0 }}>
+                  Medication: <b style={{ color: "var(--text-main)" }}>{selectedBatchForLedger?.medication_name}</b> | Batch: <b style={{ color: "var(--text-main)" }}>{selectedBatchForLedger?.batch_number}</b>
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsLedgerModalOpen(false)}
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "50%",
+                  width: "36px",
+                  height: "36px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "var(--text-muted)",
+                  transition: "all 0.2s"
+                }}
+                className="hover-lift"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: "1.5rem", overflowY: "auto", flex: 1 }}>
+              {/* Batch Info Cards */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "1rem",
+                marginBottom: "1.5rem"
+              }}>
+                <div style={{ background: "var(--background)", border: "1px solid var(--border)", padding: "0.75rem", borderRadius: "12px", textAlign: "center" }}>
+                  <span style={{ fontSize: "0.625rem", color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase", display: "block" }}>Starting Stock</span>
+                  <span style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)" }}>{selectedBatchForLedger?.initial_qty}</span>
+                </div>
+                <div style={{ background: "rgba(16, 185, 129, 0.05)", border: "1px solid rgba(16, 185, 129, 0.15)", padding: "0.75rem", borderRadius: "12px", textAlign: "center" }}>
+                  <span style={{ fontSize: "0.625rem", color: "#10b981", fontWeight: 800, textTransform: "uppercase", display: "block" }}>Current Balance</span>
+                  <span style={{ fontSize: "1.25rem", fontWeight: 900, color: "#10b981" }}>{selectedBatchForLedger?.quantity}</span>
+                </div>
+                <div style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.15)", padding: "0.75rem", borderRadius: "12px", textAlign: "center" }}>
+                  <span style={{ fontSize: "0.625rem", color: "#ef4444", fontWeight: 800, textTransform: "uppercase", display: "block" }}>Total Deductions</span>
+                  <span style={{ fontSize: "1.25rem", fontWeight: 900, color: "#ef4444" }}>
+                    {(selectedBatchForLedger?.initial_qty || 0) - (selectedBatchForLedger?.quantity || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {(() => {
+                const records = Array.isArray(ledgerRecords) ? ledgerRecords : (ledgerRecords?.results || []);
+                if (isLedgerLoading) {
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem", gap: "12px" }}>
+                      <div style={{ width: "32px", height: "32px", border: "3px solid #e2e8f0", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700 }}>Fetching deduction ledger...</span>
+                    </div>
+                  );
+                }
+                if (records.length === 0) {
+                  return (
+                    <div style={{ textAlign: "center", padding: "3rem", border: "2px dashed var(--border)", borderRadius: "16px" }}>
+                      <Activity size={36} color="var(--text-muted)" style={{ opacity: 0.5, marginBottom: "0.75rem" }} />
+                      <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>No deductions recorded yet</p>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", margin: 0 }}>This batch has not been dispensed in any prescriptions.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
+                      <thead>
+                        <tr style={{ background: "var(--background)", borderBottom: "1px solid var(--border)" }}>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontWeight: 800, color: "var(--text-muted)" }}>DATE & TIME</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontWeight: 800, color: "var(--text-muted)" }}>PATIENT (CARD NO)</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "center", fontWeight: 800, color: "var(--text-muted)" }}>DEDUCTED</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontWeight: 800, color: "var(--text-muted)" }}>PRESCRIBER</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {records.map((rec) => (
+                          <tr key={rec.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: 700 }}>
+                              {new Date(rec.dispensed_at).toLocaleDateString('en-IN', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit', hour12: true
+                              })}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: 700 }}>
+                              <div>{rec.patient_name}</div>
+                              <small style={{ color: "var(--text-muted)" }}>{rec.card_no}</small>
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", textAlign: "center", color: "#ef4444", fontWeight: 800 }}>
+                              -{rec.quantity}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", color: "var(--text-main)", fontWeight: 700 }}>
+                              {rec.prescribed_by || "System"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: "1rem 1.5rem",
+              background: "var(--background)",
+              borderTop: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "flex-end"
+            }}>
+              <button 
+                onClick={() => setIsLedgerModalOpen(false)}
+                className="btn btn-secondary"
+                style={{ height: "42px", padding: "0 1.5rem", fontSize: "0.8125rem" }}
+              >
+                Close Ledger
               </button>
             </div>
           </div>

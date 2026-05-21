@@ -9,14 +9,14 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const token = localStorage.getItem('access_token');
+      const token = sessionStorage.getItem('access_token');
       if (token) {
         try {
           const res = await api.get('accounts/me/');
           setUser(res.data);
         } catch (error) {
           console.error("Failed to fetch user", error);
-          localStorage.clear();
+          sessionStorage.clear();
         }
       }
       setLoading(false);
@@ -26,8 +26,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     const res = await api.post('accounts/login/', { username, password });
-    localStorage.setItem('access_token', res.data.access);
-    localStorage.setItem('refresh_token', res.data.refresh);
+    sessionStorage.setItem('access_token', res.data.access);
+    sessionStorage.setItem('refresh_token', res.data.refresh);
     
     // Fetch user details after login
     const userRes = await api.get('accounts/me/');
@@ -36,15 +36,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginFromData = (userData, access, refresh) => {
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
+    sessionStorage.setItem('access_token', access);
+    sessionStorage.setItem('refresh_token', refresh);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.clear();
+    sessionStorage.clear();
     setUser(null);
   };
+
+  // 🛡️ Idle Session Timeout: Automatically log out after 15 minutes of inactivity
+  useEffect(() => {
+    if (!user) return;
+
+    const TIMEOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+    let timeoutId;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout();
+        window.location.href = '/login?reason=timeout';
+      }, TIMEOUT_DURATION);
+    };
+
+    // Track user interactions
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    resetTimer(); // Initialize timer
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, loginFromData, logout }}>
@@ -54,3 +81,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

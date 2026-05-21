@@ -189,7 +189,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         if card_no_input.isdigit():
                             card_no_input = card_no_input.zfill(4)
                     
-                    if '/' in card_no_input:
+                    is_family_case = '/' in card_no_input
+                    member = None
+                    employee = None
+                    
+                    if is_family_case:
                         # 1. Family Member Granular Case (e.g. 0157/1)
                         parts = card_no_input.split('/')
                         parent_card = parts[0]
@@ -197,15 +201,48 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         
                         member = FamilyMember.objects.filter(employee__card_no=parent_card, card_no_suffix=suffix).first()
                         if not member:
-                            errors.append(f"Dependent {card_no_input} not found in Master Registry.")
-                            transaction.savepoint_rollback(sid)
-                            continue
-                        
+                            # Fallback: Check if this card number with slash was actually uploaded as a Primary Employee
+                            employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                            if employee:
+                                is_family_case = False # Re-classify as Primary Employee case
+                            else:
+                                # Create unlinked placeholder patient profile so it is present in reports/lists immediately!
+                                patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
+                                if patient_qs.count() > 1:
+                                    patient_first = patient_qs.first()
+                                    patient_qs.exclude(id=patient_first.id).delete()
+                                    
+                                Patient.objects.update_or_create(
+                                    card_no=card_no_input,
+                                    project=project,
+                                    defaults={
+                                        'first_name': 'Patient',
+                                        'last_name': card_no_input,
+                                        'dob': None,
+                                        'gender': 'MALE',
+                                        'id_proof_type': 'EMPLOYEE_CARD',
+                                        'id_proof_number': card_no_input,
+                                        'is_employee_linked': False,
+                                        'relationship': 'DEPENDENT'
+                                    }
+                                )
+                                errors.append(f"Dependent {card_no_input} not in Masters. Profile created as unlinked placeholder.")
+                                linked_count += 1
+                                transaction.savepoint_commit(sid)
+                                continue
+                                
+                    if is_family_case:
                         employee = member.employee
                         # Sync parent project link if needed (Metadata sync)
                         if employee.project != project:
                             employee.project = project
                             employee.save()
+                            
+                        # Safe update or create: Deduplicate existing duplicate patient profiles to prevent MultipleObjectsReturned errors
+                        patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
+                        if patient_qs.count() > 1:
+                            patient_first = patient_qs.first()
+                            patient_qs.exclude(id=patient_first.id).delete()
                             
                         # Create/Update Patient Profile for the SPECIFIC Family Member
                         Patient.objects.update_or_create(
@@ -228,17 +265,45 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         )
                         linked_count += 1
                     else:
-                        # 2. Primary Employee Case (e.g. 2254)
-                        employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                        # 2. Primary Employee Case (e.g. 2254 or 0055/1 uploaded as primary employee)
                         if not employee:
-                            errors.append(f"Card {card_no_input} not found in Global Master List.")
-                            transaction.savepoint_rollback(sid)
+                            employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                        if not employee:
+                            # Create unlinked placeholder patient profile so it is present in reports/lists immediately!
+                            patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
+                            if patient_qs.count() > 1:
+                                patient_first = patient_qs.first()
+                                patient_qs.exclude(id=patient_first.id).delete()
+                                
+                            Patient.objects.update_or_create(
+                                card_no=card_no_input,
+                                project=project,
+                                defaults={
+                                    'first_name': 'Patient',
+                                    'last_name': card_no_input,
+                                    'dob': None,
+                                    'gender': 'MALE',
+                                    'id_proof_type': 'EMPLOYEE_CARD',
+                                    'id_proof_number': card_no_input,
+                                    'is_employee_linked': False,
+                                    'relationship': 'PRIMARY CARD HOLDER'
+                                }
+                            )
+                            errors.append(f"Card {card_no_input} not in Masters. Profile created as unlinked placeholder.")
+                            linked_count += 1
+                            transaction.savepoint_commit(sid)
                             continue
                         
                         # Link to this project (Metadata)
                         employee.project = project
                         employee.save()
                         
+                        # Safe update or create: Deduplicate existing duplicate patient profiles to prevent MultipleObjectsReturned errors
+                        patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
+                        if patient_qs.count() > 1:
+                            patient_first = patient_qs.first()
+                            patient_qs.exclude(id=patient_first.id).delete()
+                            
                         # Create/Update Patient Profile for Primary Employee ONLY
                         Patient.objects.update_or_create(
                             card_no=card_no_input,
@@ -776,11 +841,28 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                         return data[d_key]
             return None
 
+        def clean_str_field(val):
+            if val is None:
+                return None
+            val_str = str(val).strip()
+            if val_str.lower() in ['nan', 'none', 'null', '', 'n/a']:
+                return None
+            # Strip trailing float decimals if present (e.g. 9876543210.0 -> 9876543210)
+            if '.' in val_str:
+                parts = val_str.split('.')
+                if parts[1] == '0' or parts[1] == '':
+                    val_str = parts[0]
+            return val_str
+
         from django.db import transaction
 
         with transaction.atomic():
             # 1. Process Primary Employees
             for data in records:
+                card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
+                if '/' in card_no:
+                    continue # Skip slashed card numbers, they are dependents!
+                
                 rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
                 if not rel or 'PRIMARY' in rel or 'HOLDER' in rel:
                     try:
@@ -807,8 +889,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                                     'name': name,
                                     'dob': dob,
                                     'gender': gender,
-                                    'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
-                                    'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
+                                    'aadhar_no': clean_str_field(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar', 'aadhar_card', 'aadhaar_card', 'aadhar_card_number')),
+                                    'mobile_no': clean_str_field(get_val(data, 'mobile_no', 'mobile', 'phone', 'contact_link', 'contact', 'contact_no', 'contact_number', 'phone_no', 'phone_number', 'mobile_number', 'contact_link_no', 'contact_link_number')),
                                     'address': get_val(data, 'address', 'addr') or '',
                                     'designation': get_val(data, 'designation', 'desig') or '',
                                 }
@@ -820,11 +902,12 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
 
             # 2. Process Dependents
             for data in records:
+                full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                 rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
-                if rel and 'PRIMARY' not in rel and 'HOLDER' not in rel:
+                is_dependent = '/' in full_card_no or (rel and 'PRIMARY' not in rel and 'HOLDER' not in rel)
+                if is_dependent:
                     try:
                         with transaction.atomic():
-                            full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                             if not full_card_no: raise Exception("Missing Card Number")
                             if full_card_no.endswith('.0'):
                                 full_card_no = full_card_no[:-2]
@@ -852,8 +935,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                                     'name': get_val(data, 'name', 'family_name'),
                                     'dob': dob,
                                     'gender': gender,
-                                    'aadhar_no': str(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar') or '').split('.')[0].strip() or None,
-                                    'mobile_no': str(get_val(data, 'mobile_no', 'mobile', 'phone') or '').split('.')[0].strip() or None,
+                                    'aadhar_no': clean_str_field(get_val(data, 'aadhar_no', 'aadhar', 'aadhaar', 'aadhar_card', 'aadhaar_card', 'aadhar_card_number')),
+                                    'mobile_no': clean_str_field(get_val(data, 'mobile_no', 'mobile', 'phone', 'contact_link', 'contact', 'contact_no', 'contact_number', 'phone_no', 'phone_number', 'mobile_number', 'contact_link_no', 'contact_link_number')),
                                     'relationship': rel
                                 }
                             )
@@ -1550,8 +1633,9 @@ class PatientViewSet(viewsets.ModelViewSet):
     def download_report_detail(self, request, pk=None):
         patient = self.get_object()
         visit_date = request.query_params.get('date')
+        limit = request.query_params.get('limit')
         
-        pdf_buffer = generate_patient_pdf_report(patient.patient_id, visit_date)
+        pdf_buffer = generate_patient_pdf_report(patient.patient_id, visit_date, limit=limit)
         
         response = HttpResponse(pdf_buffer, content_type='application/pdf')
         filename = f"Clinical_Report_{patient.patient_id}_{visit_date or 'full'}.pdf"
@@ -1563,8 +1647,9 @@ class PatientViewSet(viewsets.ModelViewSet):
         user = request.user
         patient_id = user.username
         visit_date = request.query_params.get('date')
+        limit = request.query_params.get('limit')
         
-        pdf_buffer = generate_patient_pdf_report(patient_id, visit_date)
+        pdf_buffer = generate_patient_pdf_report(patient_id, visit_date, limit=limit)
         
         response = HttpResponse(pdf_buffer, content_type='application/pdf')
         filename = f"My_Clinical_Report_{patient_id}_{visit_date or 'latest'}.pdf"

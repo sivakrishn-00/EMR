@@ -37,12 +37,22 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
-  // 🛡️ SECURITY: Clean gateway entry
+  //  SECURITY: Clean gateway entry
   useEffect(() => {
     if (step === 0 && !user) {
-        localStorage.clear();
+        sessionStorage.clear();
     }
   }, [user]);
+
+  // SECURITY: Detect session idle timeout redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reason') === 'timeout') {
+      toast.error('Session expired due to inactivity. Please log in again.', { id: 'session-timeout' });
+      // Clean up query param to avoid repeat toast on refresh
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Timer logic for Resend OTP
   useEffect(() => {

@@ -78,6 +78,9 @@ const Patients = () => {
   const [isCheckingIn, setIsCheckingIn] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isTriaging, setIsTriaging] = useState(false);
+  const [visibleRows, setVisibleRows] = useState(15);
+  const sentinelRef = React.useRef(null);
+  const latestRequestRef = React.useRef(0);
   
   // Download Report Settings
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -109,6 +112,30 @@ const Patients = () => {
     errors: 0,
     failedRecords: [],
     completed: false
+  });
+
+  const filteredPatients = (patients || []).filter(p => {
+    const searchLow = searchQuery.toLowerCase().trim();
+    if (!searchLow) return true;
+
+    // Smart card group matching: check if search term is a card base/suffix and extract the base
+    const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
+    if (cardMatch) {
+      const baseCard = cardMatch[1].padStart(4, '0');
+      const pCard = String(p.card_no || '').toLowerCase();
+      const pCardMatch = pCard.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || pCard.match(/(\d+)(?:\/\d+)?/);
+      if (pCardMatch && pCardMatch[1].padStart(4, '0') === baseCard) {
+        return true;
+      }
+    }
+
+    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
+    const phone = String(p.phone || '');
+    const idProof = String(p.id_proof_number || '');
+    const cardNo = String(p.card_no || '').toLowerCase();
+    const patientID = String(p.patient_id || '').toLowerCase();
+
+    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
   });
 
   const downloadFailedEnrollmentCards = () => {
@@ -354,10 +381,33 @@ const Patients = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        fetchPatients(1, viewMode, projectFilter);
+        fetchPatients(1, viewMode, projectFilter, searchQuery);
     }, 300);
     return () => clearTimeout(timer);
   }, [viewMode, searchQuery, projectFilter]);
+
+  useEffect(() => {
+    setVisibleRows(15);
+  }, [patients, viewMode]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && visibleRows < filteredPatients.length) {
+        setVisibleRows(prev => Math.min(prev + 15, filteredPatients.length));
+      }
+    }, { threshold: 0.1 });
+    
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [visibleRows, filteredPatients.length, isLoading]);
   
   const fetchStats = async () => {
     try {
@@ -373,13 +423,20 @@ const Patients = () => {
     } catch (err) {}
   };
 
-  const fetchPatients = async (pageNum = 1, currentView = viewMode, proj = projectFilter) => {
+  const fetchPatients = async (pageNum = 1, currentView = viewMode, proj = projectFilter, search = searchQuery) => {
+    const requestId = ++latestRequestRef.current;
     setIsLoading(true);
     try {
       const viewParam = currentView.toLowerCase();
-      let url = `patients/patients/?page=${pageNum}&view=${viewParam}&search=${searchQuery}`;
+      let url = `patients/patients/?page=${pageNum}&view=${viewParam}&search=${search}`;
       if (proj) url += `&project=${proj}`;
       const res = await api.get(url);
+      
+      // If a newer request has been started, ignore this response entirely!
+      if (requestId !== latestRequestRef.current) {
+          return;
+      }
+      
       if (res.data.results) {
           setPatients(res.data.results);
           setTotalCount(res.data.count);
@@ -392,10 +449,14 @@ const Patients = () => {
       setPage(pageNum);
       fetchStats(); // Update dashboard cards whenever we fetch patients
     } catch (err) {
-      console.error(err);
-      toast.error("Cloud synchronization delay. Please refresh.");
+      if (requestId === latestRequestRef.current) {
+          console.error(err);
+          toast.error("Cloud synchronization delay. Please refresh.");
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === latestRequestRef.current) {
+          setIsLoading(false);
+      }
     }
   };
 
@@ -519,7 +580,7 @@ const Patients = () => {
     const loading = toast.loading(`Generating clinical report for ${patient.first_name}...`);
     try {
       // 🚀 ELITE REDIRECTION: Using the Backend PDF API for 100% template synchronization
-      const response = await api.get(`patients/patients/${patient.id}/download_report/`, {
+      const response = await api.get(`patients/patients/${patient.id}/download_report/?limit=${limit}`, {
         responseType: 'blob'
       });
       
@@ -700,15 +761,21 @@ const Patients = () => {
 
   const renderDownloadModal = () => {
     if (!showDownloadModal || !selectedPatientForDownload) return null;
+
+    // Dynamically retrieve the currently selected project-specific theme colors for consistent page styling
+    const primaryColor = currentProject?.primary_color || '#6366f1';
+    const secondaryColor = currentProject?.secondary_color || primaryColor;
+    const fullName = `${selectedPatientForDownload.first_name} ${selectedPatientForDownload.last_name || ''}`.trim();
+
     return createPortal(
       <div className="modal-overlay">
         <div className="modal-content" style={{ maxWidth: '450px', borderRadius: '28px', padding: '0', overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f0fdfa 100%)', padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', background: 'white', color: '#0d9488', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+          <div style={{ background: `linear-gradient(135deg, #f8fafc 0%, ${primaryColor}0d 100%)`, padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'white', color: primaryColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
               <Download size={24} />
             </div>
             <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Export Scope</h2>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>{selectedPatientForDownload.first_name}'s Medical Dossier</p>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>{fullName}'s Clinical Report</p>
           </div>
 
           <div style={{ padding: '1.5rem 2.5rem 2rem' }}>
@@ -720,7 +787,7 @@ const Patients = () => {
                   min="1" 
                   max={selectedPatientForDownload.total_visits || 100}
                   className="form-control" 
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '52px', fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: 'var(--primary)' }}
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '52px', fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: primaryColor }}
                   value={downloadVisitCount}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 1;
@@ -730,7 +797,7 @@ const Patients = () => {
                 />
               </div>
               <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.75rem', fontWeight: 600 }}>
-                Patient has <span style={{ color: 'var(--primary)' }}>{selectedPatientForDownload.total_visits || 'multiple'}</span> total records.
+                Patient has <span style={{ color: primaryColor }}>{selectedPatientForDownload.total_visits || 'multiple'}</span> total records.
               </p>
             </div>
 
@@ -738,7 +805,7 @@ const Patients = () => {
               <button 
                 onClick={() => downloadMasterReport(selectedPatientForDownload, downloadVisitCount)}
                 className="btn btn-primary" 
-                style={{ padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: '#0d9488', border: 'none', boxShadow: '0 10px 15px -3px rgba(13, 148, 136, 0.3)', width: '100%', color: 'white' }}
+                style={{ padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, border: 'none', boxShadow: `0 10px 15px -3px ${primaryColor}4d`, width: '100%', color: 'white' }}
               >
                 GENERATE CLINICAL PDF
               </button>
@@ -758,29 +825,7 @@ const Patients = () => {
     );
   };
 
-  const filteredPatients = (patients || []).filter(p => {
-    const searchLow = searchQuery.toLowerCase().trim();
-    if (!searchLow) return true;
 
-    // Smart card group matching: check if search term is a card base/suffix and extract the base
-    const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
-    if (cardMatch) {
-      const baseCard = cardMatch[1].padStart(4, '0');
-      const pCard = String(p.card_no || '').toLowerCase();
-      const pCardMatch = pCard.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || pCard.match(/(\d+)(?:\/\d+)?/);
-      if (pCardMatch && pCardMatch[1].padStart(4, '0') === baseCard) {
-        return true;
-      }
-    }
-
-    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
-    const phone = String(p.phone || '');
-    const idProof = String(p.id_proof_number || '');
-    const cardNo = String(p.card_no || '').toLowerCase();
-    const patientID = String(p.patient_id || '').toLowerCase();
-
-    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
-  });
 
   const currentProject = projects.find(p => p.id == (projectFilter || user?.project));
   const activeRegProject = projects.find(p => p.id == (formData.project || user?.project));
@@ -816,7 +861,7 @@ const Patients = () => {
       {/* Navigation Tabs */}
       <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
         <button 
-            onClick={() => setViewMode('ACTIVE')}
+            onClick={() => { setSearchQuery(''); setViewMode('ACTIVE'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
                 borderBottom: viewMode === 'ACTIVE' ? '3px solid var(--primary)' : '3px solid transparent',
@@ -827,7 +872,7 @@ const Patients = () => {
             In-Clinic Queue ({tabCounts.active})
         </button>
         <button 
-            onClick={() => setViewMode('SCHEDULED')}
+            onClick={() => { setSearchQuery(''); setViewMode('SCHEDULED'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
                 borderBottom: viewMode === 'SCHEDULED' ? '3px solid var(--primary)' : '3px solid transparent',
@@ -838,7 +883,7 @@ const Patients = () => {
             Planned Schedule ({tabCounts.scheduled})
         </button>
         <button 
-            onClick={() => setViewMode('COMPLETED')}
+            onClick={() => { setSearchQuery(''); setViewMode('COMPLETED'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
                 borderBottom: viewMode === 'COMPLETED' ? '3px solid var(--primary)' : '3px solid transparent',
@@ -849,7 +894,7 @@ const Patients = () => {
             Closed Today ({tabCounts.completed})
         </button>
         <button 
-            onClick={() => setViewMode('ALL')}
+            onClick={() => { setSearchQuery(''); setViewMode('ALL'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
                 borderBottom: viewMode === 'ALL' ? '3px solid var(--primary)' : '3px solid transparent',
@@ -908,7 +953,7 @@ const Patients = () => {
                 Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i}><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Loading records...</td></tr>
                 ))
-              ) : filteredPatients.map(p => {
+              ) : filteredPatients.slice(0, visibleRows).map(p => {
                 const age = p.dob ? new Date().getFullYear() - new Date(p.dob).getFullYear() : 'N/A';
                 return (
                   <tr key={p.id}>
@@ -1138,6 +1183,26 @@ const Patients = () => {
               )}
             </tbody>
           </table>
+          {/* Lazy Loading Sentinel */}
+          {!isLoading && visibleRows < filteredPatients.length && (
+            <div 
+              ref={sentinelRef} 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                padding: '1.5rem', 
+                background: 'var(--surface)',
+                borderTop: '1px solid var(--border)',
+                gap: '0.5rem',
+                color: 'var(--text-muted)',
+                fontWeight: 600,
+                fontSize: '0.875rem'
+              }}
+            >
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading more records...
+            </div>
+          )}
         </div>
         
         {/* Pagination Controls */}

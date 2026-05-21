@@ -21,21 +21,21 @@ def PageBorder(canvas, doc):
         footer_left="ELECTRONIC MEDICAL RECORDS", 
         footer_center="Patient Clinical Report | Powered by Bavya Health Service PVT Ltd.")
 
-def generate_patient_pdf_report(patient_id, visit_date_str=None):
+def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
     """
     Elite Refactored Pass: Using the Centralized Theme Engine to eliminate redundancy.
     Maintains the Hybrid Elite layout with synchronized alignment and bold typography.
     """
+    # Force a live real-time sync of the patient's dossier before compiling the clinical report
+    dossier_manager.sync_dossier(patient_id)
     dossier = dossier_manager.get_dossier(patient_id)
-    if not dossier:
-        dossier_manager.sync_dossier(patient_id)
-        dossier = dossier_manager.get_dossier(patient_id)
     
     try:
         patient = Patient.objects.get(patient_id=patient_id)
         project_name = patient.project.name if patient.project else "Global Healthcare Hub"
         project_color = patient.project.primary_color if patient.project and patient.project.primary_color else '#1e3a8a'
     except:
+        patient = None
         project_name = "N/A"
         project_color = '#1e3a8a'
 
@@ -72,11 +72,16 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None):
     elements.append(create_main_bar("PATIENT DETAILS", theme_color))
     elements.append(Spacer(1, 0.05 * inch))
     
-    meta = dossier.get('registry_metadata', {})
+    meta = dossier.get('registry_metadata', {}) if dossier else {}
+    patient_fullname = f"{patient.first_name} {patient.last_name}" if patient else dossier.get('full_name', 'N/A')
+    patient_gender = patient.gender if patient else meta.get('gender', 'N/A')
+    patient_dob = str(patient.dob) if (patient and patient.dob) else meta.get('dob', 'N/A')
+    patient_phone = patient.phone if patient else meta.get('phone', 'N/A')
+
     id_data = [
-        [Paragraph("FULL LEGAL NAME", theme['label_left']), Paragraph(to_str(dossier.get('full_name')), theme['value']), Paragraph("PATIENT UID", theme['label_left']), Paragraph(to_str(patient_id), theme['value'])],
-        [Paragraph("GENDER", theme['label_left']), Paragraph(to_str(meta.get('gender')), theme['value']), Paragraph("AADHAR / CARD NO", theme['label_left']), Paragraph(to_str(patient.id_proof_number), theme['value'])],
-        [Paragraph("DATE OF BIRTH", theme['label_left']), Paragraph(to_str(meta.get('dob')), theme['value']), Paragraph("CONTACT LINK", theme['label_left']), Paragraph(to_str(meta.get('phone')), theme['value'])],
+        [Paragraph("FULL LEGAL NAME", theme['label_left']), Paragraph(to_str(patient_fullname), theme['value']), Paragraph("PATIENT UID", theme['label_left']), Paragraph(to_str(patient_id), theme['value'])],
+        [Paragraph("GENDER", theme['label_left']), Paragraph(to_str(patient_gender), theme['value']), Paragraph("AADHAR / CARD NO", theme['label_left']), Paragraph(to_str(patient.id_proof_number if patient else None), theme['value'])],
+        [Paragraph("DATE OF BIRTH", theme['label_left']), Paragraph(to_str(patient_dob), theme['value']), Paragraph("CONTACT LINK", theme['label_left']), Paragraph(to_str(patient_phone), theme['value'])],
     ]
     id_t = Table(id_data, colWidths=[1.4*inch, 1.9*inch, 1.4*inch, 1.9*inch])
     id_t.setStyle(TableStyle([
@@ -93,6 +98,13 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None):
     visits = dossier.get('visit_history', [])
     if visit_date_str:
         visits = [v for v in visits if v['visit_date'].startswith(visit_date_str)]
+    
+    if limit is not None:
+        try:
+            limit_val = int(limit)
+            visits = visits[:limit_val]
+        except:
+            pass
 
     for v in visits:
         v_date = to_str(v['visit_date'])[:10]
@@ -158,15 +170,19 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None):
             if res and res.get('values'):
                 lab_data.append([Paragraph(f"<b>{tn.upper()}</b>", ParagraphStyle('P', parent=theme['value'], textColor=NAVY)), Paragraph("", theme['badge_green']), Paragraph("", theme['value'])])
                 for sn, sv in res['values'].items():
-                    ref = "--"; is_alert = False; match = next((s for s in lr.get('test_master_details', {}).get('sub_tests', []) if s['name'] == sn), None)
+                    ref = "--"
+                    is_alert = False
+                    match = next((s for s in lr.get('test_master_details', {}).get('sub_tests', []) if s['name'] == sn), None)
                     if match:
-                        ref = f"{match.get('biological_range', '--')} {match.get('units', '')}";
+                        ref = f"{match.get('biological_range', '--')} {match.get('units', '')}"
                         try:
-                            val = float(sv); 
+                            val = float(sv)
                             if ' - ' in match.get('biological_range', ''):
-                                l, h = map(float, match['biological_range'].split(' - '));
-                                if val < l or val > h: is_alert = True
-                        except: pass
+                                l, h = map(float, match['biological_range'].split(' - '))
+                                if val < l or val > h:
+                                    is_alert = True
+                        except:
+                            pass
                     lab_data.append([Paragraph(f"{sn}", theme['value']), Paragraph(to_str(sv), theme['alert_red'] if is_alert else theme['badge_green']), Paragraph(ref, ParagraphStyle('R', parent=theme['value'], alignment=1))])
             else:
                 lab_data.append([Paragraph(tn, theme['value']), Paragraph(to_str(res.get('value', 'Pending')), theme['badge_green']), Paragraph("--", ParagraphStyle('R', parent=theme['value'], alignment=1))])

@@ -2,6 +2,11 @@ from rest_framework import serializers
 from .models import Prescription, DispensingRecord
 
 class DispensingRecordSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='prescription.visit.patient.__str__', read_only=True, default='Unknown')
+    card_no = serializers.CharField(source='prescription.visit.patient.card_no', read_only=True, default='N/A')
+    prescribed_by = serializers.CharField(source='prescription.ordered_by.username', read_only=True, default='System')
+    dispensed_by_username = serializers.CharField(source='dispensed_by.username', read_only=True, default='System')
+
     class Meta:
         model = DispensingRecord
         fields = '__all__'

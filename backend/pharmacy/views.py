@@ -208,6 +208,7 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = DispensingRecord.objects.all()
     serializer_class = DispensingRecordSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
         queryset = DispensingRecord.objects.all().order_by('-dispensed_at')
@@ -234,6 +235,10 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(Q(prescription__visit__patient__project_id=project_param) | Q(prescription__visit__patient__employee_master__project_id=project_param))
         else:
             queryset = queryset.filter(dispensed_by=user)
+
+        batch_param = self.request.query_params.get('batch')
+        if batch_param:
+            queryset = queryset.filter(batch_id=batch_param)
 
         return queryset
     

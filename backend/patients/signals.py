@@ -74,3 +74,11 @@ def sync_lab_to_dossier(sender, instance, created, **kwargs):
 @receiver(post_save, sender='pharmacy.Prescription')
 def sync_pharmacy_to_dossier(sender, instance, created, **kwargs):
     trigger_dossier_map(instance, created)
+
+@receiver(post_save, sender='patients.Patient')
+def sync_patient_to_dossier(sender, instance, created, **kwargs):
+    if instance.patient_id:
+        try:
+            sync_patient_dossier_task.delay(instance.patient_id)
+        except Exception as e:
+            print(f"RESILIENCE: Patient dossier sync skipped: {e}")
