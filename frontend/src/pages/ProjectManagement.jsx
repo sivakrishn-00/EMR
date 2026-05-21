@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Database, Plus, X, Pencil, Trash2, Info, Activity, AlertTriangle } from 'lucide-react';
 import api, { MEDIA_URL } from '../services/api';
 import toast from 'react-hot-toast';
@@ -21,6 +22,7 @@ const ProjectManagement = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState({ show: false, id: null });
 
     useEffect(() => {
         fetchProjects();
@@ -111,14 +113,20 @@ const ProjectManagement = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleDeleteProject = async (id) => {
-        if (!window.confirm("Are you sure? This will unmap all assigned categories.")) return;
+    const handleDeleteProject = (id) => {
+        setDeleteConfirmModal({ show: true, id: id });
+    };
+
+    const confirmDeleteProject = async () => {
+        const id = deleteConfirmModal.id;
         try {
             await api.delete(`patients/projects/${id}/`);
             toast.success("Project de-registered.");
             fetchProjects();
         } catch (err) {
             toast.error("Cannot delete active project with existing records.");
+        } finally {
+            setDeleteConfirmModal({ show: false, id: null });
         }
     };
 
@@ -461,8 +469,103 @@ const ProjectManagement = () => {
                 </div>
             </div>
             
+            
             {/* Project-Specific Branding Manager */}
             <BrandingManager projects={projects} />
+
+            {/* Project Delete Confirm Modal */}
+            {deleteConfirmModal.show && createPortal(
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 999999,
+                    padding: '1.5rem'
+                }}>
+                    <div style={{
+                        background: 'var(--surface)',
+                        width: '100%',
+                        maxWidth: '400px',
+                        borderRadius: '24px',
+                        padding: '2.4rem',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.05)',
+                        textAlign: 'center',
+                        animation: 'modalFadeIn 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: '72px',
+                            height: '72px',
+                            background: '#fef2f2',
+                            borderRadius: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.5rem',
+                            color: '#ef4444'
+                        }}>
+                            <AlertTriangle size={36} />
+                        </div>
+                        <h3 style={{ fontSize: '1.375rem', fontWeight: 900, marginBottom: '0.75rem', color: 'var(--text-main)' }}>De-register Project</h3>
+                        <p style={{ fontSize: '0.9375rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
+                            Are you sure? This will unmap all assigned categories from this project.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button 
+                                onClick={() => setDeleteConfirmModal({ show: false, id: null })}
+                                style={{
+                                    flex: 1,
+                                    padding: '0.875rem',
+                                    borderRadius: '16px',
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--background)',
+                                    color: 'var(--text-main)',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = 'var(--surface)'}
+                                onMouseOut={e => e.currentTarget.style.background = 'var(--background)'}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmDeleteProject}
+                                style={{
+                                    flex: 1,
+                                    padding: '0.875rem',
+                                    borderRadius: '16px',
+                                    border: 'none',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 8px 20px rgba(239, 68, 68, 0.3)'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = '#dc2626'}
+                                onMouseOut={e => e.currentTarget.style.background = '#ef4444'}
+                            >
+                                De-register
+                            </button>
+                        </div>
+                    </div>
+                    <style>{`
+                        @keyframes modalFadeIn {
+                            from { transform: scale(0.95); opacity: 0; }
+                            to { transform: scale(1); opacity: 1; }
+                        }
+                    `}</style>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };
@@ -619,7 +722,7 @@ const BrandingManager = ({ projects }) => {
             </div>
 
             {/* Custom Premium Pop-up Modal */}
-            {confirmModal.show && (
+            {confirmModal.show && createPortal(
                 <div style={{
                     position: 'fixed',
                     top: 0,
@@ -627,10 +730,11 @@ const BrandingManager = ({ projects }) => {
                     width: '100%',
                     height: '100%',
                     background: 'rgba(15, 23, 42, 0.75)',
+                    backdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    zIndex: 1000,
+                    zIndex: 999999,
                     padding: '1.5rem'
                 }}>
                     <div style={{
@@ -707,7 +811,8 @@ const BrandingManager = ({ projects }) => {
                             to { transform: scale(1); opacity: 1; }
                         }
                     `}</style>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
