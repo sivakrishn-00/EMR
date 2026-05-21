@@ -128,7 +128,7 @@ const Vitals = () => {
       }
       setPage(pageNum);
     } catch (err) {
-      toast.error("Failed to fetch triage queue");
+      toast.error("Failed to fetch intake queue");
     } finally {
       setIsLoading(false);
     }
@@ -312,7 +312,7 @@ const Vitals = () => {
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Triage & Nursing Station</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
         <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
       </header>
 
@@ -707,7 +707,7 @@ const Vitals = () => {
                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Observations</p>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <label><Clipboard size={14} /> Current Symptoms</label>
-                  <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during triage..."></textarea>
+                  <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during intake..."></textarea>
                </div>
                
                <div className="form-group" style={{ marginBottom: '2.5rem' }}>

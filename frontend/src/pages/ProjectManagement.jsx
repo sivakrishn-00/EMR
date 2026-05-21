@@ -444,7 +444,7 @@ const ProjectManagement = () => {
                                         />
                                         <div>
                                             <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enforce Mandatory Vitals</p>
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>When enabled, Temp and Weight are required for every triage assessment.</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>When enabled, Temp and Weight are required for every intake assessment.</p>
                                         </div>
                                     </label>
                                 </div>

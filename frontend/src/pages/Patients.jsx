@@ -518,14 +518,14 @@ const Patients = () => {
     if (!triagePatient) return;
 
     setIsTriaging(true);
-    const loadingToast = toast.loading('Initiating instant triage...');
+     const loadingToast = toast.loading('Initiating instant intake...');
     try {
       await api.post('clinical/visits/', {
         patient: triagePatient.id,
         reason: triageReason || 'OPD Consultation',
         status: 'PENDING_VITALS'
       });
-      toast.success('Patient moved to Triage/Vitals queue!', { id: loadingToast });
+      toast.success('Patient moved to Intake/Vitals queue!', { id: loadingToast });
       setShowTriageModal(false);
       setTriagePatient(null);
       setTriageReason('Routine Checkup');
@@ -1092,7 +1092,7 @@ const Patients = () => {
                                 }}>
                                     {p.current_visit.status === 'PENDING_PHARMACY' ? 'Awaiting Pharmacy' : 
                                      p.current_visit.status === 'PENDING_LAB' ? 'In Laboratory' :
-                                     p.current_visit.status === 'PENDING_VITALS' ? 'In Triage' :
+                                     p.current_visit.status === 'PENDING_VITALS' ? 'In Intake' :
                                      p.current_visit.status === 'PENDING_CONSULTATION' ? 'Initial Consult' :
                                      p.current_visit.status === 'FINAL_CONSULTATION' ? 'Final Review' : 'In Clinic'}
                                 </span>
@@ -1155,7 +1155,7 @@ const Patients = () => {
                                     setShowTriageModal(true);
                                 }}
                             >
-                                <Activity size={12} /> Triage
+                                <Activity size={12} /> Intake
                             </button>
                         )}
                         {(viewMode === 'ALL' || viewMode === 'COMPLETED') && (
@@ -1744,7 +1744,7 @@ const Patients = () => {
         document.body
       )}
 
-      {/* INSTANT TRIAGE MODAL FOR EXISTING PATIENTS */}
+      {/* INSTANT INTAKE MODAL FOR EXISTING PATIENTS */}
       {showTriageModal && triagePatient && createPortal(
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
           <div className="fade-in" style={{ background: 'var(--surface)', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)' }}>
@@ -1754,7 +1754,7 @@ const Patients = () => {
                   <Activity size={24} color="white" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: '#1e293b' }}>Confirm Triage</h2>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: '#1e293b' }}>Confirm Intake</h2>
                   <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Create new visit for returning patient</p>
                 </div>
               </div>
