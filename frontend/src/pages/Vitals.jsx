@@ -39,8 +39,6 @@ const Vitals = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
   const [vitalsData, setVitalsData] = useState({
     temperature_c: '', 
     temp_unit: 'F',
@@ -118,7 +116,7 @@ const Vitals = () => {
   const fetchActiveVisits = async (pageNum = 1) => {
     setIsLoading(true);
     try {
-      const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}`);
+      const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}&page_size=100`);
       if (res.data.results) {
           setActiveVisits(res.data.results);
           setTotalCount(res.data.count);
@@ -295,19 +293,12 @@ const Vitals = () => {
       return `Warning: Unusual ${range.label} range (${range.min}-${range.max} ${range.unit})`;
     }
     return null;
-  };
-
-  const filteredVisits = activeVisits.filter(visit => {
+  };  const filteredVisits = activeVisits.filter(visit => {
     const patientName = `${visit.patient_details?.first_name} ${visit.patient_details?.last_name}`.toLowerCase();
     const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
     const term = searchTerm.toLowerCase();
     return patientName.includes(term) || patientId.includes(term);
   });
-
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentVisits = filteredVisits.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
  
   return (
     <div className="fade-in">
@@ -315,7 +306,7 @@ const Vitals = () => {
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
         <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
       </header>
-
+ 
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting List - Only show if NO patient is selected */}
         {!selectedVisit && (
@@ -332,13 +323,13 @@ const Vitals = () => {
                         type="text"
                         placeholder="Search patient..."
                         value={searchTerm}
-                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
                         className="search-input"
                         style={{ paddingRight: '2rem' }}
                      />
                      {searchTerm && (
                         <button 
-                           onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                           onClick={() => { setSearchTerm(''); setPage(1); }}
                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                         >
                            <X size={14} />
@@ -370,7 +361,7 @@ const Vitals = () => {
                        </td>
                      </tr>
                    ) : 
-                     currentVisits.map(v => (
+                     filteredVisits.map(v => (
                     <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -470,31 +461,112 @@ const Vitals = () => {
                 </tbody>
               </table>
             </div>
-            
-               {/* Pagination */}
-               {totalPages > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #f1f5f9', background: 'var(--background)' }}>
-                     <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredVisits.length)} of {filteredVisits.length} entries
-                     </p>
-                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                           disabled={currentPage === 1}
-                           className="btn btn-secondary"
-                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-                        >
-                           Previous
-                        </button>
-                        <button
-                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                           disabled={currentPage === totalPages}
-                           className="btn btn-secondary"
-                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-                        >
-                           Next
-                        </button>
-                     </div>
+                          {/* Pagination Controls */}
+               {Math.ceil(totalCount / 100) > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Showing <span style={{ color: 'var(--primary)' }}>{filteredVisits.length}</span> of {totalCount} entries
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <button 
+                              className="btn btn-secondary" 
+                              disabled={page === 1}
+                              onClick={() => fetchActiveVisits(page - 1)}
+                              style={{ padding: '0.4rem', borderRadius: '8px', opacity: page === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContents: 'center' }}
+                          >
+                              <ChevronLeft size={18} />
+                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {(() => {
+                                  const totalPages = Math.ceil(totalCount / 100);
+                                  if (totalPages <= 1) return null;
+
+                                  const buttons = [];
+                                  const maxVisiblePages = 5;
+                                  
+                                  // Always show page 1
+                                  buttons.push(
+                                      <button 
+                                          key={1} 
+                                          onClick={() => fetchActiveVisits(1)}
+                                          style={{ 
+                                              width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                              background: page === 1 ? 'var(--primary)' : 'transparent',
+                                              color: page === 1 ? 'white' : 'var(--text-muted)',
+                                              fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                          }}
+                                      >
+                                          1
+                                      </button>
+                                  );
+
+                                  let startPage = Math.max(2, page - 1);
+                                  let endPage = Math.min(totalPages - 1, page + 1);
+
+                                  if (page <= 3) {
+                                      endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
+                                  }
+                                  if (page >= totalPages - 2) {
+                                      startPage = Math.max(2, totalPages - maxVisiblePages + 2);
+                                  }
+
+                                  if (startPage > 2) {
+                                      buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                                  }
+
+                                  for (let i = startPage; i <= endPage; i++) {
+                                      if (i > 1 && i < totalPages) {
+                                          buttons.push(
+                                              <button 
+                                                  key={i} 
+                                                  onClick={() => fetchActiveVisits(i)}
+                                                  style={{ 
+                                                      width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                      background: page === i ? 'var(--primary)' : 'transparent',
+                                                      color: page === i ? 'white' : 'var(--text-muted)',
+                                                      fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                                  }}
+                                              >
+                                                  {i}
+                                              </button>
+                                          );
+                                      }
+                                  }
+
+                                  if (endPage < totalPages - 1) {
+                                      buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                                  }
+
+                                  // Always show last page
+                                  if (totalPages > 1) {
+                                      buttons.push(
+                                          <button 
+                                              key={totalPages} 
+                                              onClick={() => fetchActiveVisits(totalPages)}
+                                              style={{ 
+                                                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                  background: page === totalPages ? 'var(--primary)' : 'transparent',
+                                                  color: page === totalPages ? 'white' : 'var(--text-muted)',
+                                                  fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                              }}
+                                          >
+                                              {totalPages}
+                                          </button>
+                                      );
+                                  }
+
+                                  return buttons;
+                              })()}
+                          </div>
+                          <button 
+                              className="btn btn-secondary" 
+                              disabled={page >= Math.ceil(totalCount / 100)}
+                              onClick={() => fetchActiveVisits(page + 1)}
+                              style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContents: 'center' }}
+                          >
+                              <ChevronRight size={18} />
+                          </button>
+                      </div>
                   </div>
                )}
           </div>

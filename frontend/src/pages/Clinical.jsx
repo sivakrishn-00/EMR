@@ -38,8 +38,6 @@ const Clinical = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
 
   const [newMed, setNewMed] = useState({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
@@ -162,7 +160,7 @@ const Clinical = () => {
     setIsLoading(true);
     try {
       // Fetch only visits that need consultation
-      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}`);
+      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=100`);
       if (res.data.results) {
           setVisitsReady(res.data.results);
           setTotalCount(res.data.count);
@@ -192,6 +190,10 @@ const Clinical = () => {
     // Auto-add current drug if typed but not added
     let finalConsultData = { ...consultData };
     if (newMed.name && consultData.next_step === 'PENDING_PHARMACY') {
+        if (!newMed.duration) {
+            toast.error("Please specify the number of Days for the medication being prescribed.");
+            return;
+        }
         const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
           ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
           : (parseInt(newMed.total_units) || 1);
@@ -207,6 +209,10 @@ const Clinical = () => {
     // Stock validation: ensure each prescribed medicine is in stock and has sufficient units if any are prescribed
     if (finalConsultData.medications.length > 0) {
         for (const med of finalConsultData.medications) {
+            if (!med.duration) {
+                toast.error(`Please specify the number of Days for "${med.name}".`);
+                return;
+            }
             const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === med.name.toLowerCase());
             if (!drugObj) {
                 toast.error(`"${med.name}" is not registered in the project's pharmacy registry.`);
@@ -283,11 +289,6 @@ const Clinical = () => {
     return patientName.includes(term) || patientId.includes(term);
   });
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentVisits = filteredVisits.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
-
   return (
     <div className="fade-in">
       <header style={{ marginBottom: '2.5rem' }}>
@@ -311,13 +312,13 @@ const Clinical = () => {
                         type="text"
                         placeholder="Search patient..."
                         value={searchTerm}
-                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
                         className="search-input"
                         style={{ paddingRight: '2rem' }}
                      />
                      {searchTerm && (
                         <button 
-                           onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                           onClick={() => { setSearchTerm(''); setPage(1); }}
                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                         >
                            <X size={14} />
@@ -349,7 +350,7 @@ const Clinical = () => {
                        </td>
                      </tr>
                    ) : (
-                     currentVisits.map(v => (
+                      filteredVisits.map(v => (
                     <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -414,31 +415,112 @@ const Clinical = () => {
                 </tbody>
               </table>
             </div>
-            
-               {/* Pagination */}
-               {totalPages > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
-                     <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                        Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredVisits.length)} of {filteredVisits.length} entries
-                     </p>
-                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                           disabled={currentPage === 1}
-                           className="btn btn-secondary"
-                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-                        >
-                           Previous
-                        </button>
-                        <button
-                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                           disabled={currentPage === totalPages}
-                           className="btn btn-secondary"
-                           style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-                        >
-                           Next
-                        </button>
-                     </div>
+                          {/* Pagination Controls */}
+               {Math.ceil(totalCount / 100) > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Showing <span style={{ color: 'var(--primary)' }}>{filteredVisits.length}</span> of {totalCount} entries
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <button 
+                              className="btn btn-secondary" 
+                              disabled={page === 1}
+                              onClick={() => fetchVisitsToSee(page - 1)}
+                              style={{ padding: '0.4rem', borderRadius: '8px', opacity: page === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                              <ChevronLeft size={18} />
+                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {(() => {
+                                  const totalPages = Math.ceil(totalCount / 100);
+                                  if (totalPages <= 1) return null;
+
+                                  const buttons = [];
+                                  const maxVisiblePages = 5;
+                                  
+                                  // Always show page 1
+                                  buttons.push(
+                                      <button 
+                                          key={1} 
+                                          onClick={() => fetchVisitsToSee(1)}
+                                          style={{ 
+                                              width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                              background: page === 1 ? 'var(--primary)' : 'transparent',
+                                              color: page === 1 ? 'white' : 'var(--text-muted)',
+                                              fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                          }}
+                                      >
+                                          1
+                                      </button>
+                                  );
+
+                                  let startPage = Math.max(2, page - 1);
+                                  let endPage = Math.min(totalPages - 1, page + 1);
+
+                                  if (page <= 3) {
+                                      endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
+                                  }
+                                  if (page >= totalPages - 2) {
+                                      startPage = Math.max(2, totalPages - maxVisiblePages + 2);
+                                  }
+
+                                  if (startPage > 2) {
+                                      buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                                  }
+
+                                  for (let i = startPage; i <= endPage; i++) {
+                                      if (i > 1 && i < totalPages) {
+                                          buttons.push(
+                                              <button 
+                                                  key={i} 
+                                                  onClick={() => fetchVisitsToSee(i)}
+                                                  style={{ 
+                                                      width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                      background: page === i ? 'var(--primary)' : 'transparent',
+                                                      color: page === i ? 'white' : 'var(--text-muted)',
+                                                      fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                                  }}
+                                              >
+                                                  {i}
+                                              </button>
+                                          );
+                                      }
+                                  }
+
+                                  if (endPage < totalPages - 1) {
+                                      buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                                  }
+
+                                  // Always show last page
+                                  if (totalPages > 1) {
+                                      buttons.push(
+                                          <button 
+                                              key={totalPages} 
+                                              onClick={() => fetchVisitsToSee(totalPages)}
+                                              style={{ 
+                                                  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                  background: page === totalPages ? 'var(--primary)' : 'transparent',
+                                                  color: page === totalPages ? 'white' : 'var(--text-muted)',
+                                                  fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                              }}
+                                          >
+                                              {totalPages}
+                                          </button>
+                                      );
+                                  }
+
+                                  return buttons;
+                              })()}
+                          </div>
+                          <button 
+                              className="btn btn-secondary" 
+                              disabled={page >= Math.ceil(totalCount / 100)}
+                              onClick={() => fetchVisitsToSee(page + 1)}
+                              style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                              <ChevronRight size={18} />
+                          </button>
+                      </div>
                   </div>
                )}
           </div>

@@ -14,7 +14,7 @@ const Pharmacy = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [itemsPerPage] = useState(5);
+  const [itemsPerPage] = useState(100);
 
   const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
@@ -246,30 +246,111 @@ const Pharmacy = () => {
             </table>
           </div>
           
-          {/* Pagination */}
+          {/* Pagination Controls */}
           {totalPages > 1 && (
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                   Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredPrescriptions.length)} of {filteredPrescriptions.length} entries
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                   <button
-                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: page === 1 ? 'not-allowed' : 'pointer' }}
-                   >
-                      Previous
-                   </button>
-                   <button
-                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={page === totalPages}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', borderRadius: '8px', cursor: page === totalPages ? 'not-allowed' : 'pointer' }}
-                   >
-                      Next
-                   </button>
-                </div>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                     Showing <span style={{ color: 'var(--primary)' }}>{indexOfFirstItem + 1}</span> to <span style={{ color: 'var(--primary)' }}>{Math.min(indexOfLastItem, filteredPrescriptions.length)}</span> of {filteredPrescriptions.length} entries
+                 </p>
+                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                     <button 
+                         className="btn btn-secondary" 
+                         disabled={page === 1}
+                         onClick={() => setPage(page - 1)}
+                         style={{ padding: '0.4rem', borderRadius: '8px', opacity: page === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                     >
+                         <ChevronLeft size={18} />
+                     </button>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                         {(() => {
+                             if (totalPages <= 1) return null;
+
+                             const buttons = [];
+                             const maxVisiblePages = 5;
+                             
+                             // Always show page 1
+                             buttons.push(
+                                 <button 
+                                     key={1} 
+                                     onClick={() => setPage(1)}
+                                     style={{ 
+                                         width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                         background: page === 1 ? 'var(--primary)' : 'transparent',
+                                         color: page === 1 ? 'white' : 'var(--text-muted)',
+                                         fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                     }}
+                                 >
+                                     1
+                                 </button>
+                             );
+
+                             let startPage = Math.max(2, page - 1);
+                             let endPage = Math.min(totalPages - 1, page + 1);
+
+                             if (page <= 3) {
+                                 endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
+                             }
+                             if (page >= totalPages - 2) {
+                                 startPage = Math.max(2, totalPages - maxVisiblePages + 2);
+                             }
+
+                             if (startPage > 2) {
+                                 buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                             }
+
+                             for (let i = startPage; i <= endPage; i++) {
+                                 if (i > 1 && i < totalPages) {
+                                     buttons.push(
+                                         <button 
+                                             key={i} 
+                                             onClick={() => setPage(i)}
+                                             style={{ 
+                                                 width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                 background: page === i ? 'var(--primary)' : 'transparent',
+                                                 color: page === i ? 'white' : 'var(--text-muted)',
+                                                 fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                             }}
+                                         >
+                                             {i}
+                                         </button>
+                                     );
+                                 }
+                             }
+
+                             if (endPage < totalPages - 1) {
+                                 buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                             }
+
+                             // Always show last page
+                             if (totalPages > 1) {
+                                 buttons.push(
+                                     <button 
+                                         key={totalPages} 
+                                         onClick={() => setPage(totalPages)}
+                                         style={{ 
+                                             width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                             background: page === totalPages ? 'var(--primary)' : 'transparent',
+                                             color: page === totalPages ? 'white' : 'var(--text-muted)',
+                                             fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                         }}
+                                     >
+                                         {totalPages}
+                                     </button>
+                                 );
+                             }
+
+                             return buttons;
+                         })()}
+                     </div>
+                     <button 
+                         className="btn btn-secondary" 
+                         disabled={page >= totalPages}
+                         onClick={() => setPage(page + 1)}
+                         style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= totalPages ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                     >
+                         <ChevronRight size={18} />
+                     </button>
+                 </div>
              </div>
           )}
         </div>

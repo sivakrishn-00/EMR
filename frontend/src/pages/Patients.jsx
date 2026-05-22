@@ -1092,7 +1092,7 @@ const Patients = () => {
                                 }}>
                                     {p.current_visit.status === 'PENDING_PHARMACY' ? 'Awaiting Pharmacy' : 
                                      p.current_visit.status === 'PENDING_LAB' ? 'In Laboratory' :
-                                     p.current_visit.status === 'PENDING_VITALS' ? 'In Intake' :
+                                     p.current_visit.status === 'PENDING_VITALS' ? 'In Clinic' :
                                      p.current_visit.status === 'PENDING_CONSULTATION' ? 'Initial Consult' :
                                      p.current_visit.status === 'FINAL_CONSULTATION' ? 'Final Review' : 'In Clinic'}
                                 </span>
