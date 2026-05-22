@@ -66,10 +66,10 @@ const Laboratory = () => {
     }
   };
 
-  const fetchLabRequests = async () => {
+  const fetchLabRequests = async (search = searchTerm) => {
     setIsLoading(true);
     try {
-      const res = await api.get(`laboratory/requests/?page_size=1000`);
+      const res = await api.get(`laboratory/requests/?page_size=1000&search=${encodeURIComponent(search)}`);
       const data = res.data.results || res.data;
       setLabRequests(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -183,12 +183,28 @@ const Laboratory = () => {
 
   const filteredRequests = labRequests
     .filter(r => activeTab === 'COMPLETED' ? r.status === 'COMPLETED' : r.status !== 'COMPLETED')
-    .filter(r => 
-      !searchTerm || 
-      r.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.patient_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.test_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter(r => {
+      const searchLow = searchTerm.toLowerCase().trim();
+      if (!searchLow) return true;
+
+      // Smart card group matching: check if search term is a card base/suffix and extract the base
+      const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
+      if (cardMatch) {
+        const baseCard = cardMatch[1].padStart(4, '0');
+        const pCard = String(r.card_no || '').toLowerCase();
+        const pCardMatch = pCard.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || pCard.match(/(\d+)(?:\/\d+)?/);
+        if (pCardMatch && pCardMatch[1].padStart(4, '0') === baseCard) {
+          return true;
+        }
+      }
+
+      return (
+        r.patient_name?.toLowerCase().includes(searchLow) ||
+        r.patient_id?.toLowerCase().includes(searchLow) ||
+        String(r.card_no || '').toLowerCase().includes(searchLow) ||
+        r.test_name?.toLowerCase().includes(searchLow)
+      );
+    });
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -217,13 +233,13 @@ const Laboratory = () => {
                       type="text"
                       placeholder="Search patient or test..."
                       value={searchTerm}
-                      onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                      onChange={e => { const val = e.target.value; setSearchTerm(val); setCurrentPage(1); fetchLabRequests(val); }}
                       className="search-input"
                       style={{ padding: '0.5rem 2rem 0.5rem 2.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.75rem', outline: 'none' }}
                    />
                    {searchTerm && (
                       <button 
-                         onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                         onClick={() => { setSearchTerm(''); setCurrentPage(1); fetchLabRequests(''); }}
                          style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                       >
                          <X size={14} />
@@ -347,112 +363,110 @@ const Laboratory = () => {
           </div>
           
              {/* Pagination Controls */}
-             {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                        Showing <span style={{ color: 'var(--primary)' }}>{indexOfFirstItem + 1}</span> to <span style={{ color: 'var(--primary)' }}>{Math.min(indexOfLastItem, filteredRequests.length)}</span> of {filteredRequests.length} entries
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <button 
-                            className="btn btn-secondary" 
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(currentPage - 1)}
-                            style={{ padding: '0.4rem', borderRadius: '8px', opacity: currentPage === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <ChevronLeft size={18} />
-                        </button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            {(() => {
-                                if (totalPages <= 1) return null;
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
+                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                     Showing <span style={{ color: 'var(--primary)' }}>{indexOfFirstItem + 1}</span> to <span style={{ color: 'var(--primary)' }}>{Math.min(indexOfLastItem, filteredRequests.length)}</span> of {filteredRequests.length} entries
+                 </p>
+                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                     <button 
+                         className="btn btn-secondary" 
+                         disabled={currentPage === 1}
+                         onClick={() => setCurrentPage(currentPage - 1)}
+                         style={{ padding: '0.4rem', borderRadius: '8px', opacity: currentPage === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                     >
+                         <ChevronLeft size={18} />
+                     </button>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                         {(() => {
+                             if (totalPages <= 1) return null;
 
-                                const buttons = [];
-                                const maxVisiblePages = 5;
-                                
-                                // Always show page 1
-                                buttons.push(
-                                    <button 
-                                        key={1} 
-                                        onClick={() => setCurrentPage(1)}
-                                        style={{ 
-                                            width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-                                            background: currentPage === 1 ? 'var(--primary)' : 'transparent',
-                                            color: currentPage === 1 ? 'white' : 'var(--text-muted)',
-                                            fontWeight: 700, cursor: 'pointer', transition: '0.3s'
-                                        }}
-                                    >
-                                        1
-                                    </button>
-                                );
+                             const buttons = [];
+                             const maxVisiblePages = 5;
+                             
+                             // Always show page 1
+                             buttons.push(
+                                 <button 
+                                     key={1} 
+                                     onClick={() => setCurrentPage(1)}
+                                     style={{ 
+                                         width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                         background: currentPage === 1 ? 'var(--primary)' : 'transparent',
+                                         color: currentPage === 1 ? 'white' : 'var(--text-muted)',
+                                         fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                     }}
+                                 >
+                                     1
+                                 </button>
+                             );
 
-                                let startPage = Math.max(2, currentPage - 1);
-                                let endPage = Math.min(totalPages - 1, currentPage + 1);
+                             let startPage = Math.max(2, currentPage - 1);
+                             let endPage = Math.min(totalPages - 1, currentPage + 1);
 
-                                if (currentPage <= 3) {
-                                    endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
-                                }
-                                if (currentPage >= totalPages - 2) {
-                                    startPage = Math.max(2, totalPages - maxVisiblePages + 2);
-                                }
+                             if (currentPage <= 3) {
+                                 endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
+                             }
+                             if (currentPage >= totalPages - 2) {
+                                 startPage = Math.max(2, totalPages - maxVisiblePages + 2);
+                             }
 
-                                if (startPage > 2) {
-                                    buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
-                                }
+                             if (startPage > 2) {
+                                 buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                             }
 
-                                for (let i = startPage; i <= endPage; i++) {
-                                    if (i > 1 && i < totalPages) {
-                                        buttons.push(
-                                            <button 
-                                                key={i} 
-                                                onClick={() => setCurrentPage(i)}
-                                                style={{ 
-                                                    width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-                                                    background: currentPage === i ? 'var(--primary)' : 'transparent',
-                                                    color: currentPage === i ? 'white' : 'var(--text-muted)',
-                                                    fontWeight: 700, cursor: 'pointer', transition: '0.3s'
-                                                }}
-                                            >
-                                                {i}
-                                            </button>
-                                        );
-                                    }
-                                }
+                             for (let i = startPage; i <= endPage; i++) {
+                                 if (i > 1 && i < totalPages) {
+                                     buttons.push(
+                                         <button 
+                                             key={i} 
+                                             onClick={() => setCurrentPage(i)}
+                                             style={{ 
+                                                 width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                                 background: currentPage === i ? 'var(--primary)' : 'transparent',
+                                                 color: currentPage === i ? 'white' : 'var(--text-muted)',
+                                                 fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                             }}
+                                         >
+                                             {i}
+                                         </button>
+                                     );
+                                 }
+                             }
 
-                                if (endPage < totalPages - 1) {
-                                    buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
-                                }
+                             if (endPage < totalPages - 1) {
+                                 buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
+                             }
 
-                                // Always show last page
-                                if (totalPages > 1) {
-                                    buttons.push(
-                                        <button 
-                                            key={totalPages} 
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            style={{ 
-                                                width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-                                                background: currentPage === totalPages ? 'var(--primary)' : 'transparent',
-                                                color: currentPage === totalPages ? 'white' : 'var(--text-muted)',
-                                                fontWeight: 700, cursor: 'pointer', transition: '0.3s'
-                                            }}
-                                        >
-                                            {totalPages}
-                                        </button>
-                                    );
-                                }
+                             // Always show last page
+                             if (totalPages > 1) {
+                                 buttons.push(
+                                     <button 
+                                         key={totalPages} 
+                                         onClick={() => setCurrentPage(totalPages)}
+                                         style={{ 
+                                             width: '32px', height: '32px', borderRadius: '8px', border: 'none',
+                                             background: currentPage === totalPages ? 'var(--primary)' : 'transparent',
+                                             color: currentPage === totalPages ? 'white' : 'var(--text-muted)',
+                                             fontWeight: 700, cursor: 'pointer', transition: '0.3s'
+                                         }}
+                                     >
+                                         {totalPages}
+                                     </button>
+                                 );
+                             }
 
-                                return buttons;
-                            })()}
-                        </div>
-                        <button 
-                            className="btn btn-secondary" 
-                            disabled={currentPage >= totalPages}
-                            onClick={() => setCurrentPage(currentPage + 1)}
-                            style={{ padding: '0.4rem', borderRadius: '8px', opacity: currentPage >= totalPages ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <ChevronRight size={18} />
-                        </button>
-                    </div>
-                </div>
-             )}
+                             return buttons;
+                         })()}
+                     </div>
+                     <button 
+                         className="btn btn-secondary" 
+                         disabled={currentPage >= totalPages}
+                         onClick={() => setCurrentPage(currentPage + 1)}
+                         style={{ padding: '0.4rem', borderRadius: '8px', opacity: currentPage >= totalPages ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                     >
+                         <ChevronRight size={18} />
+                     </button>
+                 </div>
+             </div>
         </div>
 
         {selectedRequest && (

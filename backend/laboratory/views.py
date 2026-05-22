@@ -31,10 +31,18 @@ def notify_team(project, roles, title, message):
 
 from .permissions import HasMachineSyncKey
 
+from rest_framework.pagination import PageNumberPagination
+
+class LargeResultsPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
 class LabRequestViewSet(viewsets.ModelViewSet):
     queryset = LabRequest.objects.all().order_by('-created_at')
     serializer_class = LabRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LargeResultsPagination
 
     def get_queryset(self):
         queryset = LabRequest.objects.all().order_by('-created_at')
@@ -66,6 +74,30 @@ class LabRequestViewSet(viewsets.ModelViewSet):
         if status_param:
             statuses = status_param.split(',')
             queryset = queryset.filter(status__in=statuses)
+
+        search_query = self.request.query_params.get('search', '').strip()
+        if search_query:
+            import re
+            card_match = re.search(r'\b(?:BHSPL)?(\d{4})(?:/\d+)?\b', search_query, re.IGNORECASE)
+            if not card_match:
+                card_match = re.search(r'\b(\d+)(?:/\d+)?\b', search_query)
+            
+            card_q = Q()
+            if card_match:
+                base_card = card_match.group(1)
+                if base_card.isdigit():
+                    base_card = base_card.zfill(4)
+                card_q = Q(visit__patient__card_no=base_card) | Q(visit__patient__card_no__startswith=f"{base_card}/")
+
+            queryset = queryset.filter(
+                Q(visit__patient__first_name__icontains=search_query) |
+                Q(visit__patient__last_name__icontains=search_query) |
+                Q(visit__patient__patient_id__icontains=search_query) |
+                Q(visit__patient__phone__icontains=search_query) |
+                Q(visit__patient__card_no__icontains=search_query) |
+                Q(test_master__name__icontains=search_query) |
+                card_q
+            ).distinct()
 
         return queryset
 

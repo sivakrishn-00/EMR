@@ -156,11 +156,11 @@ const Clinical = () => {
     fetchVisitsToSee();
   }, []);
 
-  const fetchVisitsToSee = async (pageNum = 1) => {
+  const fetchVisitsToSee = async (pageNum = 1, search = searchTerm) => {
     setIsLoading(true);
     try {
       // Fetch only visits that need consultation
-      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=100`);
+      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=100&search=${encodeURIComponent(search)}`);
       if (res.data.results) {
           setVisitsReady(res.data.results);
           setTotalCount(res.data.count);
@@ -283,10 +283,26 @@ const Clinical = () => {
   };
 
   const filteredVisits = visitsReady.filter(visit => {
-    const patientName = `${visit.patient_details?.first_name} ${visit.patient_details?.last_name}`.toLowerCase();
+    const searchLow = searchTerm.toLowerCase().trim();
+    if (!searchLow) return true;
+
+    // Smart card group matching: check if search term is a card base/suffix and extract the base
+    const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
+    if (cardMatch) {
+      const baseCard = cardMatch[1].padStart(4, '0');
+      const pCard = String(visit.patient_details?.card_no || '').toLowerCase();
+      const pCardMatch = pCard.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || pCard.match(/(\d+)(?:\/\d+)?/);
+      if (pCardMatch && pCardMatch[1].padStart(4, '0') === baseCard) {
+        return true;
+      }
+    }
+
+    const patientName = `${visit.patient_details?.first_name || ''} ${visit.patient_details?.last_name || ''}`.toLowerCase();
     const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
-    const term = searchTerm.toLowerCase();
-    return patientName.includes(term) || patientId.includes(term);
+    const cardNo = String(visit.patient_details?.card_no || '').toLowerCase();
+    const phone = String(visit.patient_details?.phone || '').toLowerCase();
+
+    return patientName.includes(searchLow) || patientId.includes(searchLow) || cardNo.includes(searchLow) || phone.includes(searchLow);
   });
 
   return (
@@ -312,13 +328,13 @@ const Clinical = () => {
                         type="text"
                         placeholder="Search patient..."
                         value={searchTerm}
-                        onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
+                        onChange={e => { const val = e.target.value; setSearchTerm(val); setPage(1); fetchVisitsToSee(1, val); }}
                         className="search-input"
                         style={{ paddingRight: '2rem' }}
                      />
                      {searchTerm && (
                         <button 
-                           onClick={() => { setSearchTerm(''); setPage(1); }}
+                           onClick={() => { setSearchTerm(''); setPage(1); fetchVisitsToSee(1, ''); }}
                            style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                         >
                            <X size={14} />
@@ -415,8 +431,7 @@ const Clinical = () => {
                 </tbody>
               </table>
             </div>
-                          {/* Pagination Controls */}
-               {Math.ceil(totalCount / 100) > 1 && (
+                  {/* Pagination Controls */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
                       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                           Showing <span style={{ color: 'var(--primary)' }}>{filteredVisits.length}</span> of {totalCount} entries
@@ -425,7 +440,7 @@ const Clinical = () => {
                           <button 
                               className="btn btn-secondary" 
                               disabled={page === 1}
-                              onClick={() => fetchVisitsToSee(page - 1)}
+                              onClick={() => fetchVisitsToSee(page - 1, searchTerm)}
                               style={{ padding: '0.4rem', borderRadius: '8px', opacity: page === 1 ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                               <ChevronLeft size={18} />
@@ -442,7 +457,7 @@ const Clinical = () => {
                                   buttons.push(
                                       <button 
                                           key={1} 
-                                          onClick={() => fetchVisitsToSee(1)}
+                                          onClick={() => fetchVisitsToSee(1, searchTerm)}
                                           style={{ 
                                               width: '32px', height: '32px', borderRadius: '8px', border: 'none',
                                               background: page === 1 ? 'var(--primary)' : 'transparent',
@@ -473,7 +488,7 @@ const Clinical = () => {
                                           buttons.push(
                                               <button 
                                                   key={i} 
-                                                  onClick={() => fetchVisitsToSee(i)}
+                                                  onClick={() => fetchVisitsToSee(i, searchTerm)}
                                                   style={{ 
                                                       width: '32px', height: '32px', borderRadius: '8px', border: 'none',
                                                       background: page === i ? 'var(--primary)' : 'transparent',
@@ -496,7 +511,7 @@ const Clinical = () => {
                                       buttons.push(
                                           <button 
                                               key={totalPages} 
-                                              onClick={() => fetchVisitsToSee(totalPages)}
+                                              onClick={() => fetchVisitsToSee(totalPages, searchTerm)}
                                               style={{ 
                                                   width: '32px', height: '32px', borderRadius: '8px', border: 'none',
                                                   background: page === totalPages ? 'var(--primary)' : 'transparent',
@@ -515,14 +530,13 @@ const Clinical = () => {
                           <button 
                               className="btn btn-secondary" 
                               disabled={page >= Math.ceil(totalCount / 100)}
-                              onClick={() => fetchVisitsToSee(page + 1)}
+                              onClick={() => fetchVisitsToSee(page + 1, searchTerm)}
                               style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                               <ChevronRight size={18} />
                           </button>
                       </div>
                   </div>
-               )}
           </div>
         )}
 

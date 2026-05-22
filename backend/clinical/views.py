@@ -30,9 +30,17 @@ def notify_team(project, roles, title, message):
     notifications = [Notification(recipient=u, title=title, message=message) for u in users]
     Notification.objects.bulk_create(notifications)
 
+from rest_framework.pagination import PageNumberPagination
+
+class LargeResultsPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
 class VisitViewSet(viewsets.ModelViewSet):
     serializer_class = VisitSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LargeResultsPagination
 
     def get_queryset(self):
         queryset = Visit.objects.all().order_by('-visit_date')
@@ -70,6 +78,29 @@ class VisitViewSet(viewsets.ModelViewSet):
         if active_only:
             queryset = queryset.filter(is_active=True)
             
+        search_query = self.request.query_params.get('search', '').strip()
+        if search_query:
+            import re
+            card_match = re.search(r'\b(?:BHSPL)?(\d{4})(?:/\d+)?\b', search_query, re.IGNORECASE)
+            if not card_match:
+                card_match = re.search(r'\b(\d+)(?:/\d+)?\b', search_query)
+            
+            card_q = Q()
+            if card_match:
+                base_card = card_match.group(1)
+                if base_card.isdigit():
+                    base_card = base_card.zfill(4)
+                card_q = Q(patient__card_no=base_card) | Q(patient__card_no__startswith=f"{base_card}/")
+
+            queryset = queryset.filter(
+                Q(patient__first_name__icontains=search_query) |
+                Q(patient__last_name__icontains=search_query) |
+                Q(patient__patient_id__icontains=search_query) |
+                Q(patient__phone__icontains=search_query) |
+                Q(patient__card_no__icontains=search_query) |
+                card_q
+            ).distinct()
+
         return queryset
 
     def perform_create(self, serializer):

@@ -36,6 +36,7 @@ class LabRequestSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='visit.patient.__str__', read_only=True)
     patient_id = serializers.CharField(source='visit.patient.patient_id', read_only=True)
     patient_dhid = serializers.CharField(source='visit.patient.ucode', read_only=True)
+    card_no = serializers.CharField(source='visit.patient.card_no', read_only=True)
     ordered_by_name = serializers.CharField(source='ordered_by.username', read_only=True)
 
     class Meta:

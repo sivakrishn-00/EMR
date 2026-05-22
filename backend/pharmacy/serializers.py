@@ -15,6 +15,7 @@ class DispensingRecordSerializer(serializers.ModelSerializer):
 class PrescriptionSerializer(serializers.ModelSerializer):
     dispensing_history = DispensingRecordSerializer(many=True, read_only=True)
     patient_name = serializers.CharField(source='visit.patient.__str__', read_only=True)
+    card_no = serializers.CharField(source='visit.patient.card_no', read_only=True, default='N/A')
     uhid = serializers.SerializerMethodField()
     visit_id = serializers.IntegerField(source='visit.id', read_only=True)
     project_id = serializers.SerializerMethodField()

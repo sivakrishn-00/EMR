@@ -23,9 +23,17 @@ def notify_team(project, roles, title, message):
     notifications = [Notification(recipient=u, title=title, message=message) for u in users]
     Notification.objects.bulk_create(notifications)
 
+from rest_framework.pagination import PageNumberPagination
+
+class LargeResultsPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
 class PrescriptionViewSet(viewsets.ModelViewSet):
     serializer_class = PrescriptionSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LargeResultsPagination
 
     def get_queryset(self):
         queryset = Prescription.objects.all().order_by('-created_at')
@@ -56,6 +64,31 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         status_param = self.request.query_params.get('status')
         if status_param:
             queryset = queryset.filter(status=status_param)
+
+        search_query = self.request.query_params.get('search', '').strip()
+        if search_query:
+            import re
+            card_match = re.search(r'\b(?:BHSPL)?(\d{4})(?:/\d+)?\b', search_query, re.IGNORECASE)
+            if not card_match:
+                card_match = re.search(r'\b(\d+)(?:/\d+)?\b', search_query)
+            
+            card_q = Q()
+            if card_match:
+                base_card = card_match.group(1)
+                if base_card.isdigit():
+                    base_card = base_card.zfill(4)
+                card_q = Q(visit__patient__card_no=base_card) | Q(visit__patient__card_no__startswith=f"{base_card}/")
+
+            queryset = queryset.filter(
+                Q(visit__patient__first_name__icontains=search_query) |
+                Q(visit__patient__last_name__icontains=search_query) |
+                Q(visit__patient__patient_id__icontains=search_query) |
+                Q(visit__patient__phone__icontains=search_query) |
+                Q(visit__patient__card_no__icontains=search_query) |
+                Q(medication_name__icontains=search_query) |
+                card_q
+            ).distinct()
+
         return queryset
 
     @action(detail=True, methods=['post'])
