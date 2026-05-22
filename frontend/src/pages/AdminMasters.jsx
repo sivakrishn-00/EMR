@@ -35,7 +35,8 @@ import {
   ShoppingCart,
   Radio,
   Key,
-  Shuffle
+  Shuffle,
+  History
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../services/api";
@@ -135,6 +136,10 @@ const AdminMasters = () => {
   const [selectedEmployeeForFamily, setSelectedEmployeeForFamily] =
     useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [uploadSessions, setUploadSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [activeDetailTab, setActiveDetailTab] = useState("SUCCESS"); // SUCCESS or FAILED
   const [showSchemaModal, setShowSchemaModal] = useState(false);
   const [showRegistryEditModal, setShowRegistryEditModal] = useState(false);
   const [registryEditData, setRegistryEditData] = useState({
@@ -340,6 +345,8 @@ const AdminMasters = () => {
         fetchLabMachines();
       } else if (activeBoard === "STATS") {
         fetchDashboardStats();
+      } else if (activeBoard === "UPLOAD_HISTORY") {
+        fetchUploadSessions();
       } else {
         fetchEmployeeMasters(1);
       }
@@ -626,6 +633,25 @@ const AdminMasters = () => {
       }
     } catch (err) {
       toast.error("Failed to fetch projects");
+    }
+  };
+
+  const fetchUploadSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const url = selectedProject 
+        ? `patients/upload-sessions/?project=${selectedProject}`
+        : "patients/upload-sessions/";
+      const res = await api.get(url);
+      if (res.data.results) {
+        setUploadSessions(res.data.results);
+      } else {
+        setUploadSessions(res.data);
+      }
+    } catch (err) {
+      toast.error("Failed to fetch upload sessions");
+    } finally {
+      setSessionsLoading(false);
     }
   };
 
@@ -1075,6 +1101,7 @@ const AdminMasters = () => {
         completed: false,
       });
 
+      const uniqueSessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const batchSize = 500;
       let totalSuccess = 0;
       let totalErrors = 0;
@@ -1100,8 +1127,8 @@ const AdminMasters = () => {
           const batch = recordsWithProject.slice(i, i + batchSize);
           const payload =
             isStandard || isProject1Personnel
-              ? { records: batch }
-              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode, project: bulkProject };
+              ? { records: batch, filename: bulkFile ? bulkFile.name : 'uploaded_sheet.xlsx', upload_session_id: uniqueSessionId }
+              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode, project: bulkProject, filename: bulkFile ? bulkFile.name : 'uploaded_sheet.xlsx', upload_session_id: uniqueSessionId };
           const res = await api.post(endpoint, payload);
 
           totalSuccess += res.data.success || 0;
@@ -1746,6 +1773,30 @@ const AdminMasters = () => {
                 }}
               >
                 <Activity size={16} color={activeBoard === "STATS" ? "#f59e0b" : "#64748b"} /> Analytics & Stock Monitor
+              </button>
+
+              <button
+                className="btn"
+                style={{
+                  background: "transparent",
+                  color: activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b",
+                  fontSize: "0.85rem",
+                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                  borderRadius: "0",
+                  transition: "all 0.2s",
+                  fontWeight: activeBoard === "UPLOAD_HISTORY" ? 600 : 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderBottom: activeBoard === "UPLOAD_HISTORY" ? "2px solid #3b82f6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                }}
+                onClick={() => {
+                  setActiveBoard("UPLOAD_HISTORY");
+                  fetchUploadSessions();
+                }}
+              >
+                <History size={16} color={activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b"} /> Upload Audit Logs
               </button>
 
 
@@ -2976,6 +3027,138 @@ const AdminMasters = () => {
                             </div>
                         </div>
                       )}
+                  </div>
+                )}
+              </div>
+            ) : activeBoard === "UPLOAD_HISTORY" ? (
+              <div className="fade-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Registry Upload Audit History</h3>
+                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Complete permanent chronological ledger of spreadsheet uploads and refills</p>
+                  </div>
+                  <button 
+                    className="btn"
+                    onClick={fetchUploadSessions}
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'var(--text-main)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <RotateCcw size={14} className={sessionsLoading ? "spin" : ""} /> Refresh Logs
+                  </button>
+                </div>
+
+                {sessionsLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '6rem 0' }}>
+                    <div className="spin" style={{ width: '40px', height: '40px', border: '3px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                  </div>
+                ) : uploadSessions.length === 0 ? (
+                  <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                    <div style={{ width: '64px', height: '64px', background: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                      <Clock size={32} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No Upload Sessions Recorded</h3>
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>All Excel/CSV imports, registry updates, and drug refills will be logged here with complete audits of who, when, and what was added.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                    <div className="table-responsive">
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>File Details</th>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Registry / Category</th>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Mode</th>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Tally (Success / Errors)</th>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Done By</th>
+                            <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Audit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {uploadSessions.map((session) => (
+                            <tr key={session.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-row">
+                              <td style={{ padding: '1.25rem 2rem' }}>
+                                <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.875rem' }}>{session.filename}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>{new Date(session.timestamp).toLocaleString('en-IN', { hour12: true })}</div>
+                              </td>
+                              <td style={{ padding: '1.25rem 2rem' }}>
+                                <span style={{ 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 800, 
+                                  color: session.registry_type_name?.toLowerCase().includes('drug') ? '#8b5cf6' : '#3b82f6',
+                                  background: session.registry_type_name?.toLowerCase().includes('drug') ? 'rgba(139, 92, 246, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px'
+                                }}>
+                                  {session.registry_type_name || 'Registry'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1.25rem 2rem' }}>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  color: session.mode === 'INCREMENT' || session.mode === 'ADD' ? '#059669' : '#d97706',
+                                  background: session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'rgba(5, 150, 105, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                  padding: '4px 10px',
+                                  borderRadius: '20px'
+                                }}>
+                                  {session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'Refill (Add)' : 'Replace'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1.25rem 2rem' }}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
+                                    {session.success_count} Passed
+                                  </span>
+                                  {session.error_count > 0 && (
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
+                                      {session.error_count} Failed
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: '1.25rem 2rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                {session.username || 'System Admin'}
+                              </td>
+                              <td style={{ padding: '1.25rem 2rem', textAlign: 'right' }}>
+                                <button
+                                  className="btn"
+                                  onClick={() => {
+                                    setSelectedSession(session);
+                                    setActiveDetailTab(session.success_count > 0 ? "SUCCESS" : "FAILED");
+                                  }}
+                                  style={{
+                                    background: 'var(--primary)',
+                                    color: 'white',
+                                    fontWeight: 800,
+                                    fontSize: '0.75rem',
+                                    borderRadius: '10px',
+                                    padding: '6px 14px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(59, 130, 246, 0.15)'
+                                  }}
+                                >
+                                  View Details
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -7211,6 +7394,260 @@ const AdminMasters = () => {
                 style={{ height: "42px", padding: "0 1.5rem", fontSize: "0.8125rem" }}
               >
                 Close Ledger
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {selectedSession && createPortal(
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            zIndex: 100000,
+            padding: "40px 1rem 60px 1rem",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            className="fade-in card"
+            style={{
+              width: "100%",
+              maxWidth: "960px",
+              background: "var(--background)",
+              border: "1px solid var(--border)",
+              borderRadius: "24px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              padding: 0,
+              overflow: "hidden"
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "1.5rem 2rem",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--surface)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-main)" }}>
+                  Import Audit Logs Details
+                </h2>
+                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px", fontWeight: 600 }}>
+                  File: <span style={{ color: "#3b82f6" }}>{selectedSession.filename}</span> | Type: {selectedSession.registry_type_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedSession(null)}
+                style={{
+                  border: "none",
+                  background: "var(--background)",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                <X size={20} color="var(--text-muted)" />
+              </button>
+            </div>
+
+            {/* Session Meta Stats Cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "1rem",
+                padding: "1.5rem 2rem",
+                background: "var(--background)",
+                borderBottom: "1px solid var(--border)"
+              }}
+            >
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "1rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Uploaded By</div>
+                <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", marginTop: "4px" }}>{selectedSession.username || 'System Admin'}</div>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "1rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Upload Mode</div>
+                <div style={{ fontSize: "1rem", fontWeight: 800, color: selectedSession.mode === 'INCREMENT' || selectedSession.mode === 'ADD' ? '#059669' : '#d97706', marginTop: "4px" }}>
+                  {selectedSession.mode === 'INCREMENT' || selectedSession.mode === 'ADD' ? 'Refill (Add)' : 'Replace'}
+                </div>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "1rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Succeeded Rows</div>
+                <div style={{ fontSize: "1rem", fontWeight: 800, color: "#10b981", marginTop: "4px" }}>{selectedSession.success_count} ✅</div>
+              </div>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "16px", padding: "1rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Failed Rows</div>
+                <div style={{ fontSize: "1rem", fontWeight: 800, color: selectedSession.error_count > 0 ? "#ef4444" : "var(--text-muted)", marginTop: "4px" }}>
+                  {selectedSession.error_count} ❌
+                </div>
+              </div>
+            </div>
+
+            {/* Dynamic Tabs Selectors */}
+            <div
+              style={{
+                display: "flex",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--surface)",
+                padding: "0 2rem"
+              }}
+            >
+              <button
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "1rem 1.5rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  color: activeDetailTab === "SUCCESS" ? "#10b981" : "var(--text-muted)",
+                  borderBottom: activeDetailTab === "SUCCESS" ? "2px solid #10b981" : "2px solid transparent",
+                  transition: "all 0.2s"
+                }}
+                onClick={() => setActiveDetailTab("SUCCESS")}
+              >
+                Succeeded List ({selectedSession.success_count})
+              </button>
+              <button
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "1rem 1.5rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  color: activeDetailTab === "FAILED" ? "#ef4444" : "var(--text-muted)",
+                  borderBottom: activeDetailTab === "FAILED" ? "2px solid #ef4444" : "2px solid transparent",
+                  transition: "all 0.2s"
+                }}
+                onClick={() => setActiveDetailTab("FAILED")}
+              >
+                Failed List ({selectedSession.error_count})
+              </button>
+            </div>
+
+            {/* Details Body */}
+            <div style={{ padding: "1.5rem 2rem", maxHeight: "400px", overflowY: "auto", background: "var(--background)" }}>
+              {activeDetailTab === "SUCCESS" ? (
+                selectedSession.success_details && selectedSession.success_details.length > 0 ? (
+                  <div className="table-responsive">
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Code</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Name</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Category</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Quantity</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Unit Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedSession.success_details.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 800, color: "var(--text-main)" }}>{item.ucode}</td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-main)" }}>{item.name}</td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                              {item.category ? (
+                                <span style={{ fontSize: "0.7rem", fontWeight: 700, background: "var(--surface)", padding: "2px 6px", borderRadius: "4px" }}>
+                                  {item.category}
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 800, color: "#10b981", textAlign: "right" }}>
+                              {selectedSession.mode === 'INCREMENT' || selectedSession.mode === 'ADD' ? `+${item.qty}` : item.qty}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-main)", textAlign: "right" }}>
+                              {item.cost ? `₹${parseFloat(item.cost).toFixed(2)}` : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "3rem 0", color: "var(--text-muted)", fontWeight: 600 }}>
+                    No successfully imported records in this session.
+                  </div>
+                )
+              ) : (
+                selectedSession.error_details && selectedSession.error_details.length > 0 ? (
+                  <div className="table-responsive">
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", width: "100px" }}>Row No.</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", width: "220px" }}>Item Identifier</th>
+                          <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Failure Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedSession.error_details.map((err, idx) => (
+                          <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 800, color: "#ef4444" }}>
+                              Row {err.row || idx + 2}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-main)" }}>
+                              {err.item || 'Unknown'}
+                            </td>
+                            <td style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", color: "#f43f5e", fontWeight: 600 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <AlertCircle size={14} />
+                                {err.error || 'Failed to import'}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "3rem 0", color: "#10b981", fontWeight: 800 }}>
+                    🎉 Awesome! This upload session completed with 100% success and 0 errors!
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "1rem 2rem",
+                background: "var(--surface)",
+                borderTop: "1px solid var(--border)",
+                display: "flex",
+                justifyContent: "flex-end"
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={() => setSelectedSession(null)}
+                style={{
+                  borderRadius: "10px",
+                  padding: "0.5rem 1.25rem",
+                  fontSize: "0.75rem",
+                  fontWeight: 800
+                }}
+              >
+                Close Audit Inspector
               </button>
             </div>
           </div>

@@ -6,11 +6,12 @@ import threading
 
 _sync_lock = threading.Lock()
 from rest_framework.response import Response
-from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo
+from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo, RegistryUploadSession
 from .serializers import (
     PatientSerializer, EmployeeMasterSerializer, FamilyMemberSerializer,
     ProjectSerializer, ProjectCategoryMappingSerializer, ProjectFieldConfigSerializer,
-    RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer, ProjectLogoSerializer
+    RegistryTypeSerializer, RegistryDataSerializer, RegistryFieldSerializer, ProjectLogoSerializer,
+    RegistryUploadSessionSerializer
 )
 from accounts.utils import log_action
 
@@ -593,11 +594,12 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         cleared_batches = set()
         success_count = 0
         failed_records = []
+        success_details_list = []
         
         from django.db import transaction
         
         with transaction.atomic():
-            for data in records:
+            for row_idx, data in enumerate(records, start=2):
                 try:
                     with transaction.atomic():
                         # Normalize keys: convert keys to lowercase, replace spaces with underscores,
@@ -619,7 +621,11 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                         ucode = clean_data.get('ucode') or clean_data.get('card_no') or clean_data.get('item_code') or next(iter(clean_data.values()))
                         name = clean_data.get('name') or clean_data.get('item_name') or clean_data.get('label') or ""
                         
-                        if not str(ucode).strip() or not str(name).strip():
+                        # If both ucode and name are blank, this is an empty/trailing row (e.g. only autofilled project ID exists) - skip it gracefully!
+                        if not str(ucode or '').strip() and not str(name or '').strip():
+                            continue
+                            
+                        if not str(ucode or '').strip() or not str(name or '').strip():
                             raise Exception("Missing primary key/code or name")
                         
                         # Case-insensitive mapping of CSV headers to schema slugs
@@ -762,9 +768,93 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                             obj.quantity = total_qty
                             obj.save()
 
+                        # If successful, record success details
+                        success_details_list.append({
+                            'ucode': str(ucode).strip(),
+                            'name': str(name).strip(),
+                            'qty': qty_input,
+                            'cost': cost_input,
+                            'category': clean_data.get('category') or clean_data.get('item_group', '')
+                        })
+
                         success_count += 1
                 except Exception as e:
-                    failed_records.append({**data, "error": str(e)})
+                    failed_records.append({
+                        "row": row_idx,
+                        "item": data.get('item_name') or data.get('item_code') or data.get('name') or 'Unknown',
+                        "error": str(e)
+                    })
+
+        # Save the registry upload session record
+        filename = request.data.get('filename') or 'uploaded_sheet.xlsx'
+        upload_session_id = request.data.get('upload_session_id')
+        status = 'SUCCESS'
+        if len(failed_records) > 0:
+            status = 'WARNING' if success_count > 0 else 'FAILED'
+
+        try:
+            from .models import RegistryUploadSession
+            from django.utils import timezone
+            
+            user_val = request.user if request.user and request.user.is_authenticated else None
+            existing_session = None
+            
+            # 1. Primary lookup by unique upload_session_id if provided by frontend
+            if upload_session_id:
+                existing_session = RegistryUploadSession.objects.filter(
+                    upload_session_id=upload_session_id
+                ).first()
+                
+            # 2. Fallback lookup by time window (last 3 minutes) if upload_session_id not passed
+            if not existing_session:
+                three_minutes_ago = timezone.now() - timezone.timedelta(minutes=3)
+                existing_session = RegistryUploadSession.objects.filter(
+                    user=user_val,
+                    project_id=project_id or rt.project_id,
+                    registry_type=rt,
+                    filename=filename,
+                    mode=mode,
+                    timestamp__gte=three_minutes_ago
+                ).first()
+                
+            if existing_session:
+                # Merge into the existing upload session to present as a single logical upload event!
+                existing_session.success_count += success_count
+                existing_session.error_count += len(failed_records)
+                
+                curr_success = existing_session.success_details or []
+                curr_errors = existing_session.error_details or []
+                
+                existing_session.success_details = curr_success + success_details_list
+                existing_session.error_details = curr_errors + failed_records
+                
+                # Recalculate status
+                if existing_session.error_count > 0:
+                    existing_session.status = 'WARNING' if existing_session.success_count > 0 else 'FAILED'
+                else:
+                    existing_session.status = 'SUCCESS'
+                    
+                # Store the session ID if it was missing
+                if upload_session_id and not existing_session.upload_session_id:
+                    existing_session.upload_session_id = upload_session_id
+                    
+                existing_session.save()
+            else:
+                RegistryUploadSession.objects.create(
+                    user=user_val,
+                    project_id=project_id or rt.project_id,
+                    registry_type=rt,
+                    filename=filename,
+                    mode=mode,
+                    success_count=success_count,
+                    error_count=len(failed_records),
+                    status=status,
+                    success_details=success_details_list,
+                    error_details=failed_records,
+                    upload_session_id=upload_session_id
+                )
+        except Exception as audit_err:
+            print(f"RegistryUploadSession audit log creation/merge failed: {str(audit_err)}")
 
         log_action(request.user, 'Registry', 'Bulk Upload', f"Processed {success_count} records ({mode}) into registry type {registry_type_id}")
         return Response({
@@ -821,6 +911,11 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
     def bulk_upload(self, request):
         records = request.data.get('records', [])
         failed_records = []; success_count = 0; error_count = 0
+        success_details_list = []
+        
+        filename = request.data.get('filename') or 'personnel_sheet.xlsx'
+        upload_session_id = request.data.get('upload_session_id')
+        mode = request.data.get('mode', 'INCREMENT')
         
         def calculate_dob(age_str):
             if not age_str: return None
@@ -858,7 +953,7 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             # 1. Process Primary Employees
-            for data in records:
+            for idx, data in enumerate(records):
                 card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                 if '/' in card_no:
                     continue # Skip slashed card numbers, they are dependents!
@@ -896,12 +991,23 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                                 }
                             )
                             success_count += 1
+                            success_details_list.append({
+                                'ucode': str(card_no).strip(),
+                                'name': str(name).strip(),
+                                'category': 'Employee Primary',
+                                'qty': 1,
+                                'cost': 0.0
+                            })
                     except Exception as e:
                         error_count += 1
-                        failed_records.append({**data, 'error': str(e)})
+                        failed_records.append({
+                            'row': idx + 2,
+                            'item': str(get_val(data, 'name', 'employee_name') or 'Unknown'),
+                            'error': str(e)
+                        })
 
             # 2. Process Dependents
-            for data in records:
+            for idx, data in enumerate(records):
                 full_card_no = str(get_val(data, 'card_no', 'cardno', 'id') or '').strip()
                 rel = str(get_val(data, 'relationship', 'rel') or '').strip().upper()
                 is_dependent = '/' in full_card_no or (rel and 'PRIMARY' not in rel and 'HOLDER' not in rel)
@@ -941,10 +1047,81 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                                 }
                             )
                             success_count += 1
+                            success_details_list.append({
+                                'ucode': str(full_card_no).strip(),
+                                'name': str(get_val(data, 'name', 'family_name')).strip(),
+                                'category': f"Dependent ({rel})",
+                                'qty': 1,
+                                'cost': 0.0
+                            })
                     except Exception as e:
                         error_count += 1
-                        failed_records.append({**data, 'error': str(e)})
+                        failed_records.append({
+                            'row': idx + 2,
+                            'item': str(get_val(data, 'name', 'family_name') or 'Unknown'),
+                            'error': str(e)
+                        })
         
+        # Save RegistryUploadSession log for personnel spreadsheets
+        try:
+            from .models import RegistryType, RegistryUploadSession
+            rt = RegistryType.objects.filter(slug='employee_master').first()
+            first_record = records[0] if records else {}
+            project_id = first_record.get('project') or (request.user.project.id if request.user and request.user.project else None)
+            
+            if not rt:
+                rt = RegistryType.objects.filter(project_id=project_id).first() or RegistryType.objects.first()
+                
+            if rt:
+                user_val = request.user if request.user and request.user.is_authenticated else None
+                status = 'SUCCESS'
+                if len(failed_records) > 0:
+                    status = 'WARNING' if success_count > 0 else 'FAILED'
+                    
+                existing_session = None
+                if upload_session_id:
+                    existing_session = RegistryUploadSession.objects.filter(upload_session_id=upload_session_id).first()
+                    
+                if not existing_session:
+                    three_minutes_ago = timezone.now() - timezone.timedelta(minutes=3)
+                    existing_session = RegistryUploadSession.objects.filter(
+                        user=user_val,
+                        project_id=project_id or rt.project_id,
+                        registry_type=rt,
+                        filename=filename,
+                        mode=mode,
+                        timestamp__gte=three_minutes_ago
+                    ).first()
+                    
+                if existing_session:
+                    existing_session.success_count += success_count
+                    existing_session.error_count += len(failed_records)
+                    existing_session.success_details = (existing_session.success_details or []) + success_details_list
+                    existing_session.error_details = (existing_session.error_details or []) + failed_records
+                    if existing_session.error_count > 0:
+                        existing_session.status = 'WARNING' if existing_session.success_count > 0 else 'FAILED'
+                    else:
+                        existing_session.status = 'SUCCESS'
+                    if upload_session_id and not existing_session.upload_session_id:
+                        existing_session.upload_session_id = upload_session_id
+                    existing_session.save()
+                else:
+                    RegistryUploadSession.objects.create(
+                        user=user_val,
+                        project_id=project_id or rt.project_id,
+                        registry_type=rt,
+                        filename=filename,
+                        mode=mode,
+                        success_count=success_count,
+                        error_count=len(failed_records),
+                        status=status,
+                        success_details=success_details_list,
+                        error_details=failed_records,
+                        upload_session_id=upload_session_id
+                    )
+        except Exception as audit_err:
+            print(f"RegistryUploadSession personnel logging failed: {str(audit_err)}")
+
         log_action(request.user, 'Governance', 'Bulk Upload', f"Imported {success_count} personnel records (Errors: {error_count})")
         return Response({"success": success_count, "errors": error_count, "failed_records": failed_records})
 
@@ -1722,3 +1899,19 @@ class PatientViewSet(viewsets.ModelViewSet):
             "message": f"Bulk provisioning complete. {success_count} portal accounts activated.",
             "processed": len(patients)
         })
+
+
+class RegistryUploadSessionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = RegistryUploadSession.objects.all()
+    serializer_class = RegistryUploadSessionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = RegistryUploadSession.objects.all()
+        project_id = self.request.query_params.get('project')
+        registry_type_id = self.request.query_params.get('registry_type')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        if registry_type_id:
+            qs = qs.filter(registry_type_id=registry_type_id)
+        return qs

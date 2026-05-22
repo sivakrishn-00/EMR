@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo
+from .models import Patient, EmployeeMaster, FamilyMember, Project, ProjectCategoryMapping, ProjectFieldConfig, RegistryType, RegistryData, RegistryField, ProjectLogo, RegistryUploadSession
 
 class ProjectFieldConfigSerializer(serializers.ModelSerializer):
     class Meta:
@@ -207,4 +207,12 @@ class PatientSerializer(serializers.ModelSerializer):
 class ProjectLogoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectLogo
+        fields = '__all__'
+
+class RegistryUploadSessionSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    registry_type_name = serializers.CharField(source='registry_type.name', read_only=True)
+    
+    class Meta:
+        model = RegistryUploadSession
         fields = '__all__'

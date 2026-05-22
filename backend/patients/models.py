@@ -392,3 +392,26 @@ class ProjectLogo(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - Logo {self.id}"
+
+
+class RegistryUploadSession(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='upload_sessions')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='upload_sessions')
+    registry_type = models.ForeignKey('RegistryType', on_delete=models.CASCADE, related_name='upload_sessions')
+    filename = models.CharField(max_length=255, default='uploaded_sheet.xlsx')
+    mode = models.CharField(max_length=20, default='OVERWRITE') # OVERWRITE or INCREMENT
+    success_count = models.IntegerField(default=0)
+    error_count = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, default='SUCCESS') # SUCCESS, WARNING, FAILED
+    
+    # Detailed auditing lists
+    success_details = models.JSONField(default=list, blank=True) # [{'ucode': 'D001', 'name': 'Crocin', 'qty': 50, 'cost': 12.0}]
+    error_details = models.JSONField(default=list, blank=True) # [{'row': 2, 'item': 'Crocin', 'error': 'Missing name'}]
+    timestamp = models.DateTimeField(auto_now_add=True)
+    upload_session_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.filename} ({self.mode}) by {self.user} at {self.timestamp}"
