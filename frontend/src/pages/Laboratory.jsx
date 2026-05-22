@@ -222,7 +222,7 @@ const Laboratory = () => {
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue</h3>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue ({filteredRequests.length})</h3>
                 <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
              </div>
              
