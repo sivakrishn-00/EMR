@@ -206,6 +206,11 @@ const Clinical = () => {
         return;
     }
 
+    if (finalConsultData.next_step === 'PENDING_LAB' && finalConsultData.lab_investigations.length === 0) {
+        toast.error("Please add at least one diagnostic test for Lab request transfer.");
+        return;
+    }
+
     // Stock validation: ensure each prescribed medicine is in stock and has sufficient units if any are prescribed
     if (finalConsultData.medications.length > 0) {
         for (const med of finalConsultData.medications) {
