@@ -334,20 +334,39 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
 
   return (
     <>
-      <header className="glass" style={{
+      <header className="glass navbar-header" style={{
         height: 'var(--header-height)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 1.5rem',
         position: 'sticky',
         top: 0,
         zIndex: 40,
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
       }}>
-        {/* Left Section: Simplified Text Branding */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        {/* Left Section: Simplified Text Branding with Hamburger Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={onToggleSidebar}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-main)',
+              transition: 'all 0.2s',
+            }}
+            title="Toggle Sidebar"
+            className="sidebar-toggle-btn"
+          >
+            <Menu size={18} />
+          </button>
+
           {isCollapsed && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{
@@ -360,7 +379,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
               }}>
                 {user?.project_name || 'EMR'}
               </span>
-              <span style={{
+              <span className="brand-subtitle" style={{
                 fontSize: '0.6875rem',
                 fontWeight: 800,
                 color: '#94a3b8',
@@ -429,7 +448,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
                 className="theme-toggle"
               >
                 {isDark ? <Sun size={16} color="#fbbf24" /> : <Moon size={16} color="#475569" />}
-                <span style={{ minWidth: '40px' }}>{isDark ? 'LIGHT' : 'DARK'}</span>
+                <span className="theme-toggle-text" style={{ minWidth: '40px' }}>{isDark ? 'LIGHT' : 'DARK'}</span>
             </button>
           </div>
           <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
@@ -453,7 +472,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
                 <CalendarIcon size={18} color={showCalendar ? 'var(--primary)' : '#64748b'} />
               </button>
               {showCalendar && (
-                <div className="fade-in shadow-2xl" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '340px', background: 'var(--surface)', borderRadius: '20px', border: '1px solid var(--border)', padding: '1.25rem', zIndex: 100 }}>
+                <div className="fade-in shadow-2xl header-dropdown-menu" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '340px', background: 'var(--surface)', borderRadius: '20px', border: '1px solid var(--border)', padding: '1.25rem', zIndex: 100 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>Appointment Hub</h3>
                     <button 
@@ -560,7 +579,7 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
                 )}
               </button>
               {showNotifications && (
-                <div className="fade-in shadow-2xl" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '320px', background: 'var(--surface)', borderRadius: '20px', border: '1px solid var(--border)', padding: '1.25rem', zIndex: 100 }}>
+                <div className="fade-in shadow-2xl header-dropdown-menu" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '320px', background: 'var(--surface)', borderRadius: '20px', border: '1px solid var(--border)', padding: '1.25rem', zIndex: 100 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <h3 style={{ fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-main)' }}>News & Alerts</h3>
@@ -638,16 +657,16 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
               <div style={{ width: '32px', height: '32px', background: 'var(--primary)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
                 {user?.username?.charAt(0).toUpperCase()}
               </div>
-              <div style={{ textAlign: 'left', display: 'block' }}>
+              <div className="profile-name-container" style={{ textAlign: 'left', display: 'block' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
                   {user?.first_name ? `${user.first_name} ${user.last_name || ''}` : user?.username || 'System User'}
                 </p>
               </div>
-              <ChevronDown size={14} color="#94a3b8" />
+              <ChevronDown size={14} color="#94a3b8" className="profile-chevron" />
             </div>
 
             {showDropdown && (
-              <div className="fade-in shadow-xl" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '220px', background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)', padding: '0.5rem', zIndex: 100 }}>
+              <div className="fade-in shadow-xl header-dropdown-menu" style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: '220px', background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)', padding: '0.5rem', zIndex: 100 }}>
                 <button onClick={() => { setShowDropdown(false); navigate('/profile'); }} className="dropdown-link"><UserIcon size={16} /> My Profile</button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '0.5rem 0' }}></div>
                 <button onClick={handleLogout} className="dropdown-link logout-btn"><LogOut size={16} /> Log Out</button>
@@ -816,6 +835,30 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
       )}
 
       <style>{`
+        .navbar-header { padding: 0 1.5rem; }
+        @media (min-width: 1025px) {
+          .sidebar-toggle-btn {
+            display: none !important;
+          }
+        }
+        @media (max-width: 600px) {
+          .brand-subtitle { display: none !important; }
+          .theme-toggle-text { display: none !important; }
+          .profile-name-container { display: none !important; }
+          .profile-chevron { display: none !important; }
+          .navbar-header { padding: 0 0.75rem !important; }
+          .header-dropdown-menu {
+            position: fixed !important;
+            top: calc(var(--header-height) + 10px) !important;
+            left: 20px !important;
+            right: 20px !important;
+            width: auto !important;
+            max-width: none !important;
+            transform: none !important;
+            z-index: 9999 !important;
+            padding: 1rem !important;
+          }
+        }
         .dropdown-link { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.625rem 0.875rem; border: none; background: transparent; color: var(--text-main); font-size: 0.8125rem; font-weight: 600; cursor: pointer; border-radius: 10px; transition: 0.2s; text-align: left; }
         .dropdown-link:hover { background: var(--background); color: var(--primary); }
         .logout-btn { color: #ef4444 !important; }

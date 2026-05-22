@@ -10,7 +10,6 @@ import {
   Smartphone, 
   Fingerprint, 
   CheckCircle2,
-  Activity,
   ArrowRight,
   Loader2,
   ChevronLeft
@@ -216,9 +215,22 @@ const Login = () => {
         .g-btn:hover { background: #3730a3; transform: translateY(-1px); }
         .g-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        .otp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin: 2rem 0; }
-        .otp-box { aspect-ratio: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; text-align: center; font-size: 1.5rem; font-weight: 900; outline: none; color: #4338ca; }
-        .otp-box:focus { border-color: #4338ca; background: white; }
+        .otp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin: 2.25rem 0; }
+        .otp-box { 
+          width: 100%; 
+          height: 54px; 
+          background: #f8fafc; 
+          border: 2px solid #e2e8f0; 
+          border-radius: 12px; 
+          text-align: center; 
+          font-size: 1.5rem; 
+          font-weight: 900; 
+          outline: none; 
+          color: #4338ca; 
+          box-sizing: border-box;
+          transition: all 0.2s ease;
+        }
+        .otp-box:focus { border-color: #4338ca; background: white; box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12); }
 
         .discovery-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 6px 14px; background: #f5f3ff; border-radius: 99px; font-size: 0.75rem; font-weight: 850; color: #4338ca; margin-bottom: 1.5rem; border: 1px solid #ddd6fe; }
         
@@ -238,19 +250,76 @@ const Login = () => {
         .animate-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        @media (max-width: 900px) {
+          .gateway-root { 
+            flex-direction: column;
+            min-height: 100vh;
+            background: #ffffff;
+            overflow-y: auto;
+          }
+          .g-visual { 
+            height: 180px;
+            width: 100%;
+            flex: none;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+          }
+          .g-video {
+            height: 100%;
+            width: 100%;
+            object-fit: cover;
+          }
+          .g-content {
+            display: none !important;
+          }
+          .l-panel { 
+            flex: 1;
+            padding: 2.25rem 1.5rem 3rem 1.5rem;
+            background: #ffffff;
+            margin-top: -28px;
+            border-top-left-radius: 28px;
+            border-top-right-radius: 28px;
+            position: relative;
+            z-index: 10;
+            border: none;
+            box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+          }
+        }
+
+        .login-logo {
+          height: 50px;
+          object-fit: contain;
+          margin-bottom: 2rem;
+          display: block;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        @media (max-width: 900px) {
+          .login-logo {
+            height: 42px;
+            margin-bottom: 1.5rem;
+          }
+        }
       `}</style>
 
       <div className="g-visual">
         <video autoPlay muted loop playsInline className="g-video"><source src="/EMR.mp4" type="video/mp4" /></video>
         <div className="g-overlay"></div>
         <div className="g-content">
-          <Activity size={48} color="#ffffff" strokeWidth={2.5} style={{ marginBottom: '2.5rem' }} />
           <h1 style={{ fontSize: '4.5rem', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, color: '#ffffff' }}>Electronic <br /> <span style={{ color: '#ffffff', opacity: 0.9 }}>Medical Records</span></h1>
           <p style={{ marginTop: '2.5rem', opacity: 0.7, fontSize: '1.25rem', maxWidth: '400px', fontWeight: 500, lineHeight: 1.5 }}>Global clinical infrastructure for precision healthcare and automated registry analytics.</p>
         </div>
       </div>
 
       <div className="l-panel">
+        <img src="/white_bavya.jpg" className="login-logo" alt="Bavya Logo" />
         {step === 0 && (
           <div className="animate-in">
             <h2 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.5rem' }}>Sign In</h2>

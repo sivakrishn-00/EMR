@@ -326,7 +326,7 @@ const Vitals = () => {
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting List - Only show if NO patient is selected */}
         {!selectedVisit && (
-          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+          <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', minWidth: '0' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Nurse Queue ({totalCount})</h3>
@@ -358,7 +358,7 @@ const Vitals = () => {
                </div>
             </div>
             
-            <div className="table-responsive">
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>

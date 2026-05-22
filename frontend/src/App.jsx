@@ -104,7 +104,7 @@ const MainLayout = ({ children }) => {
   const sidebarWidth = isSidebarCollapsed ? '64px' : 'var(--sidebar-width)';
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile Overlay */}
       <div 
         className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`} 
@@ -117,20 +117,26 @@ const MainLayout = ({ children }) => {
         onToggleCollapsed={toggleCollapsed} 
       />
       
-      <div className="main-wrapper" style={{ 
-        marginLeft: window.innerWidth > 1024 ? sidebarWidth : 0,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        padding: '0'
-      }}>
+      <div className="main-wrapper">
         <Navbar onToggleSidebar={toggleSidebar} isCollapsed={isSidebarCollapsed} />
-        <main className="content-container" style={{ padding: '1rem 1.5rem', margin: '0' }}>
+        <main className="content-container" style={{ margin: '0' }}>
           {children}
         </main>
       </div>
 
       <style>{`
+        .main-wrapper {
+          padding-left: var(--sidebar-width);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .app-layout.sidebar-collapsed .main-wrapper {
+          padding-left: 64px;
+        }
         @media (max-width: 1024px) {
-          .main-wrapper { margin-left: 0 !important; }
+          .main-wrapper { 
+            padding-left: 0 !important; 
+            margin-left: 0 !important; 
+          }
         }
       `}</style>
     </div>

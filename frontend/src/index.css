@@ -91,9 +91,16 @@ body {
 
 .content-container {
   padding: 1.25rem 2rem;
-  max-width: 1600px;
+  max-width: 100%;
   margin: 0;
   width: 100%;
+}
+
+@media (max-width: 600px) {
+  .content-container {
+    padding: 1rem 0.75rem !important;
+    overflow-x: hidden !important;
+  }
 }
 
 /* Sidebar Responsive Styles */
@@ -308,4 +315,10 @@ tr:hover td {
 @keyframes modalScale {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+@media (min-width: 1025px) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
 }

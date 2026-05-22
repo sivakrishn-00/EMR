@@ -60,31 +60,36 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
         <div style={{ height: 'var(--header-height)', display: 'flex', alignItems: 'center', padding: '0 1rem', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', width: '100%' }}>
             {!isCollapsed && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{
-                  color: 'white',
-                  fontWeight: 900,
-                  fontSize: '0.9rem',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1,
-                  color: 'var(--primary)'
-                }}>
-                  {user?.project_name || 'EMR'}
-                </span>
-                <span style={{
-                  color: '#94a3b8',
-                  fontWeight: 600,
-                  fontSize: '0.65rem',
-                  letterSpacing: '0.02em',
-                  marginTop: '4px'
-                }}>
-                  Electronic Medical Records
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <img src="/bavya-logo.png" alt="Bavya Logo" style={{ height: '32px', width: '32px', objectFit: 'contain', padding: '2px', borderRadius: '8px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{
+                    color: 'white',
+                    fontWeight: 900,
+                    fontSize: '0.9rem',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                    color: 'var(--primary)'
+                  }}>
+                    {user?.project_name || 'EMR'}
+                  </span>
+                  <span style={{
+                    color: '#94a3b8',
+                    fontWeight: 600,
+                    fontSize: '0.65rem',
+                    letterSpacing: '0.02em',
+                    marginTop: '4px'
+                  }}>
+                    Electronic Medical Records
+                  </span>
+                </div>
               </div>
             )}
             {isCollapsed && (
-              <div style={{ height: '24px' }}></div>
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <img src="/bavya-logo.png" alt="Bavya Logo" style={{ height: '32px', width: '32px', objectFit: 'contain', borderRadius: '8px' }} />
+              </div>
             )}
           </div>
         </div>

@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '5173';
 const API_BASE_URL = isDev 
-  ? 'http://localhost:8000/api/'           // Terminal 1: Dev Loop
-  : `http://${window.location.hostname}:9002/api/`; // Terminal 2: Production Server (9002)
+  ? `http://${window.location.hostname}:8000/api/`
+  : `http://${window.location.hostname}:9002/api/`;
 
 export const MEDIA_URL = isDev
-  ? 'http://localhost:8000'
+  ? `http://${window.location.hostname}:8000`
   : `http://${window.location.hostname}:9002`;
 
 const api = axios.create({

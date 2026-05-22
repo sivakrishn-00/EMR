@@ -91,7 +91,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="stats-grid" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
         <StatCard title="Total Registered" value={stats.total_patients} icon={Users} gradient="linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)" />
         <StatCard title="Pending Patients" value={`${stats.pending_patients || 0} Active`} icon={Clock} gradient="linear-gradient(135deg, var(--secondary) 0%, var(--secondary) 100%)" />
         <StatCard title="Laboratory" value={`${stats.lab_pending || 0} Open`} icon={FlaskConical} gradient="linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%)" />
@@ -100,7 +100,7 @@ const Dashboard = () => {
       </div>
 
       <div className="main-grid" style={{ gap: '1rem' }}>
-        <div className="card" style={{ padding: '1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="card" style={{ padding: '1.25rem', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', minWidth: '0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.015em' }}>Real-time Patient Queue</h2>
@@ -108,7 +108,7 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <div className="table-responsive" style={{ borderRadius: '10px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ borderRadius: '10px', border: '1px solid var(--border)', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
@@ -142,7 +142,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.5rem', borderRadius: '20px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="card" style={{ padding: '1.5rem', borderRadius: '20px', background: 'var(--surface)', border: '1px solid var(--border)', minWidth: '0' }}>
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>Operational Throughput</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 500, marginTop: '2px' }}>Resource allocation across core departments</p>
