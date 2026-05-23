@@ -13,7 +13,12 @@ const SYSTEM_MODULES = [
     { id: '/reports', name: 'Analytics Hub', icon: 'BarChart3' },
     { id: '/users', name: 'System Users', icon: 'UserCircle' },
     { id: '/audit', name: 'Audit Logs', icon: 'History' },
-    { id: '/admin-masters', name: 'Admin Masters', icon: 'Settings' },
+    { id: '/admin-masters', name: 'Admin Masters (Full Access)', icon: 'Settings' },
+    { id: '/admin-masters/protocols', name: 'Admin Masters - Data Hub', icon: 'Layers' },
+    { id: '/admin-masters/diagnostics', name: 'Admin Masters - Lab Masters', icon: 'Activity' },
+    { id: '/admin-masters/machines', name: 'Admin Masters - Sync Bridge', icon: 'Radio' },
+    { id: '/admin-masters/stats', name: 'Admin Masters - Analytics & Stock Monitor', icon: 'BarChart3' },
+    { id: '/admin-masters/upload_history', name: 'Admin Masters - Upload Audit Logs', icon: 'History' },
     { id: '/projects', name: 'Project Management', icon: 'Briefcase' },
     { id: '/roles', name: 'Role Management', icon: 'ShieldCheck' }
 ];

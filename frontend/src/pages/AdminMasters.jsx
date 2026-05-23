@@ -53,6 +53,19 @@ const AdminMasters = () => {
   };
 
   const { user } = useAuth();
+  const userPerms = user?.permissions || [];
+  const hasFullAdminMasters = user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes('/admin-masters');
+  
+  const tabPermissions = {
+    PROTOCOLS: hasFullAdminMasters || userPerms.includes('/admin-masters/protocols'),
+    DIAGNOSTICS: hasFullAdminMasters || userPerms.includes('/admin-masters/diagnostics'),
+    MACHINES: hasFullAdminMasters || userPerms.includes('/admin-masters/machines'),
+    STATS: hasFullAdminMasters || userPerms.includes('/admin-masters/stats'),
+    UPLOAD_HISTORY: hasFullAdminMasters || userPerms.includes('/admin-masters/upload_history')
+  };
+
+  const permittedTabsCount = Object.values(tabPermissions).filter(Boolean).length;
+
   const [employeeMasters, setEmployeeMasters] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -355,6 +368,18 @@ const AdminMasters = () => {
     fetchProjects();
     return () => clearTimeout(timer);
   }, [selectedProject, exploringProtocolId, searchQuery, activeBoard]);
+
+  useEffect(() => {
+    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
+    const activePermKey = activeBoard === "REGISTRY" ? "PROTOCOLS" : activeBoard;
+    
+    if (!tabPermissions[activePermKey]) {
+      const firstPermitted = tabsOrder.find(t => tabPermissions[t]);
+      if (firstPermitted) {
+        setActiveBoard(firstPermitted);
+      }
+    }
+  }, [activeBoard, userPerms]);
 
   const fetchDashboardStats = async () => {
     if (!selectedProject) return;
@@ -1526,8 +1551,20 @@ const AdminMasters = () => {
                   onClick={() => {
                     setSelectedProject(p.id);
                     setViewMode("DATA");
-                    setActiveBoard("PROTOCOLS");
-                    fetchEmployeeMasters(1, p.id);
+                    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
+                    const firstPermitted = tabsOrder.find(t => tabPermissions[t]) || "PROTOCOLS";
+                    setActiveBoard(firstPermitted);
+                    if (firstPermitted === "STATS") {
+                      fetchDashboardStats();
+                    } else if (firstPermitted === "DIAGNOSTICS") {
+                      fetchLabTests();
+                    } else if (firstPermitted === "MACHINES") {
+                      fetchLabMachines();
+                    } else if (firstPermitted === "UPLOAD_HISTORY") {
+                      fetchUploadSessions();
+                    } else {
+                      fetchEmployeeMasters(1, p.id);
+                    }
                   }}
                   className="card fade-in"
                   style={{
@@ -1671,136 +1708,146 @@ const AdminMasters = () => {
           <>
             {/* Statistics cards removed at user request */}
 
-            <div
-              style={{
-                display: "flex",
-                gap: "2rem",
-                marginTop: "1.5rem",
-                marginBottom: "1.5rem",
-                borderBottom: "1px solid #e2e8f0",
-                width: "100%",
-                paddingBottom: "0",
-              }}
-            >
-               <button
-                className="btn"
+            {permittedTabsCount > 1 && (
+              <div
                 style={{
-                  background: "transparent",
-                  color: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b",
-                  fontSize: "0.85rem",
-                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
-                  borderRadius: "0",
-                  transition: "all 0.2s",
-                  fontWeight: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? 600 : 500,
                   display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderBottom: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "2px solid #6366f1" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-                onClick={() => setActiveBoard("PROTOCOLS")}
-              >
-                <Layers size={16} color={(activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b"} /> Data Hub
-              </button>
-
-              <button
-                className="btn"
-                style={{
-                  background: "transparent",
-                  color: activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b",
-                  fontSize: "0.85rem",
-                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
-                  borderRadius: "0",
-                  transition: "all 0.2s",
-                  fontWeight: activeBoard === "DIAGNOSTICS" ? 600 : 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderBottom: activeBoard === "DIAGNOSTICS" ? "2px solid #10b981" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-                onClick={() => {
-                  setActiveBoard("DIAGNOSTICS");
-                  fetchLabTests();
+                  gap: "2rem",
+                  marginTop: "1.5rem",
+                  marginBottom: "1.5rem",
+                  borderBottom: "1px solid #e2e8f0",
+                  width: "100%",
+                  paddingBottom: "0",
                 }}
               >
-                <Activity size={16} color={activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b"} /> Lab Masters
-              </button>
+                {tabPermissions.PROTOCOLS && (
+                   <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: (activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "2px solid #6366f1" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => setActiveBoard("PROTOCOLS")}
+                  >
+                    <Layers size={16} color={(activeBoard === "PROTOCOLS" || activeBoard === "REGISTRY") ? "#6366f1" : "#64748b"} /> Data Hub
+                  </button>
+                )}
 
-              <button
-                className="btn"
-                style={{
-                  background: "transparent",
-                  color: activeBoard === "MACHINES" ? "#a855f7" : "#64748b",
-                  fontSize: "0.85rem",
-                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
-                  borderRadius: "0",
-                  transition: "all 0.2s",
-                  fontWeight: activeBoard === "MACHINES" ? 600 : 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderBottom: activeBoard === "MACHINES" ? "2px solid #a855f7" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-                onClick={() => {
-                  setActiveBoard("MACHINES");
-                  fetchLabMachines();
-                }}
-              >
-                <Radio size={16} color={activeBoard === "MACHINES" ? "#a855f7" : "#64748b"} /> Sync Bridge
-              </button>
+                {tabPermissions.DIAGNOSTICS && (
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: activeBoard === "DIAGNOSTICS" ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: activeBoard === "DIAGNOSTICS" ? "2px solid #10b981" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => {
+                      setActiveBoard("DIAGNOSTICS");
+                      fetchLabTests();
+                    }}
+                  >
+                    <Activity size={16} color={activeBoard === "DIAGNOSTICS" ? "#10b981" : "#64748b"} /> Lab Masters
+                  </button>
+                )}
 
-              <button
-                className="btn"
-                style={{
-                  background: "transparent",
-                  color: activeBoard === "STATS" ? "#f59e0b" : "#64748b",
-                  fontSize: "0.85rem",
-                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
-                  borderRadius: "0",
-                  transition: "all 0.2s",
-                  fontWeight: activeBoard === "STATS" ? 600 : 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderBottom: activeBoard === "STATS" ? "2px solid #f59e0b" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-                onClick={() => {
-                  setActiveBoard("STATS");
-                  fetchDashboardStats();
-                }}
-              >
-                <Activity size={16} color={activeBoard === "STATS" ? "#f59e0b" : "#64748b"} /> Analytics & Stock Monitor
-              </button>
+                {tabPermissions.MACHINES && (
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: activeBoard === "MACHINES" ? "#a855f7" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: activeBoard === "MACHINES" ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: activeBoard === "MACHINES" ? "2px solid #a855f7" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => {
+                      setActiveBoard("MACHINES");
+                      fetchLabMachines();
+                    }}
+                  >
+                    <Radio size={16} color={activeBoard === "MACHINES" ? "#a855f7" : "#64748b"} /> Sync Bridge
+                  </button>
+                )}
 
-              <button
-                className="btn"
-                style={{
-                  background: "transparent",
-                  color: activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b",
-                  fontSize: "0.85rem",
-                  padding: "0.5rem 0.5rem 0.75rem 0.5rem",
-                  borderRadius: "0",
-                  transition: "all 0.2s",
-                  fontWeight: activeBoard === "UPLOAD_HISTORY" ? 600 : 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderBottom: activeBoard === "UPLOAD_HISTORY" ? "2px solid #3b82f6" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-                onClick={() => {
-                  setActiveBoard("UPLOAD_HISTORY");
-                  fetchUploadSessions();
-                }}
-              >
-                <History size={16} color={activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b"} /> Upload Audit Logs
-              </button>
+                {tabPermissions.STATS && (
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: activeBoard === "STATS" ? "#f59e0b" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: activeBoard === "STATS" ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: activeBoard === "STATS" ? "2px solid #f59e0b" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => {
+                      setActiveBoard("STATS");
+                      fetchDashboardStats();
+                    }}
+                  >
+                    <Activity size={16} color={activeBoard === "STATS" ? "#f59e0b" : "#64748b"} /> Analytics & Stock Monitor
+                  </button>
+                )}
 
-
-            </div>
+                {tabPermissions.UPLOAD_HISTORY && (
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: activeBoard === "UPLOAD_HISTORY" ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: activeBoard === "UPLOAD_HISTORY" ? "2px solid #3b82f6" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => {
+                      setActiveBoard("UPLOAD_HISTORY");
+                      fetchUploadSessions();
+                    }}
+                  >
+                    <History size={16} color={activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b"} /> Upload Audit Logs
+                  </button>
+                )}
+              </div>
+            )}
 
             {activeBoard === "STATS" ? (
               <div className="fade-in">

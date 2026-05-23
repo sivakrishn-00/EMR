@@ -49,7 +49,14 @@ const ProtectedRoute = ({ children, requiredModule }) => {
 
   // Dynamic permission check based on tokens assigned by admin UI
   const userPerms = user.permissions || [];
-  const hasAccess = user.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(requiredModule);
+  let hasAccess = user.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(requiredModule);
+  if (requiredModule === '/admin-masters' && !hasAccess) {
+    hasAccess = userPerms.includes('/admin-masters/protocols') ||
+                userPerms.includes('/admin-masters/diagnostics') ||
+                userPerms.includes('/admin-masters/machines') ||
+                userPerms.includes('/admin-masters/stats') ||
+                userPerms.includes('/admin-masters/upload_history');
+  }
   if (!hasAccess) {
     return (
       <div className="fade-in" style={{ 

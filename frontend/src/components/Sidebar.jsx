@@ -49,7 +49,19 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
   ];
 
   const userPerms = user?.permissions || [];
-  const checkAccess = (path) => user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(path);
+  const checkAccess = (path) => {
+    if (path === '/admin-masters') {
+      return user?.role === 'ADMIN' || 
+             userPerms.includes('ADMIN_ALL') || 
+             userPerms.includes('/admin-masters') ||
+             userPerms.includes('/admin-masters/protocols') ||
+             userPerms.includes('/admin-masters/diagnostics') ||
+             userPerms.includes('/admin-masters/machines') ||
+             userPerms.includes('/admin-masters/stats') ||
+             userPerms.includes('/admin-masters/upload_history');
+    }
+    return user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(path);
+  };
 
   const filteredNav = navItems.filter(item => checkAccess(item.path));
   const filteredAdmin = adminItems.filter(item => checkAccess(item.path));
@@ -136,18 +148,28 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
               }}>System Administration</p>
 
               <ul style={{ listStyle: 'none' }}>
-                {filteredAdmin.map((item) => (
-                  <li key={item.name} style={{ marginBottom: '0.25rem' }}>
-                    <NavLink
-                      to={item.path}
-                      className={({ isActive }) => `nav-link ${isActive || window.location.pathname.startsWith(item.path) ? 'active' : ''}`}
-                    >
-                      <item.icon size={16} className="nav-icon" />
-                      {!isCollapsed && <span className="nav-text">{item.name}</span>}
-                      <div className="tooltip">{item.name}</div>
-                    </NavLink>
-                  </li>
-                ))}
+                {filteredAdmin.map((item) => {
+                  let targetPath = item.path;
+                  if (item.path === '/admin-masters' && !userPerms.includes('/admin-masters') && user?.role !== 'ADMIN' && !userPerms.includes('ADMIN_ALL')) {
+                    if (userPerms.includes('/admin-masters/protocols')) targetPath = '/admin-masters/protocols';
+                    else if (userPerms.includes('/admin-masters/diagnostics')) targetPath = '/admin-masters/diagnostics';
+                    else if (userPerms.includes('/admin-masters/machines')) targetPath = '/admin-masters/machines';
+                    else if (userPerms.includes('/admin-masters/stats')) targetPath = '/admin-masters/stats';
+                    else if (userPerms.includes('/admin-masters/upload_history')) targetPath = '/admin-masters/upload_history';
+                  }
+                  return (
+                    <li key={item.name} style={{ marginBottom: '0.25rem' }}>
+                      <NavLink
+                        to={targetPath}
+                        className={({ isActive }) => `nav-link ${isActive || window.location.pathname.startsWith(item.path) ? 'active' : ''}`}
+                      >
+                        <item.icon size={16} className="nav-icon" />
+                        {!isCollapsed && <span className="nav-text">{item.name}</span>}
+                        <div className="tooltip">{item.name}</div>
+                      </NavLink>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}
