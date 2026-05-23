@@ -56,6 +56,7 @@ const Clinical = () => {
   const [patientHistory, setPatientHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [detailedVisit, setDetailedVisit] = useState(null);
+  const [isSavingConsult, setIsSavingConsult] = useState(false);
 
   useEffect(() => {
     fetchVisitsToSee();
@@ -169,6 +170,13 @@ const Clinical = () => {
           setTotalCount(res.data.length);
       }
       setPage(pageNum);
+      
+      // Auto-reload stock & diagnostics if a case is currently selected
+      if (selectedVisit) {
+          const pid = selectedVisit.patient_details?.project_id || selectedVisit.patient_details?.project || "";
+          fetchPharmacyInventory(pid);
+          fetchProjectLabMasters(pid);
+      }
     } catch (err) {
       toast.error("Failed to fetch doctor's queue");
     } finally {
@@ -178,6 +186,7 @@ const Clinical = () => {
 
   const handleConsultation = async (e) => {
     e.preventDefault();
+    if (isSavingConsult) return;
     
     if (!consultData.next_step) {
         toast.error("Please select a Next Workflow Action (Lab, Pharmacy, or Discharge) to proceed.", {
@@ -246,6 +255,7 @@ const Clinical = () => {
         }
     }
 
+    setIsSavingConsult(true);
     const loadingToast = toast.loading('Finalizing consultation...');
     try {
       await api.post(`clinical/visits/${selectedVisit.id}/record_consultation/`, finalConsultData);
@@ -266,6 +276,8 @@ const Clinical = () => {
       fetchVisitsToSee();
     } catch (err) {
       toast.error("Error saving consultation", { id: loadingToast });
+    } finally {
+      setIsSavingConsult(false);
     }
   };
 

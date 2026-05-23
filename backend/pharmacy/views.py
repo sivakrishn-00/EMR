@@ -92,19 +92,45 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         return queryset
 
     @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        prescription = self.get_object()
+        prescription.status = 'CANCELLED'
+        prescription.remarks = request.data.get('remarks', 'Marked Out of Stock')
+        prescription.save()
+        
+        log_action(
+            request.user, 
+            'Pharmacy', 
+            'Medication Out of Stock', 
+            f"[OUT OF STOCK] {prescription.medication_name} | Visit ID: {prescription.visit.id}"
+        )
+        return Response({'status': 'marked out of stock'})
+
+    @action(detail=True, methods=['post'])
+    def finalize_visit(self, request, pk=None):
+        prescription = self.get_object()
+        visit = prescription.visit
+        visit.status = 'COMPLETED'
+        visit.is_active = False
+        visit.save()
+        
+        log_action(
+            request.user, 
+            'Pharmacy', 
+            'Visit Finalized', 
+            f"[FINALIZED] Visit ID: {visit.id}"
+        )
+        return Response({'status': 'visit finalized'})
+
+    @action(detail=True, methods=['post'])
     def dispense(self, request, pk=None):
         prescription = self.get_object()
+        visit = prescription.visit
         serializer = DispensingRecordSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(prescription=prescription, dispensed_by=request.user)
             prescription.status = 'DISPENSED'
             prescription.save()
-            
-            # Finalize visit
-            visit = prescription.visit
-            visit.status = 'COMPLETED'
-            visit.is_active = False
-            visit.save()
             
             log_action(
                 request.user, 
@@ -210,7 +236,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                                 serializer.instance.total_cost = float(qty_to_deduct) * float(drug_item.cost or 0.0)
                                 serializer.instance.save()
                                 
-                                drug_item.quantity = F('quantity') - qty_to_deduct
+                                drug_item.refresh_from_db()
+                                drug_item.quantity = max(0, drug_item.quantity - qty_to_deduct)
                                 drug_item.save(update_fields=['quantity'])
                         else:
                             print(f"[PHARMACY LOG] Drug '{search_name}' not found in Registry for Project {p_project.name}")

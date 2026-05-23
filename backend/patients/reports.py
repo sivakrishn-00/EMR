@@ -194,10 +194,35 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
         # E. MEDS
         elements.append(create_sub_header("PHARMACY & PRESCRIPTIONS", theme_color))
         elements.append(Spacer(1, 0.04 * inch))
-        med_data = [[Paragraph("MEDICATION", theme['label_left']), Paragraph("DOSAGE", theme['label_center']), Paragraph("FREQUENCY", theme['label_center']), Paragraph("DURATION", theme['label_center'])]]
+        med_data = [[
+            Paragraph("MEDICATION", theme['label_left']), 
+            Paragraph("DOSAGE", theme['label_center']), 
+            Paragraph("FREQUENCY", theme['label_center']), 
+            Paragraph("DURATION", theme['label_center']),
+            Paragraph("UNITS GIVEN", theme['label_center'])
+        ]]
         for m in v.get('prescriptions', []):
-            med_data.append([Paragraph(f"<b>{to_str(m.get('medication_name'))}</b>", theme['value']), Paragraph(to_str(m.get('dosage')), theme['badge_green']), Paragraph(to_str(m.get('frequency')), theme['badge_green']), Paragraph(to_str(m.get('duration')), theme['badge_green'])])
-        medt = Table(med_data, colWidths=[3.1*inch, 1.1*inch, 1.2*inch, 1.2*inch])
+            status_text = ""
+            status = m.get('status')
+            if status == 'CANCELLED':
+                status_text = " <font color='#ef4444'><b>(Out of Stock)</b></font>"
+            elif status == 'DISPENSED':
+                status_text = " <font color='#10b981'><b>(Dispensed)</b></font>"
+            elif status == 'PENDING':
+                status_text = " <font color='#b45309'><b>(Pending)</b></font>"
+                
+            units_given = '0'
+            if status == 'DISPENSED':
+                units_given = to_str(m.get('total_units'), '0')
+                
+            med_data.append([
+                Paragraph(f"<b>{to_str(m.get('medication_name'))}</b>{status_text}", theme['value']), 
+                Paragraph(to_str(m.get('dosage')), theme['badge_green']), 
+                Paragraph(to_str(m.get('frequency')), theme['badge_green']), 
+                Paragraph(to_str(m.get('duration')), theme['badge_green']),
+                Paragraph(units_given, theme['badge_green'])
+            ])
+        medt = Table(med_data, colWidths=[2.8*inch, 0.8*inch, 1.0*inch, 0.9*inch, 1.1*inch])
         medt.setStyle(std_grid)
         elements.append(medt)
         elements.append(Spacer(1, 0.2 * inch))

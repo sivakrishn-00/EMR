@@ -494,6 +494,12 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                 # Security: If no protocol/filter is specified, return nothing
                 queryset = queryset.none()
 
+            names_param = self.request.query_params.get('names')
+            if names_param:
+                from django.db.models.functions import Lower
+                name_list = [n.strip().lower() for n in names_param.split(',') if n.strip()]
+                queryset = queryset.annotate(name_lower=Lower('name')).filter(name_lower__in=name_list)
+
             # Workspace Search: Filter by primary identifiers (ucode/name)
             search = self.request.query_params.get('search')
             if search:

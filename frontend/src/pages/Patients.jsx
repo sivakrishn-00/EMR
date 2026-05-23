@@ -475,6 +475,7 @@ const Patients = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isRegistering) return;
     setFormAttempted(true);
 
     if (formData.phone && (formData.phone.length !== 10 || isNaN(formData.phone))) {
@@ -516,6 +517,7 @@ const Patients = () => {
   const handleInstantTriageSubmit = async (e) => {
     e.preventDefault();
     if (!triagePatient) return;
+    if (isTriaging) return;
 
     setIsTriaging(true);
      const loadingToast = toast.loading('Initiating instant intake...');
@@ -539,6 +541,7 @@ const Patients = () => {
   };
 
   const handleEnablePortal = async (patientId) => {
+    if (isEnablingPortal) return;
     setIsEnablingPortal(patientId);
     const loading = toast.loading("Provisioning Portal Credentials...");
     try {

@@ -9,12 +9,14 @@ const Pharmacy = () => {
   const [projectConfig, setProjectConfig] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
   const [selectedPresc, setSelectedPresc] = useState(null);
-  const [dispenseData, setDispenseData] = useState({ quantity: 1, remarks: '' });
+  const [outOfStockItems, setOutOfStockItems] = useState({});
+  const [dispenseData, setDispenseData] = useState({ remarks: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [itemsPerPage] = useState(100);
+  const [isDispensing, setIsDispensing] = useState(false);
 
   const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
@@ -38,17 +40,23 @@ const Pharmacy = () => {
   };
 
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
-  const [isInventoryLoading, setIsInventoryLoading] = useState(false);
 
   useEffect(() => {
-    fetchPrescriptions();
-    fetchPharmacyInventory();
+    fetchPrescriptionsAndInventory();
     if (user?.project) {
       fetchProjectConfig(user.project.id || user.project);
     } else {
       setProjectConfig(null);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (selectedPresc) {
+      fetchStockForPresc(selectedPresc);
+    } else {
+      setPharmacyInventory([]);
+    }
+  }, [selectedPresc]);
 
   const fetchProjectConfig = async (projectId) => {
     try {
@@ -59,51 +67,36 @@ const Pharmacy = () => {
     }
   };
 
-  const fetchPharmacyInventory = async () => {
-    setIsInventoryLoading(true);
+  const fetchStockForPresc = async (presc) => {
+    if (!presc || !presc.items.length) {
+      setPharmacyInventory([]);
+      return;
+    }
+    const names = presc.items.map(i => i.medication_name).join(',');
+    const projectId = user?.project?.id || user?.project;
+    const endpoint = `patients/registry-data/?all=true&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory${projectId ? `&project=${projectId}` : ''}&names=${encodeURIComponent(names)}`;
     try {
-      const projectId = user?.project?.id || user?.project;
-      const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory${projectId ? `&project=${projectId}` : ''}`;
-        
-      const res = await api.get(endpoint);
-      setPharmacyInventory(res.data.results || res.data);
-    } catch (err) {
-      console.error("Stock sync offline:", err);
-    } finally {
-      setIsInventoryLoading(false);
+        const res = await api.get(endpoint);
+        setPharmacyInventory(res.data.results || res.data);
+    } catch (e) {
+        console.error("Failed to fetch stocks for prescription:", e);
     }
   };
 
-  const getInventoryStock = (medName, projectId) => {
-    if (!medName || !pharmacyInventory.length) return "0 items";
-    
-    const search = medName.trim().toLowerCase();
-    
-    const item = pharmacyInventory.find(d => {
-      const regProj = d.registry_type_project;
-      const isProjectMatch = !regProj || String(regProj) === String(projectId);
-      
-      const dName = d.name.trim().toLowerCase();
-      const match = dName === search;
-      
-      return isProjectMatch && match;
-    });
-
-    return item ? `${item.quantity} items` : "0 items";
-  };
-
-  const fetchPrescriptions = async (search = searchTerm) => {
+  const fetchPrescriptionsAndInventory = async (search = searchTerm) => {
     setIsLoading(true);
     try {
-      const res = await api.get(`pharmacy/prescriptions/?status=PENDING&page_size=1000&search=${encodeURIComponent(search)}`);
+      const prescRes = await api.get(`pharmacy/prescriptions/?status=PENDING&page_size=1000&search=${encodeURIComponent(search)}`);
       
-      const results = res.data.results || res.data;
-      const count = res.data.count || res.data.length;
-
-      // Group by VisitID
-      const grouped = results.reduce((acc, curr) => {
-        if (!acc[curr.visit_id]) {
-            acc[curr.visit_id] = {
+      const results = prescRes.data.results || prescRes.data;
+      const count = prescRes.data.count || prescRes.data.length;
+      
+      // Group by VisitID maintaining strict FIFO order from backend (No integer object keys sorting)
+      const grouped = [];
+      const visitMap = {};
+      results.forEach(curr => {
+        if (!visitMap[curr.visit_id]) {
+            const newGroup = {
                 visit_id: curr.visit_id,
                 patient_name: curr.patient_name,
                 uhid: curr.uhid,
@@ -111,46 +104,85 @@ const Pharmacy = () => {
                 project_id: curr.project_id,
                 items: []
             };
+            grouped.push(newGroup);
+            visitMap[curr.visit_id] = newGroup;
         }
-        acc[curr.visit_id].items.push(curr);
-        return acc;
-      }, {});
-
-      setPrescriptions(Object.values(grouped));
+        visitMap[curr.visit_id].items.push(curr);
+      });
+      
+      setPrescriptions(grouped);
       setTotalCount(count);
+
+      // Refresh stock for the selected prescription if still open
+      if (selectedPresc) {
+          const updatedGroup = grouped.find(p => p.visit_id === selectedPresc.visit_id);
+          if (updatedGroup) {
+              fetchStockForPresc(updatedGroup);
+          }
+      }
+
+      return grouped;
     } catch (err) {
       toast.error("Failed to fetch medication queue");
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDispenseVisit = async (visitId) => {
-    const loadingToast = toast.loading('Finalizing dispensing for all items...');
+  const handleSmartDispenseClose = async (visitId) => {
+    if (isDispensing) return;
+    setIsDispensing(true);
+    const loadingToast = toast.loading('Processing dispense and discharging patient...');
     try {
         const visitGroup = prescriptions.find(p => p.visit_id === visitId);
-        
-        // Dispense each medication with its correctly calculated dose count
-        const dispensePromises = visitGroup.items.map(item => {
+        if (!visitGroup || !visitGroup.items.length) {
+            setIsDispensing(false);
+            toast.dismiss(loadingToast);
+            return;
+        }
+
+        // 1. Process all dispense and cancel actions
+        const promises = visitGroup.items.map(item => {
+            const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === item.medication_name.toLowerCase());
             const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group;
             const calculatedQty = isDayBased 
                 ? getDoseCount(item.frequency, item.duration, item.item_group) 
                 : (item.total_units || 1);
-            return api.post(`pharmacy/prescriptions/${item.id}/dispense/`, {
-                ...dispenseData,
-                quantity: calculatedQty
-            });
+
+            const hasStock = drugObj && drugObj.quantity >= calculatedQty;
+            const isMarkedOutOfStock = !!outOfStockItems[item.id];
+
+            if (hasStock && !isMarkedOutOfStock) {
+                // Dispense in-stock item
+                return api.post(`pharmacy/prescriptions/${item.id}/dispense/`, {
+                    ...dispenseData,
+                    quantity: calculatedQty
+                });
+            } else {
+                // Mark out-of-stock item
+                return api.post(`pharmacy/prescriptions/${item.id}/cancel/`, {
+                    remarks: 'Out of Stock'
+                });
+            }
         });
 
-        await Promise.all(dispensePromises);
+        await Promise.all(promises);
+
+        // 2. Decoupled Finalization: Safely close the visit after all items are resolved
+        const targetPrescriptionId = visitGroup.items[0].id;
+        await api.post(`pharmacy/prescriptions/${targetPrescriptionId}/finalize_visit/`);
         
-        toast.success("Visit complete! Patient discharged.", { id: loadingToast });
+        toast.success("Dispensing complete! Patient discharged successfully.", { id: loadingToast });
         setSelectedPresc(null);
-        setDispenseData({ quantity: 1, remarks: '' });
-        fetchPrescriptions();
+        setOutOfStockItems({});
+        setDispenseData({ remarks: '' });
+        fetchPrescriptionsAndInventory();
     } catch (e) {
-        console.error(e.response?.data);
+        console.error(e);
         toast.error("Dispensing failed", { id: loadingToast });
+    } finally {
+        setIsDispensing(false);
     }
   };
 
@@ -158,7 +190,7 @@ const Pharmacy = () => {
     const searchLow = searchTerm.toLowerCase().trim();
     if (!searchLow) return true;
 
-    // Smart card group matching: check if search term is a card base/suffix and extract the base
+    // Smart card group matching
     const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
     if (cardMatch) {
       const baseCard = cardMatch[1].padStart(4, '0');
@@ -204,13 +236,13 @@ const Pharmacy = () => {
                        type="text"
                        placeholder="Search patient..."
                        value={searchTerm}
-                       onChange={e => { const val = e.target.value; setSearchTerm(val); setPage(1); fetchPrescriptions(val); }}
+                       onChange={e => { const val = e.target.value; setSearchTerm(val); setPage(1); fetchPrescriptionsAndInventory(val); }}
                        className="search-input"
                        style={{ padding: '0.5rem 2rem 0.5rem 2.25rem', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.75rem', outline: 'none' }}
                     />
                     {searchTerm && (
                        <button 
-                          onClick={() => { setSearchTerm(''); setPage(1); fetchPrescriptions(''); }}
+                          onClick={() => { setSearchTerm(''); setPage(1); fetchPrescriptionsAndInventory(''); }}
                           style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                        >
                           <X size={14} />
@@ -284,7 +316,6 @@ const Pharmacy = () => {
                           const buttons = [];
                           const maxVisiblePages = 5;
                           
-                          // Always show page 1
                           buttons.push(
                               <button 
                                   key={1} 
@@ -337,7 +368,6 @@ const Pharmacy = () => {
                               buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
                           }
 
-                          // Always show last page
                           if (totalPages > 1) {
                               buttons.push(
                                   <button 
@@ -383,7 +413,7 @@ const Pharmacy = () => {
                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Receipt for <strong>{selectedPresc.patient_name}</strong></p>
                   </div>
                </div>
-               <button onClick={() => setSelectedPresc(null)} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer' }}>
+               <button onClick={() => { setSelectedPresc(null); setOutOfStockItems({}); }} style={{ border: 'none', background: 'var(--background)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer' }}>
                   <X size={16} />
                </button>
             </div>
@@ -391,65 +421,156 @@ const Pharmacy = () => {
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '1.25rem', borderRadius: '16px', marginBottom: '2rem' }}>
                <p style={{ fontSize: '0.625rem', fontWeight: 800, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Active Prescription List</p>
                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                   {selectedPresc.items.map(item => (
-                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                           <div>
-                               <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                   {item.frequency} | {item.duration} days
-                                   <span style={{ background: projectConfig?.primary_color || 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
-                                       Total: {(['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group) 
-                                               ? getDoseCount(item.frequency, item.duration, item.item_group) 
-                                               : (item.total_units || 1)} units
-                                   </span>
-                                   {(() => {
-                                       const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === item.medication_name.toLowerCase());
-                                       if (drugObj) {
-                                           const initialQty = parseInt(drugObj.additional_fields?.initial_quantity) || 100;
-                                           const threshold = Math.max(5, Math.round(initialQty * 0.2));
-                                           const isLow = drugObj.quantity <= threshold;
-                                           return (
-                                               <span style={{ 
-                                                   marginLeft: 'auto',
-                                                   color: isLow ? '#b45309' : '#10b981', 
-                                                   fontWeight: 800,
-                                                   fontSize: '0.6875rem',
-                                                   background: isLow ? '#fffbeb' : '#f0fdf4',
-                                                   padding: '2px 8px',
-                                                   borderRadius: '6px',
-                                                   border: `1px solid ${isLow ? '#fde68a' : '#dcfce7'}`
-                                               }}>
-                                                   {isLow ? `Low Stock (Under 20%): ${drugObj.quantity} remaining` : `In Stock: ${drugObj.quantity} items`}
-                                               </span>
-                                           );
-                                       }
-                                       return (
-                                           <span style={{ marginLeft: 'auto', color: '#ef4444', fontWeight: 800, fontSize: '0.6875rem', background: '#fef2f2', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fee2e2' }}>
-                                               Out of Registry
-                                           </span>
-                                       );
-                                   })()}
-                               </p>
-                           </div>
-                           <CheckCircle size={18} color="#10b981" />
-                       </div>
-                   ))}
+                    {selectedPresc.items.map(item => {
+                        const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === item.medication_name.toLowerCase());
+                        const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(item.item_group?.toUpperCase()) || !item.item_group;
+                        const calculatedQty = isDayBased 
+                            ? getDoseCount(item.frequency, item.duration, item.item_group) 
+                            : (item.total_units || 1);
+                        const hasStock = drugObj && drugObj.quantity >= calculatedQty;
+                        const isMarkedOutOfStock = !!outOfStockItems[item.id];
+
+                        return (
+                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                <div style={{ flex: 1, marginRight: '1rem' }}>
+                                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
+                                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '4px' }}>
+                                        {item.frequency} | {item.duration} days
+                                        <span style={{ background: projectConfig?.primary_color || 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                                            Total: {calculatedQty} units
+                                        </span>
+                                        {(() => {
+                                            if (drugObj) {
+                                                const qty = Math.max(0, drugObj.quantity);
+                                                if (drugObj.quantity <= 0) {
+                                                    return (
+                                                        <span style={{ 
+                                                            color: '#ef4444', 
+                                                            fontWeight: 800,
+                                                            fontSize: '0.6875rem',
+                                                            background: '#fef2f2',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '6px',
+                                                            border: '1px solid #fee2e2'
+                                                        }}>
+                                                            Out of Stock: 0 remaining
+                                                        </span>
+                                                    );
+                                                }
+                                                const initialQty = parseInt(drugObj.additional_fields?.initial_quantity) || 100;
+                                                const threshold = Math.max(5, Math.round(initialQty * 0.2));
+                                                const isLow = drugObj.quantity <= threshold;
+                                                return (
+                                                    <span style={{ 
+                                                        color: isLow ? '#b45309' : '#10b981', 
+                                                        fontWeight: 800,
+                                                        fontSize: '0.6875rem',
+                                                        background: isLow ? '#fffbeb' : '#f0fdf4',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        border: `1px solid ${isLow ? '#fde68a' : '#dcfce7'}`
+                                                    }}>
+                                                        {isLow ? `Low Stock (Under 20%): ${qty} remaining` : `In Stock: ${qty} items`}
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <span style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.6875rem', background: '#fef2f2', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fee2e2' }}>
+                                                    Out of Registry
+                                                </span>
+                                            );
+                                        })()}
+                                     </p>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {isMarkedOutOfStock ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{ 
+                                                color: '#64748b', 
+                                                fontWeight: 800,
+                                                fontSize: '0.75rem',
+                                                background: '#f1f5f9',
+                                                padding: '4px 10px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #e2e8f0'
+                                            }}>
+                                                Marked Out of Stock
+                                            </span>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setOutOfStockItems(prev => {
+                                                    const next = { ...prev };
+                                                    delete next[item.id];
+                                                    return next;
+                                                })}
+                                                style={{ 
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'var(--primary)',
+                                                    fontSize: '0.6875rem',
+                                                    fontWeight: 800,
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline'
+                                                }}
+                                            >
+                                                Undo
+                                            </button>
+                                        </div>
+                                    ) : !hasStock ? (
+                                        <button 
+                                            type="button"
+                                            onClick={() => setOutOfStockItems(prev => ({ ...prev, [item.id]: true }))}
+                                            className="btn btn-secondary"
+                                            style={{ 
+                                                padding: '0.4rem 0.85rem', 
+                                                fontSize: '0.75rem', 
+                                                borderRadius: '8px',
+                                                background: '#ef4444',
+                                                borderColor: '#ef4444',
+                                                color: 'white',
+                                                fontWeight: 800,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                                            }}
+                                            onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                                            onMouseLeave={(e) => e.target.style.opacity = '1'}
+                                        >
+                                            Out of Stock
+                                        </button>
+                                    ) : (
+                                        <span style={{ 
+                                            color: '#10b981', 
+                                            fontWeight: 800,
+                                            fontSize: '0.75rem',
+                                            background: '#f0fdf4',
+                                            padding: '4px 10px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #dcfce7'
+                                        }}>
+                                            Auto-Dispensing
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                </div>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleDispenseVisit(selectedPresc.visit_id); }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleSmartDispenseClose(selectedPresc.visit_id); }}>
                <div className="form-group" style={{ marginBottom: '2rem' }}>
                   <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Pharmacist Notes / Counseling</label>
                   <textarea rows="3" onChange={e => setDispenseData({...dispenseData, remarks: e.target.value})} placeholder="Caution: Take after food. Avoid driving..."></textarea>
                </div>
 
-               <div style={{ background: '#fefce8', border: '1px solid #fef08a', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-                  <AlertCircle size={20} color="#854d0e" />
-                  <p style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 500 }}>Confirming this will finalize the patient visit and mark all items as dispensed.</p>
+               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+                  <CheckCircle size={20} color="#15803d" />
+                  <p style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 500 }}>Dispense & Discharge will automatically dispense all in-stock medicines, mark out-of-stock items, and safely discharge the patient.</p>
                </div>
 
-               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: projectConfig?.primary_color || '#4c1d95', borderColor: projectConfig?.primary_color || '#4c1d95', fontSize: '1rem' }}>
-                  Dispense All & Finalize <ArrowRight size={18} style={{ marginLeft: '10px' }} />
+               <button type="submit" disabled={isDispensing} className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: projectConfig?.primary_color || '#10b981', borderColor: projectConfig?.primary_color || '#10b981', fontSize: '1rem', fontWeight: 800, opacity: isDispensing ? 0.7 : 1, cursor: isDispensing ? 'not-allowed' : 'pointer' }}>
+                  {isDispensing ? 'Processing Dispensation...' : 'Dispense & Discharge Patient'} <ArrowRight size={18} style={{ marginLeft: '10px' }} />
                </button>
             </form>
           </div>

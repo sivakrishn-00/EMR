@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -20,10 +20,23 @@ import {
   Radio
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [projectConfig, setProjectConfig] = useState(null);
+
+  useEffect(() => {
+    if (user?.project) {
+      const pid = user.project.id || user.project;
+      api.get(`patients/projects/${pid}/`)
+        .then(res => setProjectConfig(res.data))
+        .catch(err => console.error("Failed to fetch sidebar project config:", err));
+    } else {
+      setProjectConfig(null);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -76,13 +89,12 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
                 <img src="/bavya-logo.png" alt="Bavya Logo" style={{ height: '32px', width: '32px', objectFit: 'contain', padding: '2px', borderRadius: '8px' }} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{
-                    color: 'white',
                     fontWeight: 900,
                     fontSize: '0.9rem',
                     letterSpacing: '0.05em',
                     textTransform: 'uppercase',
                     lineHeight: 1,
-                    color: 'var(--primary)'
+                    color: projectConfig?.primary_color || 'var(--primary)'
                   }}>
                     {user?.project_name || 'EMR'}
                   </span>
@@ -177,7 +189,12 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
 
         {!isCollapsed && (
           <div style={{ padding: '1rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)' }}>
-            <div style={{ padding: '0.875rem', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+            <div style={{ 
+              padding: '0.875rem', 
+              borderRadius: '12px', 
+              background: projectConfig?.primary_color ? `${projectConfig.primary_color}10` : 'rgba(99, 102, 241, 0.05)', 
+              border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}20` : '1px solid rgba(99, 102, 241, 0.1)' 
+            }}>
               <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'white' }}>System Version</p>
               <p style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: '4px' }}>Build: v1.0.1-stable</p>
             </div>
@@ -236,9 +253,9 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
         }
 
         .nav-link.active {
-          background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-          color: white;
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+          background: ${projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color}, ${projectConfig.primary_color})` : 'linear-gradient(135deg, var(--primary), var(--primary-dark))'} !important;
+          color: white !important;
+          box-shadow: 0 4px 12px ${projectConfig?.primary_color ? `${projectConfig.primary_color}33` : 'rgba(99, 102, 241, 0.2)'} !important;
         }
 
         .collapse-btn {
@@ -260,9 +277,9 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .collapse-btn:hover {
-          background: var(--primary);
-          color: white;
-          border-color: var(--primary);
+          background: ${projectConfig?.primary_color || 'var(--primary)'} !important;
+          color: white !important;
+          border-color: ${projectConfig?.primary_color || 'var(--primary)'} !important;
         }
         .collapsed .collapse-btn {
           transform: rotate(180deg);

@@ -88,6 +88,7 @@ const Vitals = () => {
   const [formAttempted, setFormAttempted] = useState(false);
   const [projectConfig, setProjectConfig] = useState({ vitals_mandatory: false });
   const [showVitalsSection, setShowVitalsSection] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     fetchActiveVisits();
@@ -134,26 +135,25 @@ const Vitals = () => {
 
   const handleSaveVitals = async (e) => {
     e.preventDefault();
-    setFormAttempted(true);
-    const loadingToast = toast.loading('Recording vitals...');
-    try {
-      // Normalize temperature to Celsius for backend storage
-      let finalTemp = vitalsData.temperature_c;
-      if (vitalsData.temp_unit === 'F' && finalTemp) {
-        finalTemp = ((parseFloat(finalTemp) - 32) * 5/9).toFixed(1);
-      }
+    if (isRecording) return;
 
-      const cleanedData = Object.fromEntries(
-        Object.entries(vitalsData).map(([key, value]) => {
-          if (value === '' || value === undefined) return [key, null];
-          if (key === 'temperature_c') return [key, isNaN(parseFloat(finalTemp)) ? null : parseFloat(finalTemp)];
-          if (['blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm', 'bmi'].includes(key)) {
-            const num = Number(value);
-            return [key, isNaN(num) ? null : num];
-          }
-          return [key, value];
-        })
-      );
+    // Normalize temperature to Celsius for backend storage
+    let finalTemp = vitalsData.temperature_c;
+    if (vitalsData.temp_unit === 'F' && finalTemp) {
+      finalTemp = ((parseFloat(finalTemp) - 32) * 5/9).toFixed(1);
+    }
+
+    const cleanedData = Object.fromEntries(
+      Object.entries(vitalsData).map(([key, value]) => {
+        if (value === '' || value === undefined) return [key, null];
+        if (key === 'temperature_c') return [key, isNaN(parseFloat(finalTemp)) ? null : parseFloat(finalTemp)];
+        if (['blood_pressure_sys', 'blood_pressure_dia', 'heart_rate', 'respiratory_rate', 'spo2', 'weight_kg', 'height_cm', 'bmi'].includes(key)) {
+          const num = Number(value);
+          return [key, isNaN(num) ? null : num];
+        }
+        return [key, value];
+      })
+    );
       
     if (projectConfig.vitals_mandatory) {
         const mandatoryFields = [
@@ -169,12 +169,12 @@ const Vitals = () => {
 
         for (const field of mandatoryFields) {
             if (!cleanedData[field.key]) {
-                toast.error(`${field.label} is required`, { id: loadingToast });
+                toast.error(`${field.label} is required`);
                 setFormAttempted(true);
                 return;
             }
             if (cleanedData[field.key] < field.min || cleanedData[field.key] > field.max) {
-                toast.error(`${field.label} out of valid range`, { id: loadingToast });
+                toast.error(`${field.label} out of valid range`);
                 setFormAttempted(true);
                 return;
             }
@@ -193,12 +193,15 @@ const Vitals = () => {
 
         for (const field of fieldsToCheck) {
             if (cleanedData[field.key] && (cleanedData[field.key] < field.min || cleanedData[field.key] > field.max)) {
-                toast.error(`Invalid ${field.key.replace('_', ' ')} detected`, { id: loadingToast });
+                toast.error(`Invalid ${field.key.replace('_', ' ')} detected`);
                 return;
             }
         }
     }
 
+    setIsRecording(true);
+    const loadingToast = toast.loading('Recording vitals...');
+    try {
       await api.post(`clinical/visits/${selectedVisit.id}/record_vitals/`, cleanedData);
       toast.success("Vitals captured! Patient moved to consultation.", { id: loadingToast });
       setSelectedVisit(null);
@@ -207,6 +210,8 @@ const Vitals = () => {
       fetchActiveVisits();
     } catch (err) {
       toast.error("Validation error. Please check formatting.", { id: loadingToast });
+    } finally {
+      setIsRecording(false);
     }
   };
 
