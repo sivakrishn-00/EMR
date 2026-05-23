@@ -1512,7 +1512,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                 if base_card.isdigit():
                     base_card = base_card.zfill(4)
                 
-                card_matches = self.get_base_queryset().filter(
+                card_matches = queryset.filter(
                     Q(card_no=base_card) | Q(card_no__startswith=f"{base_card}/")
                 )
                 card_ids = list(card_matches.values_list('id', flat=True))
@@ -1522,7 +1522,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         if card_ids:
             queryset_ids = list(queryset.values_list('id', flat=True))
             combined_ids = list(set(card_ids + queryset_ids))
-            queryset = self.get_base_queryset().filter(id__in=combined_ids)
+            queryset = queryset.filter(id__in=combined_ids)
             
         return queryset
 
@@ -1666,9 +1666,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         view_mode = self.request.query_params.get('view', 'all').lower()
         search_query = self.request.query_params.get('search', '').strip()
         
-        # If searching, bypass workflow filters to search across all patients
-        if search_query:
-            return queryset.distinct()
+
 
         if view_mode == 'active':
             # Only show patients with a currently active clinical visit
