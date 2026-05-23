@@ -10,7 +10,7 @@ class Prescription(models.Model):
         ('CANCELLED', 'Cancelled'),
     )
     visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name='prescriptions')
-    medication_name = models.CharField(max_length=200)
+    medication_name = models.CharField(max_length=255)
     frequency = models.CharField(max_length=100)
     duration = models.CharField(max_length=100)
     total_units = models.IntegerField(default=1)
@@ -24,7 +24,7 @@ class Prescription(models.Model):
 
 class DrugBatch(models.Model):
     registry_item = models.ForeignKey('patients.RegistryData', on_delete=models.CASCADE, related_name='batches')
-    batch_number = models.CharField(max_length=100)
+    batch_number = models.CharField(max_length=255)
     mfg_date = models.DateField()
     expiry_date = models.DateField()
     initial_qty = models.IntegerField(default=0)
