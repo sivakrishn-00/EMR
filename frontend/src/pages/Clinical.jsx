@@ -941,6 +941,7 @@ const Clinical = () => {
                         value={selectedGroup}
                         onChange={e => {
                           setSelectedGroup(e.target.value);
+                          setDrugSearch('');
                           setNewMed({...newMed, name: '', item_code: '', item_group: e.target.value});
                         }}
                         style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 700 }}
@@ -955,8 +956,13 @@ const Clinical = () => {
                         <div style={{ position: 'relative' }}>
                             <input 
                               placeholder={selectedGroup ? "SEARCH DRUG..." : "Select Group First..."} 
-                              value={drugSearch || newMed.name} 
-                              onFocus={() => selectedGroup && setShowDrugDropdown(true)}
+                              value={drugSearch} 
+                              onFocus={(e) => {
+                                if (selectedGroup) {
+                                  setShowDrugDropdown(true);
+                                  e.target.select();
+                                }
+                              }}
                               onBlur={() => setTimeout(() => setShowDrugDropdown(false), 200)}
                               onChange={e => {
                                 setDrugSearch(e.target.value);
@@ -964,8 +970,24 @@ const Clinical = () => {
                                 if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
                               }} 
                               disabled={!selectedGroup}
-                              style={{ background: selectedGroup ? 'var(--surface)' : '#f1f5f9', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.75rem', fontWeight: 800, color: 'var(--text-main)', cursor: selectedGroup ? 'text' : 'not-allowed' }} 
+                              style={{ background: selectedGroup ? 'var(--surface)' : '#f1f5f9', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 2.25rem 0 0.75rem', fontWeight: 800, color: 'var(--text-main)', cursor: selectedGroup ? 'text' : 'not-allowed' }} 
                             />
+                            {drugSearch && (
+                                <button 
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setDrugSearch('');
+                                        setNewMed({...newMed, name: '', item_code: ''});
+                                        setShowDrugDropdown(true);
+                                    }}
+                                    style={{ position: 'absolute', right: '30px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#94a3b8', transition: 'color 0.2s' }}
+                                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                                    onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
                             <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                                 <Search size={14} color="#94a3b8" />
                             </div>
