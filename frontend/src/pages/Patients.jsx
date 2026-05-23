@@ -224,7 +224,7 @@ const Patients = () => {
     });
     setIsBulkEnrolling(true);
 
-    const CHUNK_SIZE = 50;
+    const CHUNK_SIZE = 500;
     let localSuccess = 0;
     let localErrors = 0;
     let failedList = [];
@@ -1882,12 +1882,9 @@ const Patients = () => {
                   <textarea value={masterFormData.address} onChange={(e) => setMasterFormData({ ...masterFormData, address: e.target.value })} className="form-control" placeholder="Village/City, District, State" style={{ height: '80px', paddingTop: '12px' }} />
                 </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginTop: "2rem" }}>
-                <button type="button" className="btn" onClick={() => { setShowMasterModal(false); setShowBulkEnrollModal(true); }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: activeRegProject?.primary_color || 'var(--primary)', fontWeight: 800, borderRadius: '14px', padding: '0.75rem 1.5rem' }}>BULK LINK FROM MASTER</button>
-                <div style={{ display: "flex", gap: "1rem" }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" style={{ background: activeRegProject?.primary_color || '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
-                </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)} style={{ background: '#f1f5f9' }}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" style={{ background: activeRegProject?.primary_color || '#1e1b4b', color: 'white', padding: '0.75rem 2.5rem' }}>Submit</button>
               </div>
             </form>
           </div>

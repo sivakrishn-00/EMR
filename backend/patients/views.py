@@ -246,24 +246,41 @@ class ProjectViewSet(viewsets.ModelViewSet):
                             patient_qs.exclude(id=patient_first.id).delete()
                             
                         # Create/Update Patient Profile for the SPECIFIC Family Member
-                        Patient.objects.update_or_create(
-                            card_no=card_no_input,
-                            project=project,
-                            defaults={
-                                'first_name': member.name.split(' ')[0],
-                                'last_name': " ".join(member.name.split(' ')[1:]) if " " in member.name else "",
-                                'dob': member.dob,
-                                'gender': member.gender,
-                                'phone': member.mobile_no or employee.mobile_no,
-                                'address': employee.address,
-                                'id_proof_type': 'EMPLOYEE_CARD',
-                                'id_proof_number': card_no_input,
-                                'is_employee_linked': True,
-                                'employee_master': employee,
-                                'family_member': member,
-                                'relationship': member.relationship
-                            }
-                        )
+                        patient = patient_qs.first()
+                        first_name = member.name.split(' ')[0]
+                        last_name = " ".join(member.name.split(' ')[1:]) if " " in member.name else ""
+                        phone = member.mobile_no or employee.mobile_no
+                        
+                        if not patient or (
+                            patient.first_name != first_name or
+                            patient.last_name != last_name or
+                            patient.dob != member.dob or
+                            patient.gender != member.gender or
+                            patient.phone != phone or
+                            patient.address != employee.address or
+                            not patient.is_employee_linked or
+                            patient.employee_master != employee or
+                            patient.family_member != member or
+                            patient.relationship != member.relationship
+                        ):
+                            Patient.objects.update_or_create(
+                                card_no=card_no_input,
+                                project=project,
+                                defaults={
+                                    'first_name': first_name,
+                                    'last_name': last_name,
+                                    'dob': member.dob,
+                                    'gender': member.gender,
+                                    'phone': phone,
+                                    'address': employee.address,
+                                    'id_proof_type': 'EMPLOYEE_CARD',
+                                    'id_proof_number': card_no_input,
+                                    'is_employee_linked': True,
+                                    'employee_master': employee,
+                                    'family_member': member,
+                                    'relationship': member.relationship
+                                }
+                            )
                         linked_count += 1
                     else:
                         # 2. Primary Employee Case (e.g. 2254 or 0055/1 uploaded as primary employee)
@@ -295,9 +312,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
                             transaction.savepoint_commit(sid)
                             continue
                         
-                        # Link to this project (Metadata)
-                        employee.project = project
-                        employee.save()
+                        # Link to this project (Metadata) only if needed!
+                        if employee.project != project:
+                            employee.project = project
+                            employee.save()
                         
                         # Safe update or create: Deduplicate existing duplicate patient profiles to prevent MultipleObjectsReturned errors
                         patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
@@ -306,23 +324,37 @@ class ProjectViewSet(viewsets.ModelViewSet):
                             patient_qs.exclude(id=patient_first.id).delete()
                             
                         # Create/Update Patient Profile for Primary Employee ONLY
-                        Patient.objects.update_or_create(
-                            card_no=card_no_input,
-                            project=project,
-                            defaults={
-                                'first_name': employee.name.split(' ')[0],
-                                'last_name': " ".join(employee.name.split(' ')[1:]) if " " in employee.name else "",
-                                'dob': employee.dob,
-                                'gender': employee.gender,
-                                'phone': employee.mobile_no,
-                                'address': employee.address,
-                                'id_proof_type': 'EMPLOYEE_CARD',
-                                'id_proof_number': card_no_input,
-                                'is_employee_linked': True,
-                                'employee_master': employee,
-                                'relationship': 'PRIMARY CARD HOLDER'
-                            }
-                        )
+                        patient = patient_qs.first()
+                        first_name = employee.name.split(' ')[0]
+                        last_name = " ".join(employee.name.split(' ')[1:]) if " " in employee.name else ""
+                        
+                        if not patient or (
+                            patient.first_name != first_name or
+                            patient.last_name != last_name or
+                            patient.dob != employee.dob or
+                            patient.gender != employee.gender or
+                            patient.phone != employee.mobile_no or
+                            patient.address != employee.address or
+                            not patient.is_employee_linked or
+                            patient.employee_master != employee
+                        ):
+                            Patient.objects.update_or_create(
+                                card_no=card_no_input,
+                                project=project,
+                                defaults={
+                                    'first_name': first_name,
+                                    'last_name': last_name,
+                                    'dob': employee.dob,
+                                    'gender': employee.gender,
+                                    'phone': employee.mobile_no,
+                                    'address': employee.address,
+                                    'id_proof_type': 'EMPLOYEE_CARD',
+                                    'id_proof_number': card_no_input,
+                                    'is_employee_linked': True,
+                                    'employee_master': employee,
+                                    'relationship': 'PRIMARY CARD HOLDER'
+                                }
+                            )
                         linked_count += 1
                     
                     transaction.savepoint_commit(sid)
