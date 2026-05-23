@@ -36,7 +36,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     pagination_class = LargeResultsPagination
 
     def get_queryset(self):
-        queryset = Prescription.objects.all().order_by('-created_at')
+        queryset = Prescription.objects.all().order_by('created_at')
         
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()

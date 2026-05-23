@@ -39,13 +39,13 @@ class LargeResultsPagination(PageNumberPagination):
     max_page_size = 1000
 
 class LabRequestViewSet(viewsets.ModelViewSet):
-    queryset = LabRequest.objects.all().order_by('-created_at')
+    queryset = LabRequest.objects.all().order_by('created_at')
     serializer_class = LabRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = LargeResultsPagination
 
     def get_queryset(self):
-        queryset = LabRequest.objects.all().order_by('-created_at')
+        queryset = LabRequest.objects.all().order_by('created_at')
         
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()

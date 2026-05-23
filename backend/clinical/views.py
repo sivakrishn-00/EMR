@@ -43,7 +43,7 @@ class VisitViewSet(viewsets.ModelViewSet):
     pagination_class = LargeResultsPagination
 
     def get_queryset(self):
-        queryset = Visit.objects.all().order_by('-visit_date')
+        queryset = Visit.objects.all().order_by('visit_date')
         
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
