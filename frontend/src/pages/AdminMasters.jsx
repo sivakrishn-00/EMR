@@ -36,7 +36,8 @@ import {
   Radio,
   Key,
   Shuffle,
-  History
+  History,
+  Lock
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../services/api";
@@ -166,6 +167,20 @@ const AdminMasters = () => {
     additional_fields: {},
   });
   
+  const [lowStockThreshold, setLowStockThreshold] = useState(() => {
+    return parseInt(localStorage.getItem(`low_stock_threshold_${selectedProject}`)) || 10;
+  });
+  const [tempThreshold, setTempThreshold] = useState(lowStockThreshold);
+  const [allowNonAdmin, setAllowNonAdmin] = useState(() => {
+    return localStorage.getItem(`low_stock_threshold_allow_non_admin_${selectedProject}`) === 'true';
+  });
+  const [stockDetailModal, setStockDetailModal] = useState({
+    isOpen: false,
+    title: "",
+    type: "",
+    items: []
+  });
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [dashboardStats, setDashboardStats] = useState(null);
   const [depletionItems, setDepletionItems] = useState([]);
   const [isDepletionLoading, setIsDepletionLoading] = useState(false);
@@ -367,7 +382,16 @@ const AdminMasters = () => {
     
     fetchProjects();
     return () => clearTimeout(timer);
-  }, [selectedProject, exploringProtocolId, searchQuery, activeBoard]);
+  }, [selectedProject, exploringProtocolId, searchQuery, activeBoard, lowStockThreshold]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      const saved = parseInt(localStorage.getItem(`low_stock_threshold_${selectedProject}`)) || 10;
+      setLowStockThreshold(saved);
+      setTempThreshold(saved);
+      setAllowNonAdmin(localStorage.getItem(`low_stock_threshold_allow_non_admin_${selectedProject}`) === 'true');
+    }
+  }, [selectedProject]);
 
   useEffect(() => {
     const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
@@ -385,7 +409,7 @@ const AdminMasters = () => {
     if (!selectedProject) return;
     setIsDepletionLoading(true);
     try {
-      const res = await api.get(`patients/reports/?project=${selectedProject}`);
+      const res = await api.get(`patients/reports/?project=${selectedProject}&low_threshold=${lowStockThreshold}`);
       setDashboardStats(res.data);
 
       const endpoint = `patients/registry-data/?all=true&page_size=2000&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory&project=${selectedProject}`;
@@ -1864,124 +1888,385 @@ const AdminMasters = () => {
 
                       return (
                         <>
-                          {/* KPI Metric Cards */}
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: hasPharmacy ? "1fr 1fr 1fr" : "1fr 1fr",
-                              gap: "1rem",
-                              marginBottom: "1.25rem",
-                            }}
-                          >
-                            {hasPharmacy ? (
-                              <div
-                                className="card"
-                                style={{
-                                  padding: "0.5rem 0.75rem",
-                                  borderRadius: "8px",
-                                  background: "var(--surface)",
-                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
-                                  border: "1px solid var(--border)",
-                                  borderLeft: "3px solid #4f46e5",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  justifyContent: "center"
-                                }}
-                              >
-                                <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL INVENTORY VALUE</p>
-                                <h2 style={{ fontSize: "1.1rem", fontWeight: 900, color: "var(--text-main)", marginTop: "0.1rem" }}>
-                                  ₹{dashboardStats.inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </h2>
-                                <div style={{ display: "flex", gap: "10px", marginTop: "0.1rem" }}>
-                                   <span style={{ fontSize: "0.75rem", color: "#4f46e5", fontWeight: 700 }}>
-                                      {dashboardStats.total_registered} Patients Served
-                                   </span>
+                          {/* Premium Dashboard Header & Dynamic Threshold Controller */}
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '1.25rem',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                            background: 'var(--surface)',
+                            padding: '0.875rem 1.25rem',
+                            borderRadius: '16px',
+                            border: '1px solid var(--border)',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                  <h2 style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+                                    Real-Time Operations & Inventory Intelligence
+                                  </h2>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', padding: '2px 8px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                    <span className="pulse" style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                                    <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Real-Time Sync</span>
+                                  </div>
                                 </div>
+                                <p style={{ fontSize: '0.6875rem', fontWeight: 500, color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  Live clinical trends and pharmacy stock level diagnostics
+                                </p>
                               </div>
-                            ) : (
-                              <div
-                                className="card"
-                                style={{
-                                  padding: "0.5rem 0.75rem",
-                                  borderRadius: "8px",
-                                  background: "var(--surface)",
-                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
-                                  border: "1px solid var(--border)",
-                                  borderLeft: "3px solid #4f46e5",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  justifyContent: "center"
-                                }}
-                              >
-                                <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL REGISTERED PATIENTS</p>
-                                <h2 style={{ fontSize: "1.1rem", fontWeight: 900, color: "var(--text-main)", marginTop: "0.1rem" }}>
-                                  {dashboardStats.total_registered} Patients
-                                </h2>
-                                <div style={{ display: "flex", gap: "10px", marginTop: "0.1rem" }}>
-                                   <span style={{ fontSize: "0.75rem", color: "#4f46e5", fontWeight: 700 }}>
-                                      Primary Patients & Dependents
-                                   </span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {hasPharmacy && (
-                              <div
-                                className="card"
-                                style={{
-                                  padding: "0.5rem 0.75rem",
-                                  borderRadius: "8px",
-                                  background: "var(--surface)",
-                                  border: "1px solid var(--border)",
-                                  borderLeft: "3px solid #ef4444",
-                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  justifyContent: "center"
-                                }}
-                              >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                   <p style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>STOCK ALERT NOTIFICATIONS</p>
-                                   <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#ef4444", animation: "pulse 1.5s infinite" }} />
-                                </div>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.1rem" }}>
-                                   <div>
-                                      <h4 style={{ fontSize: "1.1rem", fontWeight: 900, color: "#ef4444", lineHeight: 1.1 }}>{dashboardStats.stock_health.low}</h4>
-                                      <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "2px" }}>LOW STOCK ITEMS</p>
-                                   </div>
-                                   <div style={{ borderLeft: "1px solid var(--border)", height: "35px" }} />
-                                   <div>
-                                      <h4 style={{ fontSize: "1.1rem", fontWeight: 900, color: "#dc2626", lineHeight: 1.1 }}>{dashboardStats.stock_health.out}</h4>
-                                      <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "2px" }}>OUT OF STOCK</p>
-                                   </div>
-                                </div>
-                              </div>
-                            )}
-
-                            <div
-                              className="card"
-                              style={{
-                                padding: "1.5rem",
-                                borderRadius: "16px",
-                                background: "var(--surface)",
-                                border: "1px solid var(--border)",
-                                borderLeft: "4px solid #10b981",
-                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between"
-                              }}
-                            >
-                              <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>CLINICAL CONVERSION</p>
-                              <h2 style={{ fontSize: "2rem", fontWeight: 900, color: "#10b981", marginTop: "0.5rem" }}>
-                                {dashboardStats.conversion_rate}%
-                              </h2>
-                              <p style={{ fontSize: "0.625rem", fontWeight: 900, color: "var(--text-muted)", opacity: 0.8, marginTop: "4px" }}>
-                                 Visits successfully completed today
-                              </p>
                             </div>
+
+                            {hasPharmacy && (() => {
+                              const isAdmin = user?.role === 'ADMIN' || user?.is_superuser || user?.user_roles?.some(r => r.name === 'ADMIN');
+                              const canEdit = isAdmin || allowNonAdmin;
+                              return (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  background: 'var(--background)',
+                                  padding: '0.375rem 0.75rem',
+                                  borderRadius: '12px',
+                                  border: '1px solid var(--border)'
+                                }}>
+                                  <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Low Stock Warning Threshold:
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <button 
+                                      onClick={() => setTempThreshold(prev => Math.max(1, prev - 1))}
+                                      disabled={!canEdit}
+                                      style={{
+                                        border: 'none',
+                                        background: 'rgba(0,0,0,0.03)',
+                                        color: 'var(--text-muted)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold',
+                                        cursor: canEdit ? 'pointer' : 'not-allowed',
+                                        width: '20px',
+                                        height: '20px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s',
+                                        opacity: canEdit ? 1 : 0.5
+                                      }}
+                                      onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
+                                      onMouseLeave={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
+                                    >
+                                      −
+                                    </button>
+                                    <input 
+                                      type="range" 
+                                      min="1" 
+                                      max="100" 
+                                      value={tempThreshold} 
+                                      onChange={(e) => setTempThreshold(parseInt(e.target.value) || 10)}
+                                      disabled={!canEdit}
+                                      style={{
+                                        width: '120px',
+                                        accentColor: '#f59e0b',
+                                        cursor: canEdit ? 'pointer' : 'not-allowed',
+                                        height: '4px',
+                                        borderRadius: '2px',
+                                        background: 'var(--border)',
+                                        opacity: canEdit ? 1 : 0.5
+                                      }}
+                                    />
+                                    <button 
+                                      onClick={() => setTempThreshold(prev => Math.min(100, prev + 1))}
+                                      disabled={!canEdit}
+                                      style={{
+                                        border: 'none',
+                                        background: 'rgba(0,0,0,0.03)',
+                                        color: 'var(--text-muted)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold',
+                                        cursor: canEdit ? 'pointer' : 'not-allowed',
+                                        width: '20px',
+                                        height: '20px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s',
+                                        opacity: canEdit ? 1 : 0.5
+                                      }}
+                                      onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
+                                      onMouseLeave={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
+                                    >
+                                      +
+                                    </button>
+                                    <div style={{
+                                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                      color: 'white',
+                                      fontWeight: 900,
+                                      fontSize: '0.7rem',
+                                      padding: '2px 8px',
+                                      borderRadius: '6px',
+                                      minWidth: '24px',
+                                      textAlign: 'center',
+                                      boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+                                      marginLeft: '0.25rem'
+                                    }}>
+                                      {tempThreshold}
+                                    </div>
+                                    
+                                    {canEdit ? (
+                                      tempThreshold !== lowStockThreshold ? (
+                                        <button
+                                          onClick={() => {
+                                            setLowStockThreshold(tempThreshold);
+                                            localStorage.setItem(`low_stock_threshold_${selectedProject}`, tempThreshold);
+                                            toast.success(`Low stock threshold updated to ${tempThreshold} units!`);
+                                          }}
+                                          style={{
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            color: 'white',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 850,
+                                            padding: '4px 10px',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            marginLeft: '0.5rem'
+                                          }}
+                                        >
+                                          <Check size={10} strokeWidth={3} /> Save & Apply
+                                        </button>
+                                      ) : (
+                                        <span style={{
+                                          fontSize: '0.625rem',
+                                          fontWeight: 800,
+                                          color: '#10b981',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          padding: '4px 8px',
+                                          borderRadius: '6px',
+                                          background: 'rgba(16, 185, 129, 0.05)',
+                                          border: '1px solid rgba(16, 185, 129, 0.15)',
+                                          marginLeft: '0.5rem'
+                                        }}>
+                                          <Check size={10} strokeWidth={3.5} /> Saved
+                                        </span>
+                                      )
+                                    ) : (
+                                      <span style={{
+                                        fontSize: '0.625rem',
+                                        fontWeight: 800,
+                                        color: 'var(--text-muted)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        background: 'var(--surface)',
+                                        border: '1px solid var(--border)',
+                                        marginLeft: '0.5rem'
+                                      }}>
+                                        <Lock size={10} /> Locked (Admin Only)
+                                      </span>
+                                    )}
+
+                                    {/* Admin-only Switch to Grant/Revoke access for other staff */}
+                                    {isAdmin && (
+                                      <div 
+                                        onClick={() => {
+                                          const newVal = !allowNonAdmin;
+                                          setAllowNonAdmin(newVal);
+                                          localStorage.setItem(`low_stock_threshold_allow_non_admin_${selectedProject}`, newVal);
+                                          toast.success(newVal ? "Staff members are now permitted to modify low stock threshold!" : "Access restricted. Only Admins can modify threshold now.");
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.375rem',
+                                          background: 'rgba(0,0,0,0.02)',
+                                          padding: '3px 8px',
+                                          borderRadius: '8px',
+                                          border: '1px solid var(--border)',
+                                          cursor: 'pointer',
+                                          marginLeft: '0.75rem',
+                                          userSelect: 'none',
+                                          transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
+                                      >
+                                        <div style={{
+                                          width: '24px',
+                                          height: '14px',
+                                          background: allowNonAdmin ? '#10b981' : '#cbd5e1',
+                                          borderRadius: '8px',
+                                          position: 'relative',
+                                          transition: 'background 0.2s ease',
+                                          padding: '1px'
+                                        }}>
+                                          <div style={{
+                                            width: '12px',
+                                            height: '12px',
+                                            background: 'white',
+                                            borderRadius: '50%',
+                                            position: 'absolute',
+                                            left: allowNonAdmin ? '11px' : '1px',
+                                            transition: 'left 0.2s ease',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                          }} />
+                                        </div>
+                                        <span style={{ fontSize: '0.58rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                                          Staff Edit
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
 
+                          {/* KPI Metric Cards */}
+                          {(() => {
+                            const StatCard = ({ title, value, icon: Icon, subtext, gradient, onClick }) => (
+                              <div className="card fade-in" 
+                                onClick={onClick}
+                                style={{ 
+                                  background: gradient, 
+                                  borderRadius: '16px', 
+                                  padding: '0.75rem 1.125rem', 
+                                  color: 'white',
+                                  boxShadow: onClick ? '0 8px 16px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)' : '0 6px 12px -3px rgba(0,0,0,0.1)',
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  border: '1px solid rgba(255,255,255,0.08)',
+                                  transition: 'all 0.3s ease',
+                                  cursor: onClick ? 'pointer' : 'default',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'center',
+                                  minWidth: '0'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-4px)';
+                                  if (onClick) {
+                                    e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.2)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                  e.currentTarget.style.boxShadow = onClick ? '0 8px 16px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.1)' : '0 6px 12px -3px rgba(0,0,0,0.1)';
+                                }}
+                              >
+                                <div style={{ position: 'relative', zIndex: 2 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.15)', padding: '0.4rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Icon size={14} strokeWidth={3} />
+                                    </div>
+                                    <div style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.8, background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '10px' }}>Live</div>
+                                  </div>
+                                  <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.01em' }}>{value}</div>
+                                  <div style={{ fontSize: '0.6875rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.01em', marginBottom: '0.1rem' }}>{title}</div>
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 600, opacity: 0.7 }}>{subtext}</div>
+                                </div>
+                                <div style={{ position: 'absolute', right: '-10%', bottom: '-15%', width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', zIndex: 1 }}></div>
+                              </div>
+                            );
+
+                            const filteredModalItems = stockDetailModal.items.filter(item => 
+                              item.name?.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+                              item.ucode?.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+                              item.category?.toLowerCase().includes(modalSearchQuery.toLowerCase())
+                            );
+
+                            return (
+                              <>
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: hasPharmacy ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+                                    gap: "1rem",
+                                    marginBottom: "1.25rem",
+                                  }}
+                                >
+                                  {hasPharmacy ? (
+                                    <StatCard 
+                                      title="Total Inventory Value" 
+                                      value={`₹${dashboardStats.inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                      icon={ShoppingCart}
+                                      subtext={`${dashboardStats.total_registered} Patients Served`}
+                                      gradient="linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)"
+                                    />
+                                  ) : (
+                                    <StatCard 
+                                      title="Total Registered Patients" 
+                                      value={`${dashboardStats.total_registered} Patients`}
+                                      icon={Users}
+                                      subtext="Primary Patients & Dependents"
+                                      gradient="linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)"
+                                    />
+                                  )}
+                                  
+                                  {hasPharmacy && (
+                                    <>
+                                      <StatCard 
+                                        title="Low Stock Items" 
+                                        value={dashboardStats.stock_health.low}
+                                        icon={Clock}
+                                        subtext="Items needing replenishment"
+                                        gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                                        onClick={() => {
+                                          setStockDetailModal({
+                                            isOpen: true,
+                                            title: `Low Stock Inventory Diagnostics`,
+                                            type: "LOW_STOCK",
+                                            items: depletionItems.filter(item => item.quantity > 0 && item.quantity < lowStockThreshold)
+                                          });
+                                          setModalSearchQuery("");
+                                        }}
+                                      />
+                                      <StatCard 
+                                        title="Out of Stock" 
+                                        value={dashboardStats.stock_health.out}
+                                        icon={AlertCircle}
+                                        subtext="Critically depleted items"
+                                        gradient="linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)"
+                                        onClick={() => {
+                                          setStockDetailModal({
+                                            isOpen: true,
+                                            title: "Critically Depleted Out-of-Stock Registry",
+                                            type: "OUT_OF_STOCK",
+                                            items: depletionItems.filter(item => item.quantity === 0)
+                                          });
+                                          setModalSearchQuery("");
+                                        }}
+                                      />
+                                    </>
+                                  )}
+
+                                  <StatCard 
+                                    title="Clinical Conversion" 
+                                    value={`${dashboardStats.conversion_rate}%`}
+                                    icon={Activity}
+                                    subtext="Visits successfully completed today"
+                                    gradient="linear-gradient(135deg, #10b981 0%, #047857 100%)"
+                                  />
+                                </div>
+
+
+                              </>
+                            );
+                          })()}
+                          {/* Split Dashboard Row */}
+                          {/* Split Dashboard Row */}
                           {/* Split Dashboard Row */}
                           {hasPharmacy ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -2032,10 +2317,10 @@ const AdminMasters = () => {
                                          })()}
 
                                          {/* Chart Columns Container */}
-                                         <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", flex: 1, padding: "0.25rem 0", minHeight: "100px" }}>
+                                         <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-end", flex: 1, padding: "0.5rem 0", minHeight: "120px" }}>
                                             {dashboardStats.trends.map((t, i) => {
                                                const maxVal = Math.max(...dashboardStats.trends.map(x => x.units), 1);
-                                               const percentHeight = Math.min(100, (t.units / maxVal) * 100);
+                                               const percentHeight = Math.min(100, (t.units / maxVal) * 92); /* Max height 92% to leave space for floating indicator */
                                                
                                                let dayName = "";
                                                try {
@@ -2052,30 +2337,31 @@ const AdminMasters = () => {
                                                      {/* Outer Track Column */}
                                                      <div style={{ 
                                                         width: "100%", 
-                                                        background: "#f8fafc", 
+                                                        background: "rgba(99, 102, 241, 0.02)", 
                                                         borderRadius: "12px", 
-                                                        height: "125px",
+                                                        height: "135px",
                                                         position: "relative",
                                                         display: "flex",
                                                         flexDirection: "column",
                                                         justifyContent: "flex-end",
-                                                        overflow: "hidden",
-                                                        border: "1px solid #e2e8f0"
+                                                        border: "1px solid rgba(99, 102, 241, 0.06)",
+                                                        padding: "3px" /* Small inset spacing for dynamic bar */
                                                      }} title={`${t.units} units dispensed`}>
                                                         
-                                                        {/* Raised Value Indicator inside or floating on top */}
+                                                        {/* Dynamic Floating Value Indicator (always floats exactly 6px above bar) */}
                                                         <span style={{ 
                                                            position: "absolute", 
-                                                           top: "6px", 
+                                                           bottom: `calc(${percentHeight}% + 6px)`, 
                                                            left: "50%", 
                                                            transform: "translateX(-50%)", 
                                                            fontSize: "0.625rem", 
                                                            fontWeight: 900, 
                                                            color: t.units > 0 ? "#4f46e5" : "var(--text-muted)",
-                                                           background: t.units > 0 ? "rgba(99, 102, 241, 0.15)" : "transparent",
+                                                           background: t.units > 0 ? "rgba(99, 102, 241, 0.09)" : "transparent",
                                                            padding: t.units > 0 ? "2px 6px" : "0",
-                                                           borderRadius: "4px",
-                                                           zIndex: 2
+                                                           borderRadius: "6px",
+                                                           zIndex: 2,
+                                                           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                                                         }}>
                                                            {t.units}
                                                         </span>
@@ -2083,9 +2369,10 @@ const AdminMasters = () => {
                                                         {/* Dynamic Bar */}
                                                         <div style={{ 
                                                            width: "100%", 
-                                                           background: "#6366f1", 
-                                                           borderRadius: "8px 8px 0 0", 
+                                                           background: t.units > 0 ? "linear-gradient(to top, #4f46e5, #6366f1)" : "#f1f5f9", 
+                                                           borderRadius: "10px", 
                                                            height: `${percentHeight}%`,
+                                                           boxShadow: t.units > 0 ? "0 4px 10px rgba(99, 102, 241, 0.12)" : "none",
                                                            transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                                                            minHeight: t.units > 0 ? "8px" : "0"
                                                         }} />
@@ -2093,17 +2380,16 @@ const AdminMasters = () => {
 
                                                      {/* Multi-tier Date Label */}
                                                      <div style={{ textAlign: "center", lineHeight: "1.2" }}>
-                                                        <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
-                                                        <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>{t.date.split('-').slice(1).join('/')}</span>
+                                                        <span style={{ fontSize: "0.72rem", fontWeight: 900, color: "var(--text-main)", display: "block" }}>{dayName}</span>
+                                                        <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--text-muted)" }}>{t.date.split('-').slice(1).join('/')}</span>
                                                      </div>
 
                                                   </div>
                                                );
                                             })}
-                                         </div>
-                                      </div>
-                                   </div>
-
+                                          </div>
+                                       </div>
+                                    </div>
                                   {/* Right Column Widget 1: TOP DISPENSED (Right Side) */}
                                   <div className="card" style={{ 
                                      flex: "1 1 360px",
@@ -7701,6 +7987,289 @@ const AdminMasters = () => {
         </div>,
         document.body
       )}
+
+      {stockDetailModal.isOpen && createPortal(
+        (() => {
+          const filteredModalItems = stockDetailModal.items.filter(item => 
+            item.name?.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+            item.ucode?.toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+            item.category?.toLowerCase().includes(modalSearchQuery.toLowerCase())
+          );
+          
+          return (
+            <div 
+              onClick={() => setStockDetailModal(prev => ({ ...prev, isOpen: false }))}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.08)', /* Transparent light backdrop overlay */
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 999999, /* Absolute root z-index overlay */
+                animation: 'fadeIn 0.2s ease-out'
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()} /* Prevents closing modal on internal clicks */
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '24px',
+                  width: '90%',
+                  maxWidth: '820px',
+                  maxHeight: '85vh',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}
+              >
+                {/* Header */}
+                <div style={{
+                  background: stockDetailModal.type === 'LOW_STOCK' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                  color: 'white',
+                  padding: '1.25rem 1.5rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  position: 'relative'
+                }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.01em', margin: 0 }}>
+                      {stockDetailModal.title}
+                    </h3>
+                    <p style={{ fontSize: '0.7rem', opacity: 0.85, margin: '4px 0 0 0', fontWeight: 500 }}>
+                      {stockDetailModal.type === 'LOW_STOCK' 
+                        ? `Stock levels currently operating below safe baseline threshold` 
+                        : `Medications with zero recorded inventory balance in the system`}
+                    </p>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      padding: '4px 10px',
+                      borderRadius: '20px',
+                      fontSize: '0.7rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      border: '1px solid rgba(255,255,255,0.3)'
+                    }}>
+                      {stockDetailModal.items.length} {stockDetailModal.items.length === 1 ? 'item' : 'items'}
+                    </span>
+                    <button 
+                      onClick={() => setStockDetailModal(prev => ({ ...prev, isOpen: false }))}
+                      style={{
+                        background: 'rgba(255,255,255,0.15)',
+                        border: 'none',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '28px',
+                        height: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--background)' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '12px' }} />
+                    <input 
+                      type="text"
+                      placeholder="Search items by name, code or category..."
+                      value={modalSearchQuery}
+                      onChange={(e) => setModalSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 34px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        color: 'var(--text-main)',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = stockDetailModal.type === 'LOW_STOCK' ? '#f59e0b' : '#ef4444'}
+                      onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+                    />
+                    {modalSearchQuery && (
+                      <button 
+                        onClick={() => setModalSearchQuery("")}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          border: 'none',
+                          background: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Table list */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
+                  {filteredModalItems.length > 0 ? (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
+                      <thead>
+                        <tr style={{ 
+                          background: 'var(--background)',
+                          color: 'var(--text-muted)', 
+                          fontWeight: 900, 
+                          textAlign: 'left',
+                          fontSize: '0.625rem',
+                          letterSpacing: '0.06em'
+                        }}>
+                          <th style={{ padding: '12px 16px', borderTopLeftRadius: '12px', borderBottomLeftRadius: '12px' }}>CODE</th>
+                          <th style={{ padding: '12px 16px' }}>ITEM NAME</th>
+                          <th style={{ padding: '12px 16px' }}>CATEGORY</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center' }}>STOCK QTY</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>UNIT COST</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', borderTopRightRadius: '12px', borderBottomRightRadius: '12px' }}>TOTAL VALUE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModalItems.map((item, index) => {
+                          const costVal = parseFloat(item.cost) || 0;
+                          const qtyVal = parseFloat(item.quantity) || 0;
+                          const totalVal = costVal * qtyVal;
+                          
+                          return (
+                            <tr 
+                              key={index} 
+                              style={{ 
+                                borderBottom: '1px solid var(--border)', 
+                                transition: 'all 0.18s ease',
+                                cursor: 'pointer'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(0,0,0,0.015)';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              <td style={{ padding: '12px 16px', fontWeight: 800, color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.6875rem' }}>
+                                {item.ucode || 'N/A'}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.75rem' }}>{item.name}</div>
+                                {item.description && (
+                                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+                                    {item.description}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <span style={{
+                                  fontSize: '0.55rem',
+                                  fontWeight: 900,
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(99, 102, 241, 0.08)',
+                                  color: '#4f46e5',
+                                  border: '1px solid rgba(99, 102, 241, 0.15)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.02em'
+                                }}>
+                                  {item.category?.replace('_', ' ') || 'DRUG'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <span style={{
+                                  fontWeight: 900,
+                                  padding: '4px 10px',
+                                  borderRadius: '20px',
+                                  fontSize: '0.65rem',
+                                  background: qtyVal === 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                  color: qtyVal === 0 ? '#ef4444' : '#d97706',
+                                  border: qtyVal === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <span style={{
+                                    width: '5px',
+                                    height: '5px',
+                                    borderRadius: '50%',
+                                    background: qtyVal === 0 ? '#ef4444' : '#f59e0b',
+                                    display: 'inline-block'
+                                  }} />
+                                  {qtyVal} units
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                                ₹{costVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 900, color: 'var(--text-main)', fontSize: '0.75rem' }}>
+                                ₹{totalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
+                      <AlertCircle size={32} color={stockDetailModal.type === 'LOW_STOCK' ? '#f59e0b' : '#ef4444'} style={{ marginBottom: '1rem', opacity: 0.8 }} />
+                      <p style={{ fontWeight: 800, fontSize: '0.8rem', margin: 0 }}>No items match search filter</p>
+                      <p style={{ fontSize: '0.65rem', margin: '4px 0 0 0' }}>Try entering a different drug name or code</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Total Estimated Summary */}
+                <div style={{
+                  padding: '1rem 1.5rem',
+                  background: 'var(--background)',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.72rem'
+                }}>
+                  <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>
+                    Total Estimated Value of Listed Items:
+                  </span>
+                  <span style={{
+                    fontSize: '0.9rem',
+                    fontWeight: 900,
+                    color: stockDetailModal.type === 'LOW_STOCK' ? '#d97706' : '#ef4444',
+                    letterSpacing: '-0.01em'
+                  }}>
+                    ₹{filteredModalItems.reduce((acc, item) => acc + ((parseFloat(item.cost) || 0) * (parseFloat(item.quantity) || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      , document.body)}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

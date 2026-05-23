@@ -134,7 +134,7 @@ const MainLayout = ({ children }) => {
       <style>{`
         .main-wrapper {
           padding-left: var(--sidebar-width);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .app-layout.sidebar-collapsed .main-wrapper {
           padding-left: 64px;

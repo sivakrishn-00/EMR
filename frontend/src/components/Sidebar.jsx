@@ -188,7 +188,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
           onClick={onToggleCollapsed}
           className="collapse-btn"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} style={{ pointerEvents: 'none' }} />
         </button>
       </div>
 
@@ -203,7 +203,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
           display: flex;
           flex-direction: column;
           z-index: 100;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.1, 1);
+          transition: width 0.3s cubic-bezier(0.4, 0, 0.1, 1);
           box-shadow: 1px 0 10px rgba(0,0,0,0.1);
         }
 
@@ -244,19 +244,20 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
         .collapse-btn {
           position: absolute;
           bottom: 2rem;
-          right: -12px;
-          width: 24px;
-          height: 24px;
+          right: -14px;
+          width: 28px;
+          height: 28px;
           background: #334155;
           color: #94a3b8;
           border: 1px solid #475569;
-          border-radius: 6px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          z-index: 10;
-          transition: all 0.3s;
+          z-index: 110;
+          transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .collapse-btn:hover {
           background: var(--primary);

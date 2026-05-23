@@ -1201,6 +1201,12 @@ class RegistryReportView(viewsets.ViewSet):
         project_id = request.query_params.get('project')
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
 
+        low_threshold_str = request.query_params.get('low_threshold', '10')
+        try:
+            low_threshold = int(low_threshold_str)
+        except ValueError:
+            low_threshold = 10
+
         active_project = None
         if user.is_superuser:
             if project_id:
@@ -1378,7 +1384,7 @@ class RegistryReportView(viewsets.ViewSet):
         # 3. Inventory Health
         inventory_stats = inventory_items.aggregate(
             total_value=Sum(Case(When(quantity__gt=0, then='cost'), default=0, output_field=FloatField())),
-            low_stock=Count('id', filter=Q(quantity__lt=10, quantity__gt=0)),
+            low_stock=Count('id', filter=Q(quantity__lt=low_threshold, quantity__gt=0)),
             out_of_stock=Count('id', filter=Q(quantity=0))
         )
 
@@ -1398,7 +1404,7 @@ class RegistryReportView(viewsets.ViewSet):
                 status = 'EXPIRED'
             elif days_to_expiry <= 90:
                 status = 'EXPIRING_SOON'
-            elif batch.quantity < 15:
+            elif batch.quantity < low_threshold:
                 status = 'LOW_STOCK'
             elif batch.quantity > 100:
                 status = 'HIGH_STOCK'
@@ -1436,7 +1442,7 @@ class RegistryReportView(viewsets.ViewSet):
                 status = 'SAFE'
                 if item.quantity == 0:
                     status = 'DEPLETED'
-                elif item.quantity < 15:
+                elif item.quantity < low_threshold:
                     status = 'LOW_STOCK'
                 elif item.quantity > 100:
                     status = 'HIGH_STOCK'
