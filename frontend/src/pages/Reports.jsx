@@ -797,24 +797,26 @@ const Reports = () => {
               </button>
 
 
-              <button 
-                onClick={() => setShowBulkModal(true)}
-                style={{
-                  padding: '10px 20px',
-                  background: '#f8fafc',
-                  color: '#64748b',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '0.8125rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <UploadIcon size={16} /> Bulk Import History
-              </button>
+              {(user?.role === 'ADMIN' || user?.permissions?.includes('ADMIN_ALL') || user?.permissions?.includes('/reports/bulk-import')) && (
+                <button 
+                  onClick={() => setShowBulkModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#f8fafc',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '0.8125rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <UploadIcon size={16} /> Bulk Import History
+                </button>
+              )}
               <button 
                 onClick={exportToXLSX}
                 style={{

@@ -308,6 +308,18 @@ class DispensingRecordViewSet(viewsets.ReadOnlyModelViewSet):
         Elite Admin Tool: Batch process historical consumption data.
         Input: List of { date, card_no, medication_name, quantity, project_id }
         """
+        user = request.user
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+        
+        if not is_admin:
+            has_permission = False
+            for r in user.user_roles.all():
+                if isinstance(r.permissions, list) and '/reports/bulk-import' in r.permissions:
+                    has_permission = True
+                    break
+            if not has_permission:
+                return Response({"error": "Access Restricted: You do not have permission to perform bulk historical upload. Please contact the administrator."}, status=403)
+
         data_list = request.data.get('records', [])
         if not data_list:
             return Response({"error": "No records provided"}, status=400)
