@@ -129,6 +129,19 @@ const MainLayout = ({ children }) => {
         <main className="content-container" style={{ margin: '0' }}>
           {children}
         </main>
+        <footer style={{
+          textAlign: 'center',
+          padding: '1.5rem 1rem',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          color: 'var(--text-muted, #94a3b8)',
+          borderTop: '1px solid var(--border, #e2e8f0)',
+          background: 'var(--surface, #ffffff)',
+          width: '100%',
+          marginTop: 'auto',
+        }}>
+          Powered by <span style={{ color: 'var(--primary, #7c3aed)', fontWeight: 800 }}>Bavya</span>
+        </footer>
       </div>
 
       <style>{`
