@@ -181,10 +181,17 @@ def generate_consumption_xlsx_report(data):
     summary_header_cell.alignment = center_align
 
     for visit in data.get('items', []):
-        ws.append([f"VISIT DATE: {visit['visit_date']}", f"PATIENT: {visit['patient_name']} ({visit['card_no']})", "", "", "", "", "TOTAL UNITS:", visit['total_visit_units']])
+        ws.append([
+            f"VISIT DATE: {visit['visit_date']}", 
+            f"PATIENT: {visit['patient_name']} ({visit['card_no']})", 
+            "", "", "", 
+            f"TOTAL COST: ₹{visit.get('total_visit_cost', 0.0):,.2f}", 
+            "TOTAL UNITS:", 
+            visit['total_visit_units']
+        ])
         # Style visit header row
         curr_row = ws.max_row
-        ws.merge_cells(f'B{curr_row}:F{curr_row}')
+        ws.merge_cells(f'B{curr_row}:E{curr_row}')
         for col in range(1, 9):
             cell = ws.cell(row=curr_row, column=col)
             cell.font = Font(bold=True, size=10)

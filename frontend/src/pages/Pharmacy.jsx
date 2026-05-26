@@ -31,12 +31,17 @@ const Pharmacy = () => {
 
     let perDay = 0;
     if (freq.includes('-')) {
-        perDay = freq.split('-').reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+        perDay = freq.split('-').reduce((sum, val) => {
+            const clean = val.trim();
+            let parsed = parseFloat(clean) || 0;
+            if (clean === '1/2') parsed = 0.5;
+            return sum + parsed;
+        }, 0);
     } else {
         const map = { 'OD': 1, 'BD': 2, 'TDS': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1 };
         perDay = map[freq] || 1;
     }
-    return perDay * (parseInt(dur) || 0);
+    return Math.ceil(perDay * (parseInt(dur) || 0));
   };
 
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
@@ -276,7 +281,7 @@ const Pharmacy = () => {
                   <tr key={p.visit_id}>
                     <td style={{ padding: '1.25rem' }}>
                        <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{p.patient_name}</p>
-                       <p style={{ fontSize: '0.625rem', color: '#64748b' }}>UHID: #{p.uhid}</p>
+                       <p style={{ fontSize: '0.625rem', color: '#64748b' }}>UHID: #{p.uhid}{p.card_no ? ` | Card: ${p.card_no}` : ''}</p>
                     </td>
                     <td style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--primary)' }}>
                         {p.items.length} Medications
@@ -435,7 +440,7 @@ const Pharmacy = () => {
                                 <div style={{ flex: 1, marginRight: '1rem' }}>
                                     <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.medication_name}</p>
                                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '4px' }}>
-                                        {item.frequency} | {item.duration} days
+                                        {item.dosage ? `${item.dosage} | ` : ''}{item.frequency} | {item.duration} days
                                         <span style={{ background: projectConfig?.primary_color || 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                                             Total: {calculatedQty} units
                                         </span>

@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   Pencil,
   FileText,
-  Calendar
+  Calendar,
+  Plus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -39,7 +40,7 @@ const Clinical = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [newMed, setNewMed] = useState({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
+  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [totalInventoryCount, setTotalInventoryCount] = useState(0);
@@ -132,6 +133,22 @@ const Clinical = () => {
     }
   };
 
+  const getAge = (dobString) => {
+    if (!dobString) return 'N/A';
+    try {
+      const birthDate = new Date(dobString);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age >= 0 ? `${age}y` : 'N/A';
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
   const getDoseCount = (freq, dur, itemGroup = "") => {
     if (!freq || !dur) return 0;
 
@@ -145,7 +162,12 @@ const Clinical = () => {
 
     let perDay = 0;
     if (freq.includes('-')) {
-        perDay = freq.split('-').reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+        perDay = freq.split('-').reduce((sum, val) => {
+            const clean = val.trim();
+            let parsed = parseFloat(clean) || 0;
+            if (clean === '1/2') parsed = 0.5;
+            return sum + parsed;
+        }, 0);
     } else {
         const map = { 'OD': 1, 'BD': 2, 'TDS': 3, 'QID': 4, 'SOS': 1, 'HS': 1, 'STAT': 1 };
         perDay = map[freq] || 1;
@@ -270,7 +292,7 @@ const Clinical = () => {
         medications: []
       });
       setSearchLab("");
-      setNewMed({ name: '', frequency: '1-0-1', duration: '', timing: 'After Food', item_code: '', item_group: '' });
+      setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', timing: 'After Food', item_code: '', item_group: '' });
       setSelectedGroup("");
       setDrugSearch("");
       fetchVisitsToSee();
@@ -296,6 +318,105 @@ const Clinical = () => {
       console.error("History pre-fetch failed");
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const handleRepeatMedication = (histMed) => {
+    const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === histMed.medication_name.toLowerCase());
+    if (!drugObj) {
+      toast.error(`"${histMed.medication_name}" is not registered in the project's pharmacy registry.`);
+      return;
+    }
+    const available = drugObj.quantity || drugObj.balance_qty || 0;
+    if (available <= 0) {
+      toast.error(`"${histMed.medication_name}" is out of stock!`);
+      return;
+    }
+
+    const alreadyAdded = consultData.medications.some(m => m.name.toLowerCase() === histMed.medication_name.toLowerCase());
+    if (alreadyAdded) {
+      toast.error(`"${histMed.medication_name}" is already in your active prescription list.`);
+      return;
+    }
+
+    const totalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(drugObj.item_group?.toUpperCase())
+      ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group)
+      : (parseInt(histMed.total_units) || 1);
+
+    const newPrescription = {
+      name: drugObj.name,
+      dosage: histMed.dosage || 'As directed',
+      frequency: histMed.frequency || '1-0-1',
+      duration: histMed.duration || '5 days',
+      timing: histMed.timing || 'After Food',
+      total_units: totalUnits,
+      item_code: drugObj.ucode || drugObj.item_code || '',
+      item_group: drugObj.item_group || ''
+    };
+
+    setConsultData(prev => ({
+      ...prev,
+      medications: [...prev.medications, newPrescription],
+      next_step: prev.next_step || 'PENDING_PHARMACY'
+    }));
+
+    toast.success(`Added ${drugObj.name} to active prescription list!`);
+  };
+
+  const handleRepeatAllMedications = () => {
+    if (!detailedVisit?.prescriptions?.length) return;
+    
+    let addedCount = 0;
+    let skippedOut = [];
+    let skippedDup = [];
+    let updatedMedications = [...consultData.medications];
+
+    detailedVisit.prescriptions.forEach(histMed => {
+      const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === histMed.medication_name.toLowerCase());
+      if (!drugObj) {
+        skippedOut.push(histMed.medication_name);
+        return;
+      }
+      const available = drugObj.quantity || drugObj.balance_qty || 0;
+      if (available <= 0) {
+        skippedOut.push(drugObj.name);
+        return;
+      }
+      
+      const alreadyAdded = updatedMedications.some(m => m.name.toLowerCase() === histMed.medication_name.toLowerCase());
+      if (alreadyAdded) {
+        skippedDup.push(drugObj.name);
+        return;
+      }
+
+      const totalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(drugObj.item_group?.toUpperCase())
+        ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group)
+        : (parseInt(histMed.total_units) || 1);
+
+      updatedMedications.push({
+        name: drugObj.name,
+        dosage: histMed.dosage || 'As directed',
+        frequency: histMed.frequency || '1-0-1',
+        duration: histMed.duration || '5 days',
+        timing: histMed.timing || 'After Food',
+        total_units: totalUnits,
+        item_code: drugObj.ucode || drugObj.item_code || '',
+        item_group: drugObj.item_group || ''
+      });
+      addedCount++;
+    });
+
+    if (addedCount > 0) {
+      setConsultData(prev => ({
+        ...prev,
+        medications: updatedMedications,
+        next_step: prev.next_step || 'PENDING_PHARMACY'
+      }));
+      toast.success(`Successfully repeated ${addedCount} medication(s) in active prescription!`);
+    }
+
+    if (skippedOut.length > 0) {
+      toast.error(`Out of stock / Unavailable: ${skippedOut.join(', ')}`, { duration: 4000 });
     }
   };
 
@@ -392,7 +513,7 @@ const Clinical = () => {
                             </div>
                             <div>
                                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
                             </div>
                          </div>
                       </td>
@@ -412,6 +533,7 @@ const Clinical = () => {
                                 lab_investigations: [], // Start fresh for new investigations
                                 medications: v.prescriptions?.map(p => ({
                                     name: p.medication_name,
+                                    dosage: p.dosage || 'As directed',
                                     frequency: p.frequency,
                                     duration: p.duration,
                                     total_units: p.total_units || 1,
@@ -648,13 +770,65 @@ const Clinical = () => {
                                         <p className="diagnosis-text" style={{ fontSize: '0.85rem', color: '#78350f' }}>{detailedVisit.consultation?.diagnosis || 'No diagnosis recorded'}</p>
                                     </div>
                                     <div style={{ background: 'var(--surface)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', flex: 1, overflowY: 'auto' }}>
-                                        <p style={{ fontSize: '0.65rem', fontWeight: 950, color: projectConfig?.primary_color || '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
-                                        {detailedVisit.prescriptions?.length > 0 ? detailedVisit.prescriptions.map((m, i) => (
-                                            <div key={i} className="history-med-item" style={{ marginBottom: '8px', padding: '6px 10px', borderRadius: '8px' }}>
-                                                <p className="history-med-name" style={{ fontSize: '0.75rem', fontWeight: 800 }}>{m.medication_name}</p>
-                                                <p style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600 }}>{m.dosage} | {m.frequency} | {m.duration}</p>
-                                            </div>
-                                        )) : <p className="empty-text">No medications prescribed</p>}
+                                        {detailedVisit.prescriptions?.length > 0 ? (
+                                            <>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                                    <p style={{ fontSize: '0.65rem', fontWeight: 950, color: projectConfig?.primary_color || '#4338ca', textTransform: 'uppercase', margin: 0 }}>Prescribed Medications</p>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleRepeatAllMedications}
+                                                        className="btn btn-secondary"
+                                                        style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <Plus size={10} /> Repeat All
+                                                    </button>
+                                                </div>
+                                                {detailedVisit.prescriptions.map((m, i) => {
+                                                    const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === m.medication_name.toLowerCase());
+                                                    const available = drugObj ? (drugObj.quantity || drugObj.balance_qty || 0) : 0;
+                                                    const inStock = available > 0;
+                                                    
+                                                    return (
+                                                        <div key={i} className="history-med-item" style={{ marginBottom: '8px', padding: '8px 12px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                                            <div>
+                                                                <p className="history-med-name" style={{ fontSize: '0.75rem', fontWeight: 800, margin: 0 }}>{m.medication_name}</p>
+                                                                <p style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 600, margin: '2px 0 0 0' }}>{m.dosage} | {m.frequency} | {m.duration}</p>
+                                                            </div>
+                                                            {inStock ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRepeatMedication(m)}
+                                                                    style={{ 
+                                                                        border: 'none', 
+                                                                        background: projectConfig?.primary_color ? projectConfig.primary_color + '1a' : '#eff6ff', 
+                                                                        color: projectConfig?.primary_color || '#2563eb', 
+                                                                        padding: '4px 8px', 
+                                                                        borderRadius: '6px', 
+                                                                        fontSize: '0.65rem', 
+                                                                        fontWeight: 900, 
+                                                                        cursor: 'pointer',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '2px'
+                                                                    }}
+                                                                >
+                                                                    <Plus size={10} /> Repeat
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ fontSize: '0.55rem', fontWeight: 900, background: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fecaca' }}>
+                                                                    OUT OF STOCK
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p style={{ fontSize: '0.65rem', fontWeight: 950, color: projectConfig?.primary_color || '#4338ca', marginBottom: '8px', textTransform: 'uppercase' }}>Prescribed Medications</p>
+                                                <p className="empty-text">No medications prescribed</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -702,10 +876,10 @@ const Clinical = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem' }}>
+              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
@@ -714,6 +888,14 @@ const Clinical = () => {
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
                     <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
+                 </div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                       {selectedVisit.patient_details?.card_no ? 'Card Number' : 'Aadhaar Number'}
+                    </p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                       {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
+                    </p>
                  </div>
                   <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
                      {selectedVisit?.patient_details?.total_visits > 1 && (
@@ -935,7 +1117,7 @@ const Clinical = () => {
                         Total Available: {totalInventoryCount} Drug Variations 
                       </span>
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr 0.8fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {/* ITEM GROUP DROPDOWN */}
                       <select
                         value={selectedGroup}
@@ -1044,6 +1226,13 @@ const Clinical = () => {
                             );
                         })()}
                       </div>
+                       <input 
+                          placeholder="Dosage" 
+                          type="text" 
+                          value={newMed.dosage} 
+                          onChange={e => setNewMed({...newMed, dosage: e.target.value})} 
+                          style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 800, color: 'var(--text-main)' }} 
+                       />
                        <select 
                           value={newMed.frequency} 
                           onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
@@ -1051,6 +1240,10 @@ const Clinical = () => {
                        >
                            <option value="1-0-1">1-0-1</option>
                            <option value="1-1-1">1-1-1</option>
+                           <option value="0.5-0-0.5">0.5-0-0.5 (Half Morning/Night)</option>
+                           <option value="0.5-0-0">0.5-0-0 (Half Morning Only)</option>
+                           <option value="0-0-0.5">0-0-0.5 (Half Night Only)</option>
+                           <option value="0.5-0.5-0.5">0.5-0.5-0.5 (Half Thrice a day)</option>
                            <option value="1-0-0">1-0-0 (Morning Only)</option>
                            <option value="0-1-0">0-1-0 (Afternoon Only)</option>
                            <option value="0-0-1">0-0-1 (Night Only)</option>
@@ -1143,7 +1336,7 @@ const Clinical = () => {
                               ...consultData, 
                               medications: [...consultData.medications, { ...newMed, total_units: finalUnits }]
                           });
-                          setNewMed({ name: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
+                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
                           setDrugSearch("");
                        }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
                     </div>
@@ -1161,7 +1354,7 @@ const Clinical = () => {
                                             <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)', marginBottom: '4px' }}>{m.name}</p>
                                             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                                    | {m.frequency} | {m.timing} | {m.duration} days
+                                                    | {m.dosage ? `${m.dosage} | ` : ''}{m.frequency} | {m.timing} | {m.duration} days
                                                 </span>
                                                 
                                                 <span style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', padding: '3px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900, boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)' }}>

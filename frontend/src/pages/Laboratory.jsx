@@ -317,7 +317,7 @@ const Laboratory = () => {
                           </div>
                           <div>
                              <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{r.patient_name}</p>
-                             <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {r.patient_id}</p>
+                             <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {r.patient_id}{r.card_no ? ` | Card: ${r.card_no}` : ''}</p>
                           </div>
                        </div>
                     </td>
@@ -478,7 +478,7 @@ const Laboratory = () => {
                   </div>
                   <div>
                      <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Clinical Diagnostic Entry</h2>
-                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequest.patient_name}</strong></p>
+                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequest.patient_name}</strong> (ID: {selectedRequest.patient_id}{selectedRequest.card_no ? ` | Card: ${selectedRequest.card_no}` : ''})</p>
                   </div>
                </div>
                <button onClick={() => setSelectedRequest(null)} style={{ border: 'none', background: 'var(--background)', color: 'var(--text-main)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

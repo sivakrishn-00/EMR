@@ -11,6 +11,7 @@ class Prescription(models.Model):
     )
     visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name='prescriptions')
     medication_name = models.CharField(max_length=255)
+    dosage = models.CharField(max_length=100, blank=True, null=True, default='As directed')
     frequency = models.CharField(max_length=100)
     duration = models.CharField(max_length=100)
     total_units = models.IntegerField(default=1)

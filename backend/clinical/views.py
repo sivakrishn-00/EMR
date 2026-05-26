@@ -71,13 +71,19 @@ class VisitViewSet(viewsets.ModelViewSet):
 
         status_param = self.request.query_params.get('status')
         active_only = self.request.query_params.get('active_only')
+        patient_param = self.request.query_params.get('patient')
         
         if status_param:
             statuses = status_param.split(',')
             queryset = queryset.filter(status__in=statuses)
+            if 'COMPLETED' in statuses and len(statuses) == 1:
+                queryset = queryset.order_by('-visit_date')
         
         if active_only:
             queryset = queryset.filter(is_active=True)
+            
+        if patient_param:
+            queryset = queryset.filter(patient_id=patient_param)
             
         search_query = self.request.query_params.get('search', '').strip()
         if search_query:
@@ -187,6 +193,7 @@ class VisitViewSet(viewsets.ModelViewSet):
                         presc = Prescription.objects.create(
                             visit=visit,
                             medication_name=med_name,
+                            dosage=dosage,
                             frequency=freq,
                             duration=duration,
                             total_units=tot_units,

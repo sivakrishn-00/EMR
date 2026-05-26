@@ -298,7 +298,56 @@ const Vitals = () => {
       return `Warning: Unusual ${range.label} range (${range.min}-${range.max} ${range.unit})`;
     }
     return null;
-  };  const filteredVisits = activeVisits.filter(visit => {
+  };
+
+  const getAge = (dobString) => {
+    if (!dobString) return 'N/A';
+    try {
+      const birthDate = new Date(dobString);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age >= 0 ? `${age}y` : 'N/A';
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  const fetchPastVitalsAndHistory = async (patientId) => {
+    try {
+      const res = await api.get(`clinical/visits/?patient=${patientId}&status=COMPLETED&page_size=1`);
+      const pastVisits = res.data.results || res.data || [];
+      if (pastVisits.length > 0) {
+        const lastVisit = pastVisits[0];
+        if (lastVisit.vitals) {
+          setVitalsData(prev => ({
+            ...prev,
+            known_dm: lastVisit.vitals.known_dm === 'YES' ? 'YES' : prev.known_dm,
+            known_htn: lastVisit.vitals.known_htn === 'YES' ? 'YES' : prev.known_htn,
+            known_cancer: lastVisit.vitals.known_cancer === 'YES' ? 'YES' : prev.known_cancer,
+            known_cvs: lastVisit.vitals.known_cvs === 'YES' ? 'YES' : prev.known_cvs,
+            known_thyroid: lastVisit.vitals.known_thyroid === 'YES' ? 'YES' : prev.known_thyroid,
+            known_tb: lastVisit.vitals.known_tb === 'YES' ? 'YES' : prev.known_tb,
+            known_others: lastVisit.vitals.known_others || prev.known_others,
+            family_dm: lastVisit.vitals.family_dm === 'YES' ? 'YES' : prev.family_dm,
+            family_htn: lastVisit.vitals.family_htn === 'YES' ? 'YES' : prev.family_htn,
+            family_cancer: lastVisit.vitals.family_cancer === 'YES' ? 'YES' : prev.family_cancer,
+            family_cvs: lastVisit.vitals.family_cvs === 'YES' ? 'YES' : prev.family_cvs,
+            family_thyroid: lastVisit.vitals.family_thyroid === 'YES' ? 'YES' : prev.family_thyroid,
+            family_tb: lastVisit.vitals.family_tb === 'YES' ? 'YES' : prev.family_tb,
+            family_others: lastVisit.vitals.family_others || prev.family_others
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to pre-fetch past vitals history:", err);
+    }
+  };
+
+  const filteredVisits = activeVisits.filter(visit => {
     const searchLow = searchTerm.toLowerCase().trim();
     if (!searchLow) return true;
 
@@ -391,7 +440,7 @@ const Vitals = () => {
                             </div>
                             <div>
                                <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
-                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
                             </div>
                          </div>
                       </td>
@@ -446,6 +495,7 @@ const Vitals = () => {
                                   });
                               } else {
                                   resetForm();
+                                  fetchPastVitalsAndHistory(v.patient);
                               }
                           }}
                           style={{ 
@@ -620,14 +670,18 @@ const Vitals = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem' }}>
+              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {selectedVisit.patient_details?.age || '28'}y</p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aadhar/Card No</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.id_proof_number || 'N/A'}</p>
+                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                       {selectedVisit.patient_details?.card_no ? 'Card Number' : 'Aadhaar Number'}
+                    </p>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                       {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
+                    </p>
                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>

@@ -14,6 +14,7 @@ import {
   Filter,
   MoreVertical,
   Download,
+  Eye,
   Info,
   Activity,
   Check,
@@ -602,6 +603,25 @@ const Patients = () => {
     }
   };
 
+  const viewMasterReport = async (patient, limit = 5) => {
+    setShowDownloadModal(false);
+    const loading = toast.loading(`Preparing clinical report for ${patient.first_name}...`);
+    try {
+      const response = await api.get(`patients/patients/${patient.id}/download_report/?limit=${limit}`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      toast.success("Elite Clinical Report Opened!", { id: loading });
+    } catch (err) {
+      console.error("PDF Preview Failure:", err);
+      toast.error("Failed to generate clinical report. Check server status.", { id: loading });
+    }
+  };
+
 
   const StatusStepper = ({ status }) => {
     const steps = [
@@ -687,25 +707,25 @@ const Patients = () => {
   const renderAckModal = () => {
     if (!showAckModal) return null;    return createPortal(
       <div className="modal-overlay">
-        <div className="modal-content" style={{ maxWidth: '500px', borderRadius: '28px', padding: '0', overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', background: 'white', color: 'var(--primary)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+        <div className="modal-content" style={{ maxWidth: '500px', borderRadius: '28px', padding: '0', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div style={{ background: 'linear-gradient(135deg, var(--background) 0%, var(--primary)0d 100%)', padding: '1.5rem 2.5rem', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'var(--background)', color: 'var(--primary)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', border: '1px solid var(--border)' }}>
               <ShieldCheck size={24} />
             </div>
-            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Slot Allocation</h2>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>Validate and confirm clinical encounter</p>
+            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Slot Allocation</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>Validate and confirm clinical encounter</p>
           </div>
 
           <form onSubmit={handleAckSubmit} style={{ padding: '1.5rem 2.5rem 2rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.75rem' }}>
 
               <div className="form-group">
-                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.625rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Allocation Date</label>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.625rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Allocation Date</label>
                 <input 
                   type="date" 
                   className="form-control" 
                   required 
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                  style={{ background: 'var(--background)', border: '1px solid var(--border)', height: '42px', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}
                   value={ackForm.date}
                   onChange={(e) => setAckForm({ ...ackForm, date: e.target.value })}
                 />
@@ -713,23 +733,23 @@ const Patients = () => {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Start Time</label>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Start Time</label>
                   <input 
                     type="time" 
                     className="form-control" 
                     required 
-                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                    style={{ background: 'var(--background)', border: '1px solid var(--border)', height: '42px', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}
                     value={ackForm.startTime}
                     onChange={(e) => setAckForm({ ...ackForm, startTime: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
-                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>End Time</label>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>End Time</label>
                   <input 
                     type="time" 
                     className="form-control" 
                     required 
-                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '42px', fontWeight: 600, fontSize: '0.875rem' }}
+                    style={{ background: 'var(--background)', border: '1px solid var(--border)', height: '42px', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}
                     value={ackForm.endTime}
                     onChange={(e) => setAckForm({ ...ackForm, endTime: e.target.value })}
                   />
@@ -750,7 +770,7 @@ const Patients = () => {
                 type="button" 
                 className="btn" 
                 onClick={() => setShowAckModal(false)}
-                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', width: '100%', fontSize: '0.875rem' }}
+                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', width: '100%', fontSize: '0.875rem' }}
               >
                 Cancel Action
               </button>
@@ -772,25 +792,25 @@ const Patients = () => {
 
     return createPortal(
       <div className="modal-overlay">
-        <div className="modal-content" style={{ maxWidth: '450px', borderRadius: '28px', padding: '0', overflow: 'hidden' }}>
-          <div style={{ background: `linear-gradient(135deg, #f8fafc 0%, ${primaryColor}0d 100%)`, padding: '1.5rem 2.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', background: 'white', color: primaryColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', boxShadow: '0 8px 12px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+        <div className="modal-content" style={{ maxWidth: '450px', borderRadius: '28px', padding: '0', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div style={{ background: `linear-gradient(135deg, var(--background) 0%, ${primaryColor}0d 100%)`, padding: '1.5rem 2.5rem', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'var(--background)', color: primaryColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem', border: '1px solid var(--border)' }}>
               <Download size={24} />
             </div>
-            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Export Scope</h2>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>{fullName}'s Clinical Report</p>
+            <h2 style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '0.15rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Export Scope</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>{fullName}'s Clinical Report</p>
           </div>
 
           <div style={{ padding: '1.5rem 2.5rem 2rem' }}>
             <div className="form-group" style={{ marginBottom: '1.75rem' }}>
-              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', marginBottom: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Include Recent Visits Count</label>
+              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Include Recent Visits Count</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <input 
                   type="number" 
                   min="1" 
                   max={selectedPatientForDownload.total_visits || 100}
                   className="form-control" 
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', height: '52px', fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: primaryColor }}
+                  style={{ background: 'var(--background)', border: '1px solid var(--border)', height: '52px', fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: 'var(--text-main)' }}
                   value={downloadVisitCount}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 1;
@@ -799,24 +819,33 @@ const Patients = () => {
                   }}
                 />
               </div>
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.75rem', fontWeight: 600 }}>
+              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.75rem', fontWeight: 600 }}>
                 Patient has <span style={{ color: primaryColor }}>{selectedPatientForDownload.total_visits || 'multiple'}</span> total records.
               </p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <button 
-                onClick={() => downloadMasterReport(selectedPatientForDownload, downloadVisitCount)}
-                className="btn btn-primary" 
-                style={{ padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, border: 'none', boxShadow: `0 10px 15px -3px ${primaryColor}4d`, width: '100%', color: 'white' }}
-              >
-                GENERATE CLINICAL PDF
-              </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  onClick={() => viewMasterReport(selectedPatientForDownload, downloadVisitCount)}
+                  className="btn" 
+                  style={{ flex: 1, padding: '0.875rem', borderRadius: '14px', fontWeight: 900, border: `2px solid ${primaryColor}`, background: 'var(--surface)', color: primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8125rem' }}
+                >
+                  <Eye size={16} /> VIEW PDF
+                </button>
+                <button 
+                  onClick={() => downloadMasterReport(selectedPatientForDownload, downloadVisitCount)}
+                  className="btn btn-primary" 
+                  style={{ flex: 1, padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, border: 'none', boxShadow: `0 10px 15px -3px ${primaryColor}4d`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8125rem' }}
+                >
+                  <Download size={16} /> DOWNLOAD
+                </button>
+              </div>
               <button 
                 type="button" 
                 className="btn" 
                 onClick={() => setShowDownloadModal(false)}
-                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', width: '100%', fontSize: '0.875rem' }}
+                style={{ padding: '0.75rem', borderRadius: '14px', fontWeight: 800, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', width: '100%', fontSize: '0.875rem' }}
               >
                 Cancel
               </button>
@@ -1162,14 +1191,24 @@ const Patients = () => {
                             </button>
                         )}
                         {(viewMode === 'ALL' || viewMode === 'COMPLETED') && (
-                            <button 
-                                className="btn btn-secondary" 
-                                style={{ padding: '0.4rem 0.6rem', border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '10px' }}
-                                onClick={() => initiateDownload(p)}
-                                title="Download Case Summary PDF"
-                            >
-                                <Download size={16} color="var(--primary)" />
-                            </button>
+                            <>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    style={{ padding: '0.4rem 0.6rem', border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '10px' }}
+                                    onClick={() => initiateDownload(p)}
+                                    title="View Case Summary PDF"
+                                >
+                                    <Eye size={16} color="var(--primary)" />
+                                </button>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    style={{ padding: '0.4rem 0.6rem', border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '10px' }}
+                                    onClick={() => initiateDownload(p)}
+                                    title="Download Case Summary PDF"
+                                >
+                                    <Download size={16} color="var(--primary)" />
+                                </button>
+                            </>
                         )}
                       </div>
                     </td>

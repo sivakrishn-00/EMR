@@ -691,6 +691,7 @@ class ConsumptionReportView(views.APIView):
         for key, data in med_groups.items():
             # Process items in this visit using Snapshot Prices
             processed_items = []
+            total_visit_cost = 0
             for item in data['items']:
                 unit_price = item.get('unit_cost', 0)
                 total_price = item.get('total_cost', 0)
@@ -703,6 +704,7 @@ class ConsumptionReportView(views.APIView):
                 })
                 grand_total_cost += total_price
                 grand_total_units += item['units']
+                total_visit_cost += total_price
 
             final_items.append({
                 "visit_id": data['visit_id'],
@@ -711,7 +713,8 @@ class ConsumptionReportView(views.APIView):
                 "card_no": data.get('card_no', 'N/A'),
                 "patient_name": data['patient_name'],
                 "medications": processed_items,
-                "total_visit_units": data['total_visit_units']
+                "total_visit_units": data['total_visit_units'],
+                "total_visit_cost": round(total_visit_cost, 2)
             })
 
         final_items.sort(key=lambda x: (x['visit_date'], x['visit_id']), reverse=True)
