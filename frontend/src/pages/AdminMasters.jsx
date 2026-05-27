@@ -1713,7 +1713,7 @@ const AdminMasters = () => {
                 )}
                 {activeBoard === "REGISTRY" && (exploringProtocolId === "employee_master" || exploringProtocolId === "family_member") && (
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    {exploringProtocolId === "employee_master" && (
+                    {exploringProtocolId === "employee_master" && isAdmin && (
                       <button
                         className="btn btn-secondary"
                         style={{
