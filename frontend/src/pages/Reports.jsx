@@ -42,7 +42,9 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('all');
+  const [selectedProject, setSelectedProject] = useState(() => {
+    return sessionStorage.getItem('reports_selected_project') || 'all';
+  });
   const [consumptionData, setConsumptionData] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,7 +64,9 @@ const Reports = () => {
 
   useEffect(() => {
     if (user?.project && selectedProject === 'all') {
-      setSelectedProject(String(user.project));
+      const defaultProj = String(user.project);
+      setSelectedProject(defaultProj);
+      sessionStorage.setItem('reports_selected_project', defaultProj);
     }
   }, [user]);
 
@@ -380,7 +384,11 @@ const Reports = () => {
             <div style={{ position: 'relative' }}>
               <select 
                 value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  sessionStorage.setItem('reports_selected_project', val);
+                  window.location.reload();
+                }}
                 style={{
                   padding: '6px 2.5rem 6px 1rem',
                   background: 'var(--surface)',
@@ -405,7 +413,7 @@ const Reports = () => {
         )}
       </div>
 
-      {selectedProject !== 'all' && projects.find(p => p.id === parseInt(selectedProject))?.use_registry_for_personnel && (
+      {selectedProject !== 'all' && (
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }} className="no-print">
           <button 
             onClick={() => setActiveTab('GENERAL')}

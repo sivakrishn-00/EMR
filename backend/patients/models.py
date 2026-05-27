@@ -227,6 +227,30 @@ class RegistryData(models.Model):
     class Meta:
         unique_together = ('registry_type', 'ucode')
 
+    def save(self, *args, **kwargs):
+        if self.additional_fields and isinstance(self.additional_fields, dict):
+            # Sync cost from dynamic fields
+            for cost_key in ['cost', 'unit_cost', 'rate']:
+                if cost_key in self.additional_fields:
+                    try:
+                        val = float(self.additional_fields[cost_key])
+                        self.cost = val
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Sync quantity from dynamic fields
+            for qty_key in ['qty', 'quantity', 'stock']:
+                if qty_key in self.additional_fields:
+                    try:
+                        val = int(float(self.additional_fields[qty_key]))
+                        self.quantity = val
+                        break
+                    except (ValueError, TypeError):
+                        pass
+                        
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.registry_type.name} - {self.name} ({self.ucode})"
 

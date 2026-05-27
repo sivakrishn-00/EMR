@@ -346,7 +346,10 @@ const AdminMasters = () => {
     completed: false,
   });
   const [bulkProject, setBulkProject] = useState("");
-  const [bulkMode, setBulkMode] = useState("OVERWRITE"); // OVERWRITE or INCREMENT
+  const [bulkMode, setBulkMode] = useState(user?.role === "ADMIN" ? "OVERWRITE" : "INCREMENT"); // OVERWRITE or INCREMENT
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
+  const [uploadHistorySubTab, setUploadHistorySubTab] = useState("UPLOADS"); // UPLOADS or EDITS
 
   const [bulkStep, setBulkStep] = useState("PROJECT"); // PROJECT, TYPE, UPLOAD
   const [bulkType, setBulkType] = useState(""); // MAPPING, FAMILY, COMPLETE
@@ -761,6 +764,22 @@ const AdminMasters = () => {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    setAuditLogsLoading(true);
+    try {
+      const res = await api.get("accounts/audit-logs/");
+      if (res.data.results) {
+        setAuditLogs(res.data.results);
+      } else {
+        setAuditLogs(res.data);
+      }
+    } catch (err) {
+      toast.error("Failed to fetch detailed audit logs");
+    } finally {
+      setAuditLogsLoading(false);
+    }
+  };
+
   const fetchUploadSessions = async () => {
     setSessionsLoading(true);
     try {
@@ -773,6 +792,7 @@ const AdminMasters = () => {
       } else {
         setUploadSessions(res.data);
       }
+      fetchAuditLogs();
     } catch (err) {
       toast.error("Failed to fetch upload sessions");
     } finally {
@@ -1276,7 +1296,7 @@ const AdminMasters = () => {
           const payload =
             isStandard || isProject1Personnel
               ? { records: batch, filename: bulkFile ? bulkFile.name : 'uploaded_sheet.xlsx', upload_session_id: uniqueSessionId }
-              : { registry_type: exploringProtocolId, records: batch, mode: bulkMode, project: bulkProject, filename: bulkFile ? bulkFile.name : 'uploaded_sheet.xlsx', upload_session_id: uniqueSessionId };
+              : { registry_type: exploringProtocolId, records: batch, mode: user?.role === "ADMIN" ? bulkMode : "INCREMENT", project: bulkProject, filename: bulkFile ? bulkFile.name : 'uploaded_sheet.xlsx', upload_session_id: uniqueSessionId };
           const res = await api.post(endpoint, payload);
 
           totalSuccess += res.data.success || 0;
@@ -3675,8 +3695,8 @@ const AdminMasters = () => {
               <div className="fade-in">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Registry Upload Audit History</h3>
-                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Complete permanent chronological ledger of spreadsheet uploads and refills</p>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Registry Upload & Change Audit History</h3>
+                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>Complete permanent chronological ledger of spreadsheet uploads, refills, and record modifications</p>
                   </div>
                   <button 
                     className="btn"
@@ -3695,112 +3715,225 @@ const AdminMasters = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    <RotateCcw size={14} className={sessionsLoading ? "spin" : ""} /> Refresh Logs
+                    <RotateCcw size={14} className={sessionsLoading || auditLogsLoading ? "spin" : ""} /> Refresh Logs
                   </button>
                 </div>
 
-                {sessionsLoading ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '6rem 0' }}>
-                    <div className="spin" style={{ width: '40px', height: '40px', border: '3px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
-                  </div>
-                ) : uploadSessions.length === 0 ? (
-                  <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
-                    <div style={{ width: '64px', height: '64px', background: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
-                      <Clock size={32} />
+                {/* Sub Tabs for Upload History vs Edit History */}
+                <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border)', marginBottom: '1.5rem', paddingBottom: '0.25rem' }}>
+                  <button
+                    onClick={() => setUploadHistorySubTab("UPLOADS")}
+                    style={{
+                      padding: '10px 20px',
+                      background: uploadHistorySubTab === "UPLOADS" ? 'var(--primary)' : 'transparent',
+                      color: uploadHistorySubTab === "UPLOADS" ? 'white' : 'var(--text-muted)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: uploadHistorySubTab === "UPLOADS" ? '0 4px 12px rgba(99, 102, 241, 0.2)' : 'none'
+                    }}
+                  >
+                    Registry Upload History
+                  </button>
+                  <button
+                    onClick={() => setUploadHistorySubTab("EDITS")}
+                    style={{
+                      padding: '10px 20px',
+                      background: uploadHistorySubTab === "EDITS" ? 'var(--primary)' : 'transparent',
+                      color: uploadHistorySubTab === "EDITS" ? 'white' : 'var(--text-muted)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: uploadHistorySubTab === "EDITS" ? '0 4px 12px rgba(99, 102, 241, 0.2)' : 'none'
+                    }}
+                  >
+                    Registry & Personnel Change Audits
+                  </button>
+                </div>
+
+                {uploadHistorySubTab === "UPLOADS" ? (
+                  sessionsLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '6rem 0' }}>
+                      <div className="spin" style={{ width: '40px', height: '40px', border: '3px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No Upload Sessions Recorded</h3>
-                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>All Excel/CSV imports, registry updates, and drug refills will be logged here with complete audits of who, when, and what was added.</p>
+                  ) : uploadSessions.length === 0 ? (
+                    <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                      <div style={{ width: '64px', height: '64px', background: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                        <Clock size={32} />
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No Upload Sessions Recorded</h3>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>All Excel/CSV imports, registry updates, and drug refills will be logged here with complete audits of who, when, and what was added.</p>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
-                    <div className="table-responsive">
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>File Details</th>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Registry / Category</th>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Mode</th>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Tally (Success / Errors)</th>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Done By</th>
-                            <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Audit</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadSessions.map((session) => (
-                            <tr key={session.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-row">
-                              <td style={{ padding: '1.25rem 2rem' }}>
-                                <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.875rem' }}>{session.filename}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>{new Date(session.timestamp).toLocaleString('en-IN', { hour12: true })}</div>
-                              </td>
-                              <td style={{ padding: '1.25rem 2rem' }}>
-                                <span style={{ 
-                                  fontSize: '0.75rem', 
-                                  fontWeight: 800, 
-                                  color: session.registry_type_name?.toLowerCase().includes('drug') ? '#8b5cf6' : '#3b82f6',
-                                  background: session.registry_type_name?.toLowerCase().includes('drug') ? 'rgba(139, 92, 246, 0.08)' : 'rgba(59, 130, 246, 0.08)',
-                                  padding: '4px 10px',
-                                  borderRadius: '20px'
-                                }}>
-                                  {session.registry_type_name || 'Registry'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '1.25rem 2rem' }}>
-                                <span style={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 800,
-                                  color: session.mode === 'INCREMENT' || session.mode === 'ADD' ? '#059669' : '#d97706',
-                                  background: session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'rgba(5, 150, 105, 0.08)' : 'rgba(217, 119, 6, 0.08)',
-                                  padding: '4px 10px',
-                                  borderRadius: '20px'
-                                }}>
-                                  {session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'Refill (Add)' : 'Replace'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '1.25rem 2rem' }}>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
-                                    {session.success_count} Passed
-                                  </span>
-                                  {session.error_count > 0 && (
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
-                                      {session.error_count} Failed
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ padding: '1.25rem 2rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                                {session.username || 'System Admin'}
-                              </td>
-                              <td style={{ padding: '1.25rem 2rem', textAlign: 'right' }}>
-                                <button
-                                  className="btn"
-                                  onClick={() => {
-                                    setSelectedSession(session);
-                                    setActiveDetailTab(session.success_count > 0 ? "SUCCESS" : "FAILED");
-                                  }}
-                                  style={{
-                                    background: 'var(--primary)',
-                                    color: 'white',
-                                    fontWeight: 800,
-                                    fontSize: '0.75rem',
-                                    borderRadius: '10px',
-                                    padding: '6px 14px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(59, 130, 246, 0.15)'
-                                  }}
-                                >
-                                  View Details
-                                </button>
-                              </td>
+                  ) : (
+                    <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                      <div className="table-responsive">
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>File Details</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Registry / Category</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Mode</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Tally (Success / Errors)</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Done By</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Audit</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {uploadSessions.map((session) => (
+                              <tr key={session.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-row">
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.875rem' }}>{session.filename}</div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>{new Date(session.timestamp).toLocaleString('en-IN', { hour12: true })}</div>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <span style={{ 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 800, 
+                                    color: session.registry_type_name?.toLowerCase().includes('drug') ? '#8b5cf6' : '#3b82f6',
+                                    background: session.registry_type_name?.toLowerCase().includes('drug') ? 'rgba(139, 92, 246, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                                    padding: '4px 10px',
+                                    borderRadius: '20px'
+                                  }}>
+                                    {session.registry_type_name || 'Registry'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 800,
+                                    color: session.mode === 'INCREMENT' || session.mode === 'ADD' ? '#059669' : '#d97706',
+                                    background: session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'rgba(5, 150, 105, 0.08)' : 'rgba(217, 119, 6, 0.08)',
+                                    padding: '4px 10px',
+                                    borderRadius: '20px'
+                                  }}>
+                                    {session.mode === 'INCREMENT' || session.mode === 'ADD' ? 'Refill (Add)' : 'Replace'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
+                                      {session.success_count} Passed
+                                    </span>
+                                    {session.error_count > 0 && (
+                                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', padding: '2px 8px', borderRadius: '6px' }}>
+                                        {session.error_count} Failed
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                  {session.username || 'System Admin'}
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem', textAlign: 'right' }}>
+                                  <button
+                                    className="btn"
+                                    onClick={() => {
+                                      setSelectedSession(session);
+                                      setActiveDetailTab(session.success_count > 0 ? "SUCCESS" : "FAILED");
+                                    }}
+                                    style={{
+                                      background: 'var(--primary)',
+                                      color: 'white',
+                                      fontWeight: 800,
+                                      fontSize: '0.75rem',
+                                      borderRadius: '10px',
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 6px rgba(59, 130, 246, 0.15)'
+                                    }}
+                                  >
+                                    View Details
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
+                  )
+                ) : (
+                  auditLogsLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '6rem 0' }}>
+                      <div className="spin" style={{ width: '40px', height: '40px', border: '3px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                    </div>
+                  ) : auditLogs.length === 0 ? (
+                    <div style={{ padding: '8rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '32px', border: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+                      <div style={{ width: '64px', height: '64px', background: 'var(--background)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                        <Clock size={32} />
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.25rem' }}>No Change Audits Recorded</h3>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600, maxWidth: '400px', margin: '0 auto' }}>All manual edits, changes, additions, and overrides will be logged here with complete "from old to new" details.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                      <div className="table-responsive">
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Timestamp</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Module</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Action</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Done By</th>
+                              <th style={{ padding: '1.25rem 2rem', textAlign: 'left', fontSize: '0.8rem', fontWeight: 700, color: '#475569', background: 'var(--surface)' }}>Details of Modifications</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {auditLogs.filter(log => ['Registry', 'Personnel', 'Governance'].includes(log.module)).map((log) => (
+                              <tr key={log.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-row">
+                                <td style={{ padding: '1.25rem 2rem', whiteSpace: 'nowrap' }}>
+                                  <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.875rem' }}>
+                                    {new Date(log.timestamp).toLocaleString('en-IN', { hour12: true })}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <span style={{ 
+                                    fontSize: '0.75rem', 
+                                    fontWeight: 800, 
+                                    color: log.module === 'Registry' ? '#3b82f6' : '#8b5cf6',
+                                    background: log.module === 'Registry' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(139, 92, 246, 0.08)',
+                                    padding: '4px 10px',
+                                    borderRadius: '20px'
+                                  }}>
+                                    {log.module}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem' }}>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 800,
+                                    color: log.action.includes('Updated') ? '#d97706' : '#059669',
+                                    background: log.action.includes('Updated') ? 'rgba(217, 119, 6, 0.08)' : 'rgba(5, 150, 105, 0.08)',
+                                    padding: '4px 10px',
+                                    borderRadius: '20px'
+                                  }}>
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                  {log.user_name || 'System Admin'}
+                                </td>
+                                <td style={{ padding: '1.25rem 2rem', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                                  {log.details}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
                 )}
               </div>
             ) : activeBoard === "DIAGNOSTICS" ? (
@@ -6661,64 +6794,66 @@ const AdminMasters = () => {
                         </p>
                       </div>
 
-                      <div
-                        style={{
-                          marginTop: "1.5rem",
-                          padding: "1.25rem",
-                          background: "var(--surface)",
-                          borderRadius: "18px",
-                          border: "1.5px solid var(--border)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          cursor: "pointer",
-                          transition: "all 0.2s"
-                        }}
-                        onClick={() => setBulkMode(bulkMode === "OVERWRITE" ? "INCREMENT" : "OVERWRITE")}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                           <div style={{ 
-                             width: "44px", 
-                             height: "44px", 
-                             borderRadius: "12px", 
-                             background: bulkMode === "INCREMENT" ? "rgba(16, 185, 129, 0.15)" : "var(--background)",
-                             display: "flex",
-                             alignItems: "center",
-                             justifyContent: "center",
-                             transition: "all 0.3s"
-                           }}>
-                              {bulkMode === "INCREMENT" ? <Plus size={22} color="#10b981" /> : <RotateCcw size={20} color="#6366f1" />}
-                           </div>
-                           <div>
-                              <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
-                                 {bulkMode === "INCREMENT" ? "Add to Existing Stock" : "Overwrite Current Data"}
-                              </p>
-                              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, margin: 0 }}>
-                                 {bulkMode === "INCREMENT" ? "Increments quantity for existing medicine codes" : "Replaces all data fields for existing codes"}
-                              </p>
-                           </div>
+                      {user?.role === 'ADMIN' && (
+                        <div
+                          style={{
+                            marginTop: "1.5rem",
+                            padding: "1.25rem",
+                            background: "var(--surface)",
+                            borderRadius: "18px",
+                            border: "1.5px solid var(--border)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                          onClick={() => setBulkMode(bulkMode === "OVERWRITE" ? "INCREMENT" : "OVERWRITE")}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                             <div style={{ 
+                               width: "44px", 
+                               height: "44px", 
+                               borderRadius: "12px", 
+                               background: bulkMode === "INCREMENT" ? "rgba(16, 185, 129, 0.15)" : "var(--background)",
+                               display: "flex",
+                               alignItems: "center",
+                               justifyContent: "center",
+                               transition: "all 0.3s"
+                             }}>
+                                {bulkMode === "INCREMENT" ? <Plus size={22} color="#10b981" /> : <RotateCcw size={20} color="#6366f1" />}
+                             </div>
+                             <div>
+                                <p style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
+                                   {bulkMode === "INCREMENT" ? "Add to Existing Stock" : "Overwrite Current Data"}
+                                </p>
+                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, margin: 0 }}>
+                                   {bulkMode === "INCREMENT" ? "Increments quantity for existing medicine codes" : "Replaces all data fields for existing codes"}
+                                </p>
+                             </div>
+                          </div>
+                          <div style={{ 
+                            width: "52px", 
+                            height: "28px", 
+                            background: bulkMode === "INCREMENT" ? "#10b981" : "var(--background)",
+                            borderRadius: "20px",
+                            position: "relative",
+                            transition: "all 0.3s"
+                          }}>
+                             <div style={{ 
+                               width: "20px", 
+                               height: "20px", 
+                               background: "white", 
+                               borderRadius: "50%", 
+                               position: "absolute",
+                               top: "4px",
+                               left: bulkMode === "INCREMENT" ? "28px" : "4px",
+                               transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                               boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                             }} />
+                          </div>
                         </div>
-                        <div style={{ 
-                          width: "52px", 
-                          height: "28px", 
-                          background: bulkMode === "INCREMENT" ? "#10b981" : "var(--background)",
-                          borderRadius: "20px",
-                          position: "relative",
-                          transition: "all 0.3s"
-                        }}>
-                           <div style={{ 
-                             width: "20px", 
-                             height: "20px", 
-                             background: "white", 
-                             borderRadius: "50%", 
-                             position: "absolute",
-                             top: "4px",
-                             left: bulkMode === "INCREMENT" ? "28px" : "4px",
-                             transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                             boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                           }} />
-                        </div>
-                      </div>
+                      )}
 
                       {bulkMode === "INCREMENT" && (
                         <div style={{
