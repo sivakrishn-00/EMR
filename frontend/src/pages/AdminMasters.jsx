@@ -86,24 +86,18 @@ const AdminMasters = () => {
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
-  const [hiddenProtocols, setHiddenProtocols] = useState(() => {
+  const toggleProtocolVisibility = async (proto) => {
     try {
-      const saved = localStorage.getItem('emr_hidden_protocols');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
+      const newVisibility = !proto.is_visible;
+      await api.patch(`patients/registry-types/${proto.dbId}/`, {
+        is_visible: newVisibility
+      });
+      await fetchProjects();
+      toast.success(`${proto.name} visibility updated successfully!`);
+    } catch (err) {
+      toast.error("Failed to update visibility settings");
+      console.error(err);
     }
-  });
-
-  const toggleProtocolVisibility = (protoId) => {
-    setHiddenProtocols(prev => {
-      const updated = prev.includes(protoId) 
-        ? prev.filter(id => id !== protoId) 
-        : [...prev, protoId];
-      localStorage.setItem('emr_hidden_protocols', JSON.stringify(updated));
-      return updated;
-    });
-    toast.success("Protocol visibility toggled successfully!");
   };
 
   const getCurrentProtocols = (projectId = selectedProject) => {
@@ -127,6 +121,7 @@ const AdminMasters = () => {
             ? UserPlus
             : Users,
       color: rt.color,
+      is_visible: rt.is_visible ?? true,
       isCustom: !["PERSONNEL_PRIMARY", "PERSONNEL_DEPENDENT"].includes(rt.type_category),
       fields:
         rt.fields && rt.fields.length > 0
@@ -3244,11 +3239,11 @@ const AdminMasters = () => {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
                       {getCurrentProtocols().map((proto) => {
-                        const isHidden = hiddenProtocols.includes(proto.id);
+                        const isHidden = !proto.is_visible;
                         return (
                           <button
                             key={proto.id}
-                            onClick={() => toggleProtocolVisibility(proto.id)}
+                            onClick={() => toggleProtocolVisibility(proto)}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -3335,7 +3330,7 @@ const AdminMasters = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {getCurrentProtocols().filter(proto => isAdmin || !hiddenProtocols.includes(proto.id)).length === 0 ? (
+                      {getCurrentProtocols().filter(proto => isAdmin || proto.is_visible).length === 0 ? (
                         <tr>
                           <td colSpan="3" style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontWeight: 700 }}>
                             All upload protocols are currently hidden by visibility settings.
@@ -3343,7 +3338,7 @@ const AdminMasters = () => {
                         </tr>
                       ) : (
                         getCurrentProtocols()
-                          .filter(proto => isAdmin || !hiddenProtocols.includes(proto.id))
+                          .filter(proto => isAdmin || proto.is_visible)
                           .map((proto) => (
                         <tr
                           key={proto.id}
@@ -6457,7 +6452,7 @@ const AdminMasters = () => {
                   }}
                 >
                   {getCurrentProtocols(bulkProject)
-                    .filter(proto => isAdmin || !hiddenProtocols.includes(proto.id))
+                    .filter(proto => isAdmin || proto.is_visible)
                     .map((proto) => (
                     <div
                       key={proto.id}

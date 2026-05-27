@@ -203,6 +203,7 @@ class RegistryType(models.Model):
     coverage = models.CharField(max_length=100, default='WORKSPACE')
     icon = models.CharField(max_length=50, default='Pill')
     color = models.CharField(max_length=20, default='#ec4899')
+    is_visible = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
