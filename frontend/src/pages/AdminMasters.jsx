@@ -797,17 +797,29 @@ const AdminMasters = () => {
 
       const res = await api.get(`${endpoint}${params}`);
 
+      const fetchedResults = res.data.results || (Array.isArray(res.data) ? res.data : []);
       if (res.data.results) {
         setEmployeeMasters(res.data.results);
         setTotalCount(res.data.count);
         setTotalFamilyCount(res.data.total_family_count || 0);
       } else {
-        const results = Array.isArray(res.data)
-          ? res.data
-          : res.data.results || [];
-        setEmployeeMasters(results);
-        setTotalCount(res.data.count || results.length);
+        setEmployeeMasters(fetchedResults);
+        setTotalCount(res.data.count || fetchedResults.length);
         setTotalFamilyCount(res.data.total_family_count || 0);
+      }
+      
+      // Auto-extract designations from loaded employees and merge with the dropdown list
+      if (fetchedResults.length > 0) {
+        const extractedDesigs = fetchedResults
+          .map(emp => emp.designation ? String(emp.designation).trim().toUpperCase() : '')
+          .filter(d => d && d !== 'NAN' && d !== 'NONE' && d !== 'NULL');
+        if (extractedDesigs.length > 0) {
+          setDesignations(prev => {
+            const merged = [...new Set([...prev, ...extractedDesigs])];
+            localStorage.setItem('emr_designations', JSON.stringify(merged));
+            return merged;
+          });
+        }
       }
       setPage(pageNum);
     } catch (err) {
@@ -4064,7 +4076,7 @@ const AdminMasters = () => {
                           }...`}
                         style={{
                           width: "100%",
-                          padding: "0.5rem 1rem 0.5rem 3.5rem",
+                          padding: "0.5rem 3rem 0.5rem 3.5rem",
                           height: "48px",
                           border: "1px solid #cbd5e1",
                           borderRadius: "12px",
@@ -4082,6 +4094,25 @@ const AdminMasters = () => {
                           e.key === "Enter" && fetchEmployeeMasters(1)
                         }
                       />
+                      {searchQuery && (
+                        <X
+                          size={16}
+                          style={{
+                            position: "absolute",
+                            right: "1.25rem",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            color: "#64748b",
+                            cursor: "pointer",
+                            transition: "color 0.2s",
+                          }}
+                          onClick={() => {
+                            setSearchQuery("");
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-main)"}
+                          onMouseLeave={(e) => e.currentTarget.style.color = "#64748b"}
+                        />
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: "0.75rem" }}>
                       <button
@@ -6563,6 +6594,19 @@ const AdminMasters = () => {
                               (p) => p.id === exploringProtocolId,
                             )?.fields || [];
                             
+                            let displayFields = [...schemaFields];
+                            if (exploringProtocolId === "employee_master") {
+                              const hasEmpId = displayFields.some(f => f.slug === "employee_id");
+                              if (!hasEmpId) {
+                                const cardNoIndex = displayFields.findIndex(f => f.slug === "card_no");
+                                if (cardNoIndex !== -1) {
+                                  displayFields.splice(cardNoIndex + 1, 0, { slug: "employee_id", label: "Employee ID" });
+                                } else {
+                                  displayFields.push({ slug: "employee_id", label: "Employee ID" });
+                                }
+                              }
+                            }
+                            
                             const isPharmacy = exploringProtocolId && (
                               exploringProtocolId.includes("pharmacy") || 
                               exploringProtocolId.includes("drug")
@@ -6570,7 +6614,7 @@ const AdminMasters = () => {
                             
                             return (
                               <>
-                                {schemaFields.map((f) => (
+                                {displayFields.map((f) => (
                                   <span
                                     key={f.slug}
                                     style={{

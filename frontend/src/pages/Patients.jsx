@@ -946,10 +946,29 @@ const Patients = () => {
             <input 
               type="text" 
               placeholder="Search by ID (BHSPL0001), Name, or Mobile..." 
-              style={{ paddingLeft: '2.75rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)', width: '100%' }}
+              style={{ paddingLeft: '2.75rem', paddingRight: '2.5rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)', width: '100%' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <X
+                size={16}
+                style={{
+                  position: 'absolute',
+                  right: '1rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  transition: 'color 0.2s',
+                }}
+                onClick={() => {
+                  setSearchQuery('');
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-main)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+              />
+            )}
           </div>
           {user?.role === 'ADMIN' && (
               <select 

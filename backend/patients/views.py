@@ -1015,6 +1015,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                             if not dob:
                                 dob = calculate_dob(get_val(data, 'age', 'age_gender'))
 
+                            emp_id_val = clean_str_field(get_val(data, 'employee_id', 'employeeid', 'emp_id', 'empid', 'emp_code', 'employee_code')) or ''
+                            
                             EmployeeMaster.objects.update_or_create(
                                 card_no=card_no,
                                 defaults={
@@ -1026,6 +1028,7 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                                     'mobile_no': clean_str_field(get_val(data, 'mobile_no', 'mobile', 'phone', 'contact_link', 'contact', 'contact_no', 'contact_number', 'phone_no', 'phone_number', 'mobile_number', 'contact_link_no', 'contact_link_number')),
                                     'address': get_val(data, 'address', 'addr') or '',
                                     'designation': get_val(data, 'designation', 'desig') or '',
+                                    'additional_fields': {'employee_id': emp_id_val} if emp_id_val else {},
                                 }
                             )
                             success_count += 1
