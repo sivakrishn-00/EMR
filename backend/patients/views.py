@@ -1599,7 +1599,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
     pagination_class = LargeResultsPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no', 'patient_id']
+    search_fields = ['first_name', 'last_name', 'phone', 'id_proof_number', 'card_no', 'patient_id', 'employee_master__additional_fields__employee_id']
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):

@@ -106,6 +106,7 @@ const Pharmacy = () => {
                 patient_name: curr.patient_name,
                 uhid: curr.uhid,
                 card_no: curr.card_no,
+                employee_id: curr.employee_id,
                 project_id: curr.project_id,
                 items: []
             };
@@ -209,7 +210,8 @@ const Pharmacy = () => {
     return (
       p.patient_name?.toLowerCase().includes(searchLow) ||
       String(p.uhid || '').toLowerCase().includes(searchLow) ||
-      String(p.card_no || '').toLowerCase().includes(searchLow)
+      String(p.card_no || '').toLowerCase().includes(searchLow) ||
+      String(p.employee_id || '').toLowerCase().includes(searchLow)
     );
   });
 
@@ -239,7 +241,7 @@ const Pharmacy = () => {
                     <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
                     <input
                        type="text"
-                       placeholder="Search patient..."
+                       placeholder="Search by Patient/Employee ID, Name, Card No..."
                        value={searchTerm}
                        onChange={e => { const val = e.target.value; setSearchTerm(val); setPage(1); fetchPrescriptionsAndInventory(val); }}
                        className="search-input"

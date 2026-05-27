@@ -135,8 +135,9 @@ const Patients = () => {
     const idProof = String(p.id_proof_number || '');
     const cardNo = String(p.card_no || '').toLowerCase();
     const patientID = String(p.patient_id || '').toLowerCase();
+    const employeeId = String(p.employee_details?.additional_fields?.employee_id || '').toLowerCase();
 
-    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow);
+    return fullName.includes(searchLow) || phone.includes(searchLow) || idProof.includes(searchLow) || cardNo.includes(searchLow) || patientID.includes(searchLow) || employeeId.includes(searchLow);
   });
 
   const downloadFailedEnrollmentCards = () => {
@@ -945,7 +946,7 @@ const Patients = () => {
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
-              placeholder="Search by ID (BHSPL0001), Name, or Mobile..." 
+              placeholder="Search by Patient/Employee ID, Name, Mobile, Card No..." 
               style={{ paddingLeft: '2.75rem', paddingRight: '2.5rem', height: '44px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-main)', width: '100%' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

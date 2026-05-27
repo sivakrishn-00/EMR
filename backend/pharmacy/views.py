@@ -85,6 +85,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                 Q(visit__patient__patient_id__icontains=search_query) |
                 Q(visit__patient__phone__icontains=search_query) |
                 Q(visit__patient__card_no__icontains=search_query) |
+                Q(visit__patient__employee_master__additional_fields__employee_id__icontains=search_query) |
                 Q(medication_name__icontains=search_query) |
                 card_q
             ).distinct()

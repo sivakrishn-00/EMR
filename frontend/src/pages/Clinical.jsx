@@ -439,8 +439,9 @@ const Clinical = () => {
     const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
     const cardNo = String(visit.patient_details?.card_no || '').toLowerCase();
     const phone = String(visit.patient_details?.phone || '').toLowerCase();
+    const employeeId = String(visit.patient_details?.employee_details?.additional_fields?.employee_id || '').toLowerCase();
 
-    return patientName.includes(searchLow) || patientId.includes(searchLow) || cardNo.includes(searchLow) || phone.includes(searchLow);
+    return patientName.includes(searchLow) || patientId.includes(searchLow) || cardNo.includes(searchLow) || phone.includes(searchLow) || employeeId.includes(searchLow);
   });
 
   return (
@@ -464,7 +465,7 @@ const Clinical = () => {
                      <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
                      <input
                         type="text"
-                        placeholder="Search patient..."
+                        placeholder="Search by Patient/Employee ID, Name, Card No..."
                         value={searchTerm}
                         onChange={e => { const val = e.target.value; setSearchTerm(val); setPage(1); fetchVisitsToSee(1, val); }}
                         className="search-input"

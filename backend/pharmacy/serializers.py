@@ -16,6 +16,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     dispensing_history = DispensingRecordSerializer(many=True, read_only=True)
     patient_name = serializers.CharField(source='visit.patient.__str__', read_only=True)
     card_no = serializers.CharField(source='visit.patient.card_no', read_only=True, default='N/A')
+    employee_id = serializers.SerializerMethodField()
     uhid = serializers.SerializerMethodField()
     visit_id = serializers.IntegerField(source='visit.id', read_only=True)
     project_id = serializers.SerializerMethodField()
@@ -24,6 +25,12 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prescription
         fields = '__all__'
+
+    def get_employee_id(self, obj):
+        patient = obj.visit.patient
+        if patient and patient.employee_master:
+            return patient.employee_master.additional_fields.get('employee_id', '')
+        return ''
 
     def get_item_group(self, obj):
         # MNC Standard: Dynamic lookup to ensure category-aware dispensing even for legacy records

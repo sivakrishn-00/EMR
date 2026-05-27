@@ -202,6 +202,7 @@ const Laboratory = () => {
         r.patient_name?.toLowerCase().includes(searchLow) ||
         r.patient_id?.toLowerCase().includes(searchLow) ||
         String(r.card_no || '').toLowerCase().includes(searchLow) ||
+        String(r.employee_id || '').toLowerCase().includes(searchLow) ||
         r.test_name?.toLowerCase().includes(searchLow)
       );
     });
@@ -231,7 +232,7 @@ const Laboratory = () => {
                    <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#475569', zIndex: 10 }} />
                    <input
                       type="text"
-                      placeholder="Search patient or test..."
+                      placeholder="Search by Patient/Employee ID, Name, Test..."
                       value={searchTerm}
                       onChange={e => { const val = e.target.value; setSearchTerm(val); setCurrentPage(1); fetchLabRequests(val); }}
                       className="search-input"

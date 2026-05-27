@@ -37,11 +37,18 @@ class LabRequestSerializer(serializers.ModelSerializer):
     patient_id = serializers.CharField(source='visit.patient.patient_id', read_only=True)
     patient_dhid = serializers.CharField(source='visit.patient.ucode', read_only=True)
     card_no = serializers.CharField(source='visit.patient.card_no', read_only=True)
+    employee_id = serializers.SerializerMethodField()
     ordered_by_name = serializers.CharField(source='ordered_by.username', read_only=True)
 
     class Meta:
         model = LabRequest
         fields = '__all__'
+
+    def get_employee_id(self, obj):
+        patient = obj.visit.patient
+        if patient and patient.employee_master:
+            return patient.employee_master.additional_fields.get('employee_id', '')
+        return ''
 
 
 class LabMachineDataSerializer(serializers.ModelSerializer):
