@@ -78,9 +78,42 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
     patient_dob = str(patient.dob) if (patient and patient.dob) else meta.get('dob', 'N/A')
     patient_phone = patient.phone if patient else meta.get('phone', 'N/A')
 
+    aadhar_or_card = "N/A"
+    if patient:
+        if patient.is_employee_linked:
+            aadhar = None
+            cno = None
+            if patient.family_member:
+                aadhar = patient.family_member.aadhar_no
+                cno = patient.family_member.card_no
+            elif patient.employee_master:
+                aadhar = patient.employee_master.aadhar_no
+                cno = patient.employee_master.card_no
+            
+            parts = []
+            if aadhar and str(aadhar).strip() and str(aadhar).strip() != str(patient.phone).strip():
+                parts.append(str(aadhar))
+            if cno and str(cno).strip():
+                parts.append(str(cno))
+            elif patient.card_no and str(patient.card_no).strip():
+                parts.append(str(patient.card_no))
+                
+            if parts:
+                aadhar_or_card = " / ".join(parts)
+            else:
+                aadhar_or_card = patient.card_no or "N/A"
+        else:
+            proof_num = patient.id_proof_number
+            if proof_num and str(proof_num).strip() != str(patient.phone).strip():
+                aadhar_or_card = str(proof_num)
+            elif patient.card_no and str(patient.card_no).strip():
+                aadhar_or_card = str(patient.card_no)
+            else:
+                aadhar_or_card = "N/A"
+
     id_data = [
         [Paragraph("FULL LEGAL NAME", theme['label_left']), Paragraph(to_str(patient_fullname), theme['value']), Paragraph("PATIENT UID", theme['label_left']), Paragraph(to_str(patient_id), theme['value'])],
-        [Paragraph("GENDER", theme['label_left']), Paragraph(to_str(patient_gender), theme['value']), Paragraph("AADHAR / CARD NO", theme['label_left']), Paragraph(to_str(patient.id_proof_number if patient else None), theme['value'])],
+        [Paragraph("GENDER", theme['label_left']), Paragraph(to_str(patient_gender), theme['value']), Paragraph("AADHAR / CARD NO", theme['label_left']), Paragraph(to_str(aadhar_or_card), theme['value'])],
         [Paragraph("DATE OF BIRTH", theme['label_left']), Paragraph(to_str(patient_dob), theme['value']), Paragraph("CONTACT LINK", theme['label_left']), Paragraph(to_str(patient_phone), theme['value'])],
     ]
     id_t = Table(id_data, colWidths=[1.4*inch, 1.9*inch, 1.4*inch, 1.9*inch])

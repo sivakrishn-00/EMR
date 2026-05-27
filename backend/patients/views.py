@@ -438,8 +438,29 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
             )
 
     def perform_update(self, serializer):
+        old_instance = self.get_object()
+        
+        # Build snapshot of old values for validated fields
+        old_values = {}
+        for field in serializer.validated_data.keys():
+            old_values[field] = getattr(old_instance, field, None)
+            
         data = serializer.save()
-        log_action(self.request.user, 'Registry', 'Data Entry Updated', f"Record {data.ucode} modified in registry {data.registry_type.name}")
+        
+        # Determine changed fields
+        changes = []
+        for field, old_val in old_values.items():
+            new_val = getattr(data, field, None)
+            if old_val != new_val:
+                changes.append(f"{field}: '{old_val}' -> '{new_val}'")
+                
+        change_str = ", ".join(changes) if changes else "No fields changed"
+        log_action(
+            self.request.user, 
+            'Registry', 
+            'Data Entry Updated', 
+            f"Record {data.ucode} modified in registry {data.registry_type.name}. Changes: {change_str}"
+        )
         
         # Self-healing Sync: Align child batches when the parent medicine quantity or price is manually modified
         rt = data.registry_type
@@ -945,6 +966,31 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project_id=project_id)
         return queryset
 
+    def perform_update(self, serializer):
+        old_instance = self.get_object()
+        
+        # Build snapshot of old values for validated fields
+        old_values = {}
+        for field in serializer.validated_data.keys():
+            old_values[field] = getattr(old_instance, field, None)
+            
+        data = serializer.save()
+        
+        # Determine changed fields
+        changes = []
+        for field, old_val in old_values.items():
+            new_val = getattr(data, field, None)
+            if old_val != new_val:
+                changes.append(f"{field}: '{old_val}' -> '{new_val}'")
+                
+        change_str = ", ".join(changes) if changes else "No fields changed"
+        log_action(
+            self.request.user, 
+            'Personnel', 
+            'Employee Updated', 
+            f"Employee {data.card_no} ({data.name}) modified. Changes: {change_str}"
+        )
+
     @action(detail=False, methods=['post'], url_path='bulk-upload')
     def bulk_upload(self, request):
         records = request.data.get('records', [])
@@ -1233,6 +1279,31 @@ class FamilyMemberViewSet(viewsets.ModelViewSet):
     queryset = FamilyMember.objects.all()
     serializer_class = FamilyMemberSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def perform_update(self, serializer):
+        old_instance = self.get_object()
+        
+        # Build snapshot of old values for validated fields
+        old_values = {}
+        for field in serializer.validated_data.keys():
+            old_values[field] = getattr(old_instance, field, None)
+            
+        data = serializer.save()
+        
+        # Determine changed fields
+        changes = []
+        for field, old_val in old_values.items():
+            new_val = getattr(data, field, None)
+            if old_val != new_val:
+                changes.append(f"{field}: '{old_val}' -> '{new_val}'")
+                
+        change_str = ", ".join(changes) if changes else "No fields changed"
+        log_action(
+            self.request.user, 
+            'Personnel', 
+            'Family Member Updated', 
+            f"Family Member {data.card_no} ({data.name}) modified. Changes: {change_str}"
+        )
 
 class RegistryReportView(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
