@@ -210,9 +210,15 @@ class ProjectLogoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RegistryUploadSessionSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    registry_type_name = serializers.CharField(source='registry_type.name', read_only=True)
+    username = serializers.SerializerMethodField()
+    registry_type_name = serializers.SerializerMethodField()
     
     class Meta:
         model = RegistryUploadSession
         fields = '__all__'
+
+    def get_username(self, obj):
+        return obj.user.username if obj.user else "System/Admin"
+
+    def get_registry_type_name(self, obj):
+        return obj.registry_type.name if obj.registry_type else "General Registry"

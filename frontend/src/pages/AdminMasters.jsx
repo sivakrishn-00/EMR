@@ -56,6 +56,7 @@ const AdminMasters = () => {
   const { user } = useAuth();
   const userPerms = user?.permissions || [];
   const hasFullAdminMasters = user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes('/admin-masters');
+  const isAdmin = user?.role === 'ADMIN' || user?.is_superuser || user?.user_roles?.some(r => r.name === 'ADMIN');
   
   const tabPermissions = {
     PROTOCOLS: hasFullAdminMasters || userPerms.includes('/admin-masters/protocols'),
@@ -85,6 +86,25 @@ const AdminMasters = () => {
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
+  const [hiddenProtocols, setHiddenProtocols] = useState(() => {
+    try {
+      const saved = localStorage.getItem('emr_hidden_protocols');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const toggleProtocolVisibility = (protoId) => {
+    setHiddenProtocols(prev => {
+      const updated = prev.includes(protoId) 
+        ? prev.filter(id => id !== protoId) 
+        : [...prev, protoId];
+      localStorage.setItem('emr_hidden_protocols', JSON.stringify(updated));
+      return updated;
+    });
+    toast.success("Protocol visibility toggled successfully!");
+  };
 
   const getCurrentProtocols = (projectId = selectedProject) => {
     const proj = projects.find((p) => String(p.id) === String(projectId));
@@ -114,6 +134,7 @@ const AdminMasters = () => {
           : rt.slug === "employee_master"
             ? [
                 { label: "Card No", slug: "card_no" },
+                { label: "Employee ID", slug: "employee_id" },
                 { label: "Name", slug: "name" },
                 { label: "Age / Gender", slug: "gender" },
                 { label: "Aadhar No", slug: "aadhar_no" },
@@ -352,7 +373,7 @@ const AdminMasters = () => {
     address: "",
     designation: "",
     proof_image: null,
-    additional_fields: {},
+    additional_fields: { employee_id: "" },
   });
 
   const [familyFormData, setFamilyFormData] = useState({
@@ -369,6 +390,48 @@ const AdminMasters = () => {
 
   const [masterFormAttempted, setMasterFormAttempted] = useState(false);
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
+
+  const [designations, setDesignations] = useState(() => {
+    try {
+      const saved = localStorage.getItem('emr_designations');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [showAddDesignationModal, setShowAddDesignationModal] = useState(false);
+  const [newDesignationInput, setNewDesignationInput] = useState("");
+
+  const handleAddNewDesignation = () => {
+    setNewDesignationInput("");
+    setShowAddDesignationModal(true);
+  };
+
+  const submitNewDesignation = () => {
+    if (newDesignationInput && newDesignationInput.trim()) {
+      const formatted = newDesignationInput.trim().toUpperCase();
+      if (!designations.includes(formatted)) {
+        const updated = [...designations, formatted];
+        setDesignations(updated);
+        localStorage.setItem('emr_designations', JSON.stringify(updated));
+        toast.success(`Designation "${formatted}" added successfully!`);
+      }
+      setMasterFormData(prev => ({ ...prev, designation: formatted }));
+      setShowAddDesignationModal(false);
+      setNewDesignationInput("");
+    } else {
+      toast.error("Please enter a valid designation name");
+    }
+  };
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', '#6366f1');
+    root.style.setProperty('--primary-dark', '#4f46e5');
+    root.style.setProperty('--secondary', '#10b981');
+    root.style.setProperty('--accent', '#f59e0b');
+  }, []);
 
   useEffect(() => {
     if (showMasterModal && !isEditingMaster) {
@@ -768,6 +831,11 @@ const AdminMasters = () => {
       return;
     }
 
+    if (masterFormData.additional_fields?.employee_id && masterFormData.additional_fields.employee_id.length > 10) {
+      toast.error("Employee ID must be maximum 10 characters");
+      return;
+    }
+
     const data = new FormData();
     Object.keys(masterFormData).forEach((key) => {
       const val = masterFormData[key];
@@ -780,17 +848,18 @@ const AdminMasters = () => {
       }
     });
 
+    const loadingToast = toast.loading(isEditingMaster ? "Saving changes..." : "Registering employee...");
     try {
       if (isEditingMaster) {
         await api.put(`patients/employee-masters/${editingMasterId}/`, data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success("Employee Master Updated!");
+        toast.success("Employee Master Updated!", { id: loadingToast });
       } else {
         await api.post("patients/employee-masters/", data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        toast.success("Employee Master Registered!");
+        toast.success("Employee Master Registered!", { id: loadingToast });
       }
       setShowMasterModal(false);
       setIsEditingMaster(false);
@@ -807,7 +876,7 @@ const AdminMasters = () => {
         address: "",
         designation: "",
         proof_image: null,
-        additional_fields: {},
+        additional_fields: { employee_id: "" },
       });
       fetchEmployeeMasters();
     } catch (err) {
@@ -815,7 +884,7 @@ const AdminMasters = () => {
       const errorMsg = err.response?.data 
         ? Object.entries(err.response.data).map(([k, v]) => `${k}: ${v}`).join(", ")
         : (isEditingMaster ? "Error updating master" : "Error creating master");
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: loadingToast });
     }
   };
 
@@ -853,6 +922,7 @@ const AdminMasters = () => {
       exploringProtocolId,
     );
 
+    const loadingToast = toast.loading(isEditingFamily ? "Saving changes..." : "Adding family member...");
     try {
       if (isStandard) {
         // Legacy Protocol Persistence
@@ -871,12 +941,12 @@ const AdminMasters = () => {
           await api.put(`patients/family-members/${editingFamilyId}/`, data, {
             headers: { "Content-Type": "multipart/form-data" },
           });
-          toast.success("Legacy Family Member Updated!");
+          toast.success("Legacy Family Member Updated!", { id: loadingToast });
         } else {
           await api.post("patients/family-members/", data, {
             headers: { "Content-Type": "multipart/form-data" },
           });
-          toast.success("Legacy Family Member Added!");
+          toast.success("Legacy Family Member Added!", { id: loadingToast });
         }
       } else {
         // Polymorphic Registry Persistence: Dynamically resolve the dependent registry type
@@ -897,10 +967,10 @@ const AdminMasters = () => {
 
         if (isEditingFamily) {
           await api.patch(`patients/registry-data/${editingFamilyId}/`, payload);
-          toast.success("Registry: Dependent Profile Updated!");
+          toast.success("Registry: Dependent Profile Updated!", { id: loadingToast });
         } else {
           await api.post("patients/registry-data/", payload);
-          toast.success("Registry: New Dependent Registered!");
+          toast.success("Registry: New Dependent Registered!", { id: loadingToast });
         }
       }
 
@@ -925,6 +995,7 @@ const AdminMasters = () => {
         isEditingFamily
           ? "Action Blocked: Profile Update Failed"
           : "Action Blocked: Dependency Link Failed",
+        { id: loadingToast }
       );
     }
   };
@@ -972,6 +1043,7 @@ const AdminMasters = () => {
 
       const headers = [
         "Card No",
+        "Employee ID",
         "Name",
         "Relationship",
         "DOB",
@@ -987,6 +1059,7 @@ const AdminMasters = () => {
       allData.forEach((emp) => {
         rows.push([
           emp.card_no,
+          emp.additional_fields?.employee_id || "",
           `"${emp.name}"`,
           "PRIMARY CARD HOLDER",
           emp.dob,
@@ -1003,6 +1076,7 @@ const AdminMasters = () => {
         emp.family_members?.forEach((fam) => {
           rows.push([
             `${emp.card_no}/${fam.card_no_suffix}`,
+            "",
             `"${fam.name}"`,
             fam.relationship,
             fam.dob,
@@ -1574,7 +1648,7 @@ const AdminMasters = () => {
                 >
                   Back to Project List
                 </button>
-                {activeBoard === "PROTOCOLS" && (
+                {activeBoard === "PROTOCOLS" && isAdmin && (
                   <button
                     className="btn btn-primary"
                     style={{
@@ -1697,7 +1771,7 @@ const AdminMasters = () => {
                           address: "",
                           designation: "",
                           proof_image: null,
-                          additional_fields: {},
+                          additional_fields: { employee_id: "" },
                         });
                         fetchNextCardNo(selectedProject || user?.project);
                         setShowMasterModal(true);
@@ -3114,6 +3188,64 @@ const AdminMasters = () => {
               </div>
             ) : activeBoard === "PROTOCOLS" ? (
               <div className="fade-in">
+                {/* Protocol Visibility Control Panel */}
+                {isAdmin && (
+                  <div
+                    style={{
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "24px",
+                      padding: "1.5rem",
+                      marginBottom: "1.5rem",
+                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                      <div>
+                        <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
+                          ⚙️ Registry Protocol Visibility Settings
+                        </h3>
+                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "4px 0 0 0" }}>
+                          Toggle which registry upload protocols are active and visible in the workspace hub.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                      {getCurrentProtocols().map((proto) => {
+                        const isHidden = hiddenProtocols.includes(proto.id);
+                        return (
+                          <button
+                            key={proto.id}
+                            onClick={() => toggleProtocolVisibility(proto.id)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              padding: "8px 16px",
+                              borderRadius: "12px",
+                              border: "1px solid var(--border)",
+                              background: isHidden ? "rgba(239, 68, 68, 0.08)" : "rgba(16, 185, 129, 0.08)",
+                              color: isHidden ? "#ef4444" : "#10b981",
+                              cursor: "pointer",
+                              fontSize: "0.8125rem",
+                              fontWeight: 700,
+                              transition: "all 0.2s"
+                            }}
+                          >
+                            <span style={{ 
+                              width: "8px", 
+                              height: "8px", 
+                              borderRadius: "50%", 
+                              background: isHidden ? "#ef4444" : "#10b981" 
+                            }} />
+                            {proto.name} {isHidden ? "(Hidden)" : "(Allowed)"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div
                   className="card"
                   style={{
@@ -3171,7 +3303,16 @@ const AdminMasters = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {getCurrentProtocols().map((proto) => (
+                      {getCurrentProtocols().filter(proto => isAdmin || !hiddenProtocols.includes(proto.id)).length === 0 ? (
+                        <tr>
+                          <td colSpan="3" style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontWeight: 700 }}>
+                            All upload protocols are currently hidden by visibility settings.
+                          </td>
+                        </tr>
+                      ) : (
+                        getCurrentProtocols()
+                          .filter(proto => isAdmin || !hiddenProtocols.includes(proto.id))
+                          .map((proto) => (
                         <tr
                           key={proto.id}
                           style={{ borderBottom: "1px solid var(--border)" }}
@@ -3268,7 +3409,7 @@ const AdminMasters = () => {
                                 alignItems: "center",
                               }}
                             >
-                              {proto.isCustom && (
+                              {isAdmin && proto.isCustom && (
                                 <>
                                   <button
                                     onClick={() => {
@@ -3382,7 +3523,7 @@ const AdminMasters = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>
@@ -4086,6 +4227,17 @@ const AdminMasters = () => {
                                   letterSpacing: "0.05em",
                                 }}
                               >
+                                EMPLOYEE ID
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 900,
+                                  color: "#475569",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
                                 NAME
                               </th>
                               <th
@@ -4101,14 +4253,14 @@ const AdminMasters = () => {
                               </th>
                               <th
                                 style={{
-                                  fontSize: "0.75rem",
+                                  fontSize: "0.65rem",
                                   fontWeight: 900,
                                   color: "#475569",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                 }}
                               >
-                                AADHAR/CARD NO
+                                AADHAR NO
                               </th>
                               <th
                                 style={{
@@ -4131,6 +4283,17 @@ const AdminMasters = () => {
                                 }}
                               >
                                 ADDRESS
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 900,
+                                  color: "#475569",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                DESIGNATION
                               </th>
                               <th
                                 style={{
@@ -4321,12 +4484,21 @@ const AdminMasters = () => {
                                           fontSize: "0.875rem",
                                         }}
                                       >
+                                        {m.additional_fields?.employee_id || "--"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          fontWeight: 800,
+                                          color: "var(--text-main)",
+                                          fontSize: "0.875rem",
+                                        }}
+                                      >
                                         {m.name}
                                       </td>
                                       <td style={{ fontWeight: 800, color: "var(--text-main)", fontSize: "0.8125rem" }}>
                                         {age !== "N/A" ? `${age} / ${m.gender?.[0] || m.gender}` : (m.gender || "--")}
                                       </td>
-                                      <td style={{ color: "var(--text-muted)", fontSize: '0.8125rem', fontWeight: 700 }}>
+                                      <td style={{ color: "var(--text-muted)", fontSize: '0.75rem', fontWeight: 700 }}>
                                         {m.aadhar_no || "--"}
                                       </td>
                                       <td style={{ fontWeight: 600, color: "var(--text-muted)" }}>
@@ -4348,6 +4520,15 @@ const AdminMasters = () => {
                                         }}
                                       >
                                         {m.designation || "-"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          fontSize: "0.8125rem",
+                                          fontWeight: 800,
+                                          color: "var(--text-muted)",
+                                        }}
+                                      >
+                                        -
                                       </td>
                                     </>
                                   ) : (
@@ -4549,8 +4730,10 @@ const AdminMasters = () => {
                                               address: m.address,
                                               designation:
                                                 m.designation || "",
-                                              additional_fields:
-                                                m.additional_fields || {},
+                                              additional_fields: {
+                                                employee_id: "",
+                                                ...(m.additional_fields || {})
+                                              },
                                             });
                                             setEditingMasterId(m.id);
                                             setIsEditingMaster(true);
@@ -4575,24 +4758,26 @@ const AdminMasters = () => {
                                       >
                                         <Pencil size={18} color="#64748b" />
                                       </button>
-                                      <button
-                                        className="btn btn-secondary"
-                                        style={{
-                                          padding: "0.5rem",
-                                          border: "none",
-                                          background: "#fef2f2",
-                                          borderRadius: "10px",
-                                        }}
-                                        onClick={() => {
-                                          if (!isRegistry) {
-                                            handleDeleteMaster(m.id);
-                                          } else {
-                                            handleDeleteRegistryItem(m.id);
-                                          }
-                                        }}
-                                      >
-                                        <Trash2 size={18} color="#ef4444" />
-                                      </button>
+                                      {isAdmin && (
+                                        <button
+                                          className="btn btn-secondary"
+                                          style={{
+                                            padding: "0.5rem",
+                                            border: "none",
+                                            background: "#fef2f2",
+                                            borderRadius: "10px",
+                                          }}
+                                          onClick={() => {
+                                            if (!isRegistry) {
+                                              handleDeleteMaster(m.id);
+                                            } else {
+                                              handleDeleteRegistryItem(m.id);
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 size={18} color="#ef4444" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -4622,6 +4807,9 @@ const AdminMasters = () => {
                                         >
                                           {m.card_no}{f.card_no_suffix ? (f.card_no_suffix.startsWith('/') ? f.card_no_suffix : `/${f.card_no_suffix}`) : ""}
                                         </td>
+                                        <td style={{ color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                          --
+                                        </td>
                                         <td
                                           style={{
                                             fontWeight: 800,
@@ -4633,7 +4821,7 @@ const AdminMasters = () => {
                                         <td style={{ fontWeight: 600, color: "var(--text-muted)" }}>
                                           {fAge} / {f.gender?.[0] || f.gender}
                                         </td>
-                                        <td style={{ color: "var(--text-muted)" }}>
+                                        <td style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
                                           {f.aadhar_no || "--"}
                                         </td>
                                         <td style={{ color: "var(--text-muted)" }}>
@@ -4641,6 +4829,9 @@ const AdminMasters = () => {
                                         </td>
                                         <td style={{ color: "var(--text-muted)", fontSize: '0.7rem' }}>
                                           {f.address ? (f.address.length > 10 ? f.address.substring(0, 10) + "..." : f.address) : "--"}
+                                        </td>
+                                        <td style={{ color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                          --
                                         </td>
                                         <td
                                           style={{
@@ -4699,22 +4890,24 @@ const AdminMasters = () => {
                                                 color="#94a3b8"
                                               />
                                             </button>
-                                            <button
-                                              className="btn btn-secondary"
-                                              style={{
-                                                padding: "0.4rem",
-                                                border: "none",
-                                                background: "transparent",
-                                              }}
-                                              onClick={() =>
-                                                handleDeleteFamily(f.id)
-                                              }
-                                            >
-                                              <Trash2
-                                                size={16}
-                                                color="#ef4444"
-                                              />
-                                            </button>
+                                            {isAdmin && (
+                                              <button
+                                                className="btn btn-secondary"
+                                                style={{
+                                                  padding: "0.4rem",
+                                                  border: "none",
+                                                  background: "transparent",
+                                                }}
+                                                onClick={() =>
+                                                  handleDeleteFamily(f.id)
+                                                }
+                                              >
+                                                <Trash2
+                                                  size={16}
+                                                  color="#ef4444"
+                                                />
+                                              </button>
+                                            )}
                                           </div>
                                         </td>
                                       </tr>
@@ -4825,22 +5018,24 @@ const AdminMasters = () => {
                                                 color="#94a3b8"
                                               />
                                             </button>
-                                            <button
-                                              className="btn btn-secondary"
-                                              style={{
-                                                padding: "0.4rem",
-                                                border: "none",
-                                                background: "transparent",
-                                              }}
-                                              onClick={() =>
-                                                handleDeleteRegistryItem(f.id)
-                                              }
-                                            >
-                                              <Trash2
-                                                size={16}
-                                                color="#ef4444"
-                                              />
-                                            </button>
+                                            {isAdmin && (
+                                              <button
+                                                className="btn btn-secondary"
+                                                style={{
+                                                  padding: "0.4rem",
+                                                  border: "none",
+                                                  background: "transparent",
+                                                }}
+                                                onClick={() =>
+                                                  handleDeleteRegistryItem(f.id)
+                                                }
+                                              >
+                                                <Trash2
+                                                  size={16}
+                                                  color="#ef4444"
+                                                />
+                                              </button>
+                                            )}
                                           </div>
                                         </td>
                                       </tr>
@@ -5174,6 +5369,78 @@ const AdminMasters = () => {
                       placeholder="12-digit number"
                     />
                   </div>
+                   <div className="form-group">
+                    <label>Employee ID</label>
+                    <input
+                      value={masterFormData.additional_fields?.employee_id || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^[A-Za-z0-9-]*$/.test(val) && val.length <= 10) {
+                          setMasterFormData({
+                            ...masterFormData,
+                            additional_fields: {
+                              ...masterFormData.additional_fields,
+                              employee_id: val.toUpperCase(),
+                            },
+                          });
+                        }
+                      }}
+                      className="form-control"
+                      placeholder="EMPLOYEE ID"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <select
+                        value={masterFormData.designation}
+                        onChange={(e) =>
+                          setMasterFormData({
+                            ...masterFormData,
+                            designation: e.target.value,
+                          })
+                        }
+                        className="form-control"
+                        style={{
+                          flex: 1,
+                          borderRadius: "16px",
+                        }}
+                      >
+                        <option value="">-- Select --</option>
+                        {designations.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAddNewDesignation}
+                        style={{
+                          width: "42px",
+                          height: "42px",
+                          borderRadius: "12px",
+                          border: "none",
+                          background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.05)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                  </div>
                   <div className="form-group" style={{ gridColumn: "span 2" }}>
                     <label>Home Address</label>
                     <textarea
@@ -5270,8 +5537,165 @@ const AdminMasters = () => {
                     }}
                   >
                     {isEditingMaster
-                      ? "Save Command Core Update"
+                      ? "Save"
                       : "Submit"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {showAddDesignationModal && createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(15, 23, 42, 0.4)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 200000,
+              padding: "1.5rem",
+            }}
+            onClick={() => setShowAddDesignationModal(false)}
+          >
+            <div
+              className="fade-in card"
+              style={{
+                width: "100%",
+                maxWidth: "420px",
+                padding: "2rem",
+                borderRadius: "24px",
+                background: "var(--surface)",
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                border: "1px solid var(--border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
+                    borderRadius: "18px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "1rem",
+                    boxShadow: "0 8px 16px rgba(99, 102, 241, 0.25)",
+                  }}
+                >
+                  <Plus size={24} color="white" />
+                </div>
+                <h3
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: 900,
+                    color: "var(--text-main)",
+                    margin: 0,
+                  }}
+                >
+                  Add Designation
+                </h3>
+                <p
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--text-muted)",
+                    marginTop: "4px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Create a new title for clinical registry
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitNewDesignation();
+                }}
+              >
+                <div className="form-group" style={{ marginBottom: "1.5rem" }}>
+                  <label
+                    style={{
+                      fontSize: "0.625rem",
+                      fontWeight: 900,
+                      textTransform: "uppercase",
+                      color: "var(--text-muted)",
+                      letterSpacing: "0.05em",
+                      marginBottom: "6px",
+                      display: "block",
+                    }}
+                  >
+                    Designation Name *
+                  </label>
+                  <input
+                    autoFocus
+                    required
+                    value={newDesignationInput}
+                    onChange={(e) => setNewDesignationInput(e.target.value.toUpperCase())}
+                    placeholder="e.g. MANAGER, OPERATOR, RTPP..."
+                    className="form-control"
+                    style={{
+                      height: "48px",
+                      borderRadius: "14px",
+                      fontSize: "0.875rem",
+                      fontWeight: 700,
+                      padding: "0 1rem",
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "0.75rem",
+                    marginTop: "1.5rem",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{
+                      height: "44px",
+                      borderRadius: "14px",
+                      fontWeight: 800,
+                      fontSize: "0.8125rem",
+                    }}
+                    onClick={() => setShowAddDesignationModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{
+                      height: "44px",
+                      borderRadius: "14px",
+                      fontWeight: 800,
+                      fontSize: "0.8125rem",
+                      background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
+                      border: "none",
+                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                    }}
+                  >
+                    Create
                   </button>
                 </div>
               </form>
@@ -5868,7 +6292,9 @@ const AdminMasters = () => {
                     gap: "1.25rem",
                   }}
                 >
-                  {getCurrentProtocols(bulkProject).map((proto) => (
+                  {getCurrentProtocols(bulkProject)
+                    .filter(proto => isAdmin || !hiddenProtocols.includes(proto.id))
+                    .map((proto) => (
                     <div
                       key={proto.id}
                       onClick={() => {
