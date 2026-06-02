@@ -267,69 +267,91 @@ class LabSyncAgent:
         try:
             self.log_message(f"Initiating High-Speed Delta Sync...", "INFO")
             
-            # 1. Start from our watermark
+            # 1. Start from our watermarks
             last_id = self.config.get("last_synced_id", 0)
+            last_bc_id = self.config.get("last_synced_bc_id", 0)
             batch_limit = 5000
             total_session_synced = 0
+            cbc_synced = 0
+            bc_synced = 0
 
             conn = mysql.connector.connect(
                 host=self.config["db_host"], port=self.config["db_port"],
                 user=self.config["db_user"], password=self.config["db_pass"], 
                 database=self.config["db_name"], connect_timeout=5
             )
+
+            def json_serial(obj):
+                from datetime import datetime, date
+                if isinstance(obj, (datetime, date)): return obj.isoformat()
+                return str(obj)
             
-            while True:
-                cursor = conn.cursor(dictionary=True)
-                # QUERY: Fetch everything AFTER our last successful ID
-                query = "SELECT * FROM cbc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
-                cursor.execute(query, (last_id, batch_limit))
-                rows = cursor.fetchall()
-                cursor.close()
+            # --- SYNC CBC ---
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT * FROM cbc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
+            cursor.execute(query, (last_id, batch_limit))
+            cbc_rows = cursor.fetchall()
+            cursor.close()
 
-                if not rows:
-                    if total_session_synced == 0:
-                        self.log_message("✔ IDLE: Cloud fully matched with Local DB.", "INFO")
-                    else:
-                        self.log_message(f"✔ SYNC SESSION COMPLETE: {total_session_synced} records pushed.", "INFO")
-                    break
-
-                self.log_message(f"Pumping {len(rows)} records (Last ID: {last_id})...", "INFO")
-
-                def json_serial(obj):
-                    from datetime import datetime, date
-                    if isinstance(obj, (datetime, date)): return obj.isoformat()
-                    return str(obj)
-
+            if cbc_rows:
+                self.log_message(f"Pumping {len(cbc_rows)} CBC records (Last ID: {last_id})...", "INFO")
                 headers = {
                     "X-Machine-Sync-Key": self.config["sync_key"], 
                     "Content-Type": "application/json"
                 }
-                
                 response = requests.post(
                     self.config["emr_endpoint"], 
-                    data=json.dumps({"results": rows}, default=json_serial), 
+                    data=json.dumps({"results": cbc_rows}, default=json_serial), 
                     headers=headers, timeout=30
                 )
-
                 if response.status_code in [200, 201, 202]:
-                    # Update Watermark
-                    last_id = rows[-1]['id']
-                    total_session_synced += len(rows)
-                    self.total_synced_count += len(rows)
-                    
+                    last_id = cbc_rows[-1]['id']
+                    cbc_synced = len(cbc_rows)
                     self.config["last_synced_id"] = last_id
-                    with open(CONFIG_FILE, "w") as f:
-                        json.dump(self.config, f, indent=4)
-
-                    # Update UI Dashboard
-                    self.root.after(0, lambda: self.total_val.config(text=f"{self.total_synced_count:,}"))
-                    self.root.after(0, lambda: self.last_val.config(text=f"ID {last_id}")) 
-                    self.log_message(f"✔ BATCH OK: Synced to ID {last_id}", "INFO")
-                    
-                    if len(rows) < batch_limit: break 
+                    self.log_message(f"✔ CBC BATCH OK: Synced to ID {last_id}", "INFO")
                 else:
-                    self.log_message(f"✖ BRIDGE ERROR: HTTP {response.status_code}. Pausing.", "ERR")
-                    break
+                    self.log_message(f"✖ CBC BRIDGE ERROR: HTTP {response.status_code}", "ERR")
+
+            # --- SYNC BIOCHEMISTRY ---
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT * FROM bc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
+            cursor.execute(query, (last_bc_id, batch_limit))
+            bc_rows = cursor.fetchall()
+            cursor.close()
+
+            if bc_rows:
+                self.log_message(f"Pumping {len(bc_rows)} Biochemistry records (Last ID: {last_bc_id})...", "INFO")
+                headers = {
+                    "X-Machine-Sync-Key": self.config["sync_key"], 
+                    "Content-Type": "application/json"
+                }
+                response = requests.post(
+                    self.config["emr_endpoint"], 
+                    data=json.dumps({"results": bc_rows}, default=json_serial), 
+                    headers=headers, timeout=30
+                )
+                if response.status_code in [200, 201, 202]:
+                    last_bc_id = bc_rows[-1]['id']
+                    bc_synced = len(bc_rows)
+                    self.config["last_synced_bc_id"] = last_bc_id
+                    self.log_message(f"✔ BIOCHEMISTRY BATCH OK: Synced to ID {last_bc_id}", "INFO")
+                else:
+                    self.log_message(f"✖ BIOCHEMISTRY BRIDGE ERROR: HTTP {response.status_code}", "ERR")
+
+            total_session_synced = cbc_synced + bc_synced
+            self.total_synced_count += total_session_synced
+            
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(self.config, f, indent=4)
+
+            # Update UI Dashboard
+            self.root.after(0, lambda: self.total_val.config(text=f"{self.total_synced_count:,}"))
+            self.root.after(0, lambda: self.last_val.config(text=f"CBC {last_id} | BC {last_bc_id}")) 
+
+            if total_session_synced == 0:
+                self.log_message("✔ IDLE: Cloud fully matched with Local DB.", "INFO")
+            else:
+                self.log_message(f"✔ SYNC SESSION COMPLETE: {total_session_synced} records pushed.", "INFO")
 
             conn.close()
             

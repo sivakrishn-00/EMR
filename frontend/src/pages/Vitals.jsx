@@ -424,7 +424,23 @@ const Vitals = () => {
                   </tr>
                 </thead>
                 <tbody>
-                   {filteredVisits.length === 0 ? (
+                   {isLoading ? (
+                     <tr>
+                       <td colSpan="4" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                           <div style={{ position: 'relative', width: '60px', height: '60px' }}>
+                             <div className="pulse-loader"></div>
+                             <Activity size={24} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--primary)' }} />
+                           </div>
+                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Loading Nurse Queue...</p>
+                         </div>
+                         <style>{`
+                           .pulse-loader { width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--primary); animation: pulse 1.5s infinite; opacity: 0.5; }
+                           @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+                         `}</style>
+                       </td>
+                     </tr>
+                   ) : filteredVisits.length === 0 ? (
                      <tr>
                        <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#64748b' }}>
                           <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No patients found</p>

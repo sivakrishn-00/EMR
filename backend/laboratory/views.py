@@ -121,6 +121,12 @@ class LabRequestViewSet(viewsets.ModelViewSet):
             
             lab_request.status = 'COMPLETED'
             lab_request.save()
+
+            # Mark all matching raw machine records for this patient as processed
+            if lab_request.visit and lab_request.visit.patient:
+                patient_id = lab_request.visit.patient.patient_id
+                if patient_id:
+                    LabMachineData.objects.filter(patient_id=patient_id, is_processed=False).update(is_processed=True)
             
             # Update visit status to Final Prescription phase
             visit = lab_request.visit
@@ -537,6 +543,12 @@ class LabMachineDataViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = LabMachineData.objects.all().order_by('-received_at_machine')
+        
+        # Filter out processed results unless specified otherwise
+        include_processed = self.request.query_params.get('include_processed') == 'true'
+        if not include_processed:
+            queryset = queryset.filter(is_processed=False)
+            
         patient_id = self.request.query_params.get('patient_id')
         if patient_id:
             queryset = queryset.filter(patient_id=patient_id)

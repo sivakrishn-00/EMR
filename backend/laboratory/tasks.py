@@ -97,11 +97,75 @@ def process_sync_batch(results_batch, forced_project_id=None, machine_pk=None):
             try: return float(val) if val is not None else None
             except: return None
 
+        # CBC Values
         wbc_val = get_val('wbc', 'WBC')
         rbc_val = get_val('rbc', 'RBC')
         hgb_val = get_val('hgb', 'HGB')
-        
-        if not wbc_val and not rbc_val and not hgb_val:
+        hct_val = get_val('hct', 'HCT')
+        plt_val = get_val('plt', 'PLT')
+        lym_pct_val = get_val('lym_pct', 'LYM%')
+        lym_abs_val = get_val('lym_abs', 'LYM#')
+        mid_pct_val = get_val('mid_pct', 'MID%')
+        mid_abs_val = get_val('mid_abs', 'MID#')
+        gran_pct_val = get_val('gran_pct', 'GRAN%')
+        gran_abs_val = get_val('gran_abs', 'GRAN#')
+        mcv_val = get_val('mcv', 'MCV')
+        mch_val = get_val('mch', 'MCH')
+        mchc_val = get_val('mchc', 'MCHC')
+        rdw_cv_val = get_val('rdw_cv', 'RDW-CV')
+        rdw_sd_val = get_val('rdw_sd', 'RDW-SD')
+        mpv_val = get_val('mpv', 'MPV')
+        pct_val = get_val('pct', 'PCT')
+        p_lcr_val = get_val('p_lcr', 'P-LCR')
+        p_lcc_val = get_val('p_lcc', 'P-LCC')
+        pdw_sd_val = get_val('pdw_sd', 'PDW-SD')
+        pdw_cv_val = get_val('pdw_cv', 'PDW-CV')
+
+        # Biochemistry Values
+        alb_val = get_val('alb', 'ALB')
+        alp_val = get_val('alp', 'ALP')
+        dbil_val = get_val('dbil', 'DBIL')
+        tbil_val = get_val('tbil', 'TBIL')
+        chol_val = get_val('chol', 'CHOL')
+        crea_val = get_val('crea', 'CREA')
+        glu_val = get_val('glu', 'GLU')
+        hdl_val = get_val('hdl', 'HDL')
+        ldl_val = get_val('ldl', 'LDL')
+        tp_val = get_val('tp', 'TP')
+        tgl_val = get_val('tgl', 'TGL')
+        urea_val = get_val('urea', 'UREA')
+        uric_val = get_val('uric', 'URIC')
+        sgot_val = get_val('sgot', 'SGOT')
+        sgpt_val = get_val('sgpt', 'SGPT')
+        na_val = get_val('na', 'NA')
+        k_val = get_val('k', 'K')
+        cl_val = get_val('cl', 'CL')
+        ldh_val = get_val('ldh', 'LDH')
+        amyl_val = get_val('amyl', 'AMYL')
+        ibil_val = get_val('ibil', 'IBIL')
+        ggt_val = get_val('ggt', 'GGT')
+        phos_val = get_val('phos', 'PHOS')
+        ca_val = get_val('ca', 'CA')
+        mg_val = get_val('mg', 'MG')
+        direct_ldl_val = get_val('direct_ldl', 'DIRECT_LDL')
+        vldl_val = get_val('vldl', 'VLDL')
+        bun_val = get_val('bun', 'BUN')
+        ast_val = get_val('ast', 'AST')
+        alt_val = get_val('alt', 'ALT')
+
+        all_vals = [
+            wbc_val, rbc_val, hgb_val, hct_val, plt_val, lym_pct_val, lym_abs_val,
+            mid_pct_val, mid_abs_val, gran_pct_val, gran_abs_val, mcv_val, mch_val,
+            mchc_val, rdw_cv_val, rdw_sd_val, mpv_val, pct_val, p_lcr_val, p_lcc_val,
+            pdw_sd_val, pdw_cv_val,
+            alb_val, alp_val, dbil_val, tbil_val, chol_val, crea_val, glu_val,
+            hdl_val, ldl_val, tp_val, tgl_val, urea_val, uric_val, sgot_val,
+            sgpt_val, na_val, k_val, cl_val, ldh_val, amyl_val, ibil_val,
+            ggt_val, phos_val, ca_val, mg_val, direct_ldl_val, vldl_val,
+            bun_val, ast_val, alt_val
+        ]
+
+        if all(v is None for v in all_vals):
             continue
             
         record_patient_id = str(item.get('patient_name') or item.get('patient_id') or "").strip()
@@ -168,16 +232,24 @@ def process_sync_batch(results_batch, forced_project_id=None, machine_pk=None):
                 sample_id=item.get('sample_id'),
                 patient_id=record_patient_id, 
                 patient_name=item.get('patient_name'),
+                # CBC Parameters
                 wbc=wbc_val, rbc=rbc_val, hgb=hgb_val,
-                hct=get_val('hct', 'HCT'), plt=get_val('plt', 'PLT'),
-                lym_pct=get_val('lym_pct', 'LYM%'), lym_abs=get_val('lym_abs', 'LYM#'),
-                mid_pct=get_val('mid_pct', 'MID%'), mid_abs=get_val('mid_abs', 'MID#'),
-                gran_pct=get_val('gran_pct', 'GRAN%'), gran_abs=get_val('gran_abs', 'GRAN#'),
-                mcv=get_val('mcv', 'MCV'), mch=get_val('mch', 'MCH'), mchc=get_val('mchc', 'MCHC'),
-                rdw_cv=get_val('rdw_cv', 'RDW-CV'), rdw_sd=get_val('rdw_sd', 'RDW-SD'),
-                mpv=get_val('mpv', 'MPV'), pct=get_val('pct', 'PCT'), 
-                p_lcr=get_val('p_lcr', 'P-LCR'), p_lcc=get_val('p_lcc', 'P-LCC'),
-                pdw_sd=get_val('pdw_sd', 'PDW-SD'), pdw_cv=get_val('pdw_cv', 'PDW-CV'),
+                hct=hct_val, plt=plt_val,
+                lym_pct=lym_pct_val, lym_abs=lym_abs_val,
+                mid_pct=mid_pct_val, mid_abs=mid_abs_val,
+                gran_pct=gran_pct_val, gran_abs=gran_abs_val,
+                mcv=mcv_val, mch=mch_val, mchc=mchc_val,
+                rdw_cv=rdw_cv_val, rdw_sd=rdw_sd_val,
+                mpv=mpv_val, pct=pct_val, 
+                p_lcr=p_lcr_val, p_lcc=p_lcc_val,
+                pdw_sd=pdw_sd_val, pdw_cv=pdw_cv_val,
+                # Biochemistry Parameters
+                alb=alb_val, alp=alp_val, dbil=dbil_val, tbil=tbil_val, chol=chol_val,
+                crea=crea_val, glu=glu_val, hdl=hdl_val, ldl=ldl_val, tp=tp_val,
+                tgl=tgl_val, urea=urea_val, uric=uric_val, sgot=sgot_val, sgpt=sgpt_val,
+                na=na_val, k=k_val, cl=cl_val, ldh=ldh_val, amyl=amyl_val,
+                ibil=ibil_val, ggt=ggt_val, phos=phos_val, ca=ca_val, mg=mg_val,
+                direct_ldl=direct_ldl_val, vldl=vldl_val, bun=bun_val, ast=ast_val, alt=alt_val,
                 raw_data=raw,
                 received_at_machine=item.get('received_at') or timezone.now(),
             )

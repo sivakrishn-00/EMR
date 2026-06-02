@@ -19,10 +19,98 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+const mappingDict = {
+    'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'WBC COUNT'], 
+    'rbc': ['RBC', 'RED'], 
+    'hgb': ['HGB', 'HB', 'HEMOGLOBIN', 'HGB'], 
+    'hct': ['HCT', 'PCV', 'HEMATOCRIT', 'HCT'], 
+    'plt': ['PLT', 'PLATELET'],
+    'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'],
+    'rdw_cv': ['RDW-CV', 'RDW_CV', 'RDW'], 
+    'rdw_sd': ['RDW-SD', 'RDW_SD'],
+    
+    // Biochemistry parameters
+    'alb': ['ALB', 'ALBUMIN'],
+    'alp': ['ALP', 'ALKALINE PHOSPHATASE'],
+    'dbil': ['DBIL', 'DIRECT BILIRUBIN'],
+    'tbil': ['TBIL', 'TOTAL BILIRUBIN'],
+    'chol': ['CHOL', 'CHOLESTEROL'],
+    'crea': ['CREA', 'CREATININE'],
+    'glu': ['GLU', 'GLUCOSE', 'SUGAR', 'BLOOD SUGAR'],
+    'hdl': ['HDL', 'HDL CHOLESTEROL'],
+    'ldl': ['LDL', 'LDL CHOLESTEROL'],
+    'tp': ['TP', 'TOTAL PROTEIN'],
+    'tgl': ['TGL', 'TRIGLYCERIDES'],
+    'urea': ['UREA'],
+    'uric': ['URIC', 'URIC ACID'],
+    'sgot': ['SGOT', 'AST'],
+    'sgpt': ['SGPT', 'ALT'],
+    'na': ['NA', 'SODIUM'],
+    'k': ['K', 'POTASSIUM'],
+    'cl': ['CL', 'CHLORIDE'],
+    'ldh': ['LDH', 'LACTATE DEHYDROGENASE'],
+    'amyl': ['AMYL', 'AMYLASE'],
+    'ibil': ['IBIL', 'INDIRECT BILIRUBIN'],
+    'ggt': ['GGT', 'GAMMA GT'],
+    'phos': ['PHOS', 'PHOSPHORUS'],
+    'ca': ['CA', 'CALCIUM'],
+    'mg': ['MG', 'MAGNESIUM'],
+    'direct_ldl': ['DIRECT_LDL', 'DIRECT LDL'],
+    'vldl': ['VLDL'],
+    'bun': ['BUN', 'BLOOD UREA NITROGEN'],
+    'ast': ['AST'],
+    'alt': ['ALT']
+};
+
+const isRecordRelevant = (record, request) => {
+  if (!request || !request.test_master_details || !request.test_master_details.sub_tests) return true;
+  
+  const normalize = (str) => (str || "").toString().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const subTests = request.test_master_details.sub_tests.filter(st => st.is_active);
+  
+  return subTests.some(st => {
+    const stNameNorm = normalize(st.name);
+    const stCodeNorm = normalize(st.code || "");
+    
+    // 1. Direct code check
+    if (st.code) {
+      const val = record[st.code.toLowerCase()] || record[st.code.toUpperCase()] || record[st.code];
+      if (val !== undefined && val !== null && val !== '') return true;
+    }
+    
+    // 2. Dictionary match
+    for (const [hwKey, aliases] of Object.entries(mappingDict)) {
+      const val = record[hwKey] || record[hwKey.toUpperCase()];
+      if (val !== undefined && val !== null && val !== '') {
+        if (aliases.some(a => stNameNorm.includes(normalize(a))) || stNameNorm.includes(normalize(hwKey)) || stCodeNorm === normalize(hwKey)) {
+          return true;
+        }
+      }
+    }
+    
+    // 3. Fuzzy name match
+    for (const [rk, rv] of Object.entries(record)) {
+      if (rv !== undefined && rv !== null && rv !== '' && !['id', 'patient_id', 'patient_name', 'machine_id', 'machine_name', 'received_at_machine', 'lab_id', 'location', 'project', 'project_id', 'sample_id', 'is_processed', 'synced_at_cloud', 'raw_data'].includes(rk)) {
+        if (normalize(rk) === stNameNorm || stNameNorm.includes(normalize(rk))) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  });
+};
+
+const isRecordRelevantForGroup = (record, group) => {
+  if (!group || !group.requests) return true;
+  return group.requests.some(req => isRecordRelevant(record, req));
+};
+
 const Laboratory = () => {
   const { user } = useAuth();
   const [projectConfig, setProjectConfig] = useState(null);
   const [labRequests, setLabRequests] = useState([]);
+  const [selectedRequestGroup, setSelectedRequestGroup] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('PENDING'); // PENDING or COMPLETED
@@ -79,33 +167,74 @@ const Laboratory = () => {
     }
   };
 
-  const handleCollectSample = async () => {
-    const loadingToast = toast.loading('Recording sample collection...');
-    try {
-      await api.post(`laboratory/requests/${selectedRequest.id}/collect_sample/`, sampleData);
-      toast.success("Sample collection recorded!", { id: loadingToast });
-      fetchLabRequests();
-      const updated = await api.get(`laboratory/requests/${selectedRequest.id}/`);
-      setSelectedRequest(updated.data);
-    } catch (err) {
-      toast.error("Error recording sample", { id: loadingToast });
-    }
+  const setupGroupResultForm = (group) => {
+    const initValues = {};
+    let combinedInterpretation = '';
+    
+    group.requests.forEach(r => {
+      const hardwareData = r.result?.values || {};
+      if (r.test_master_details?.sub_tests) {
+         r.test_master_details.sub_tests.forEach(st => {
+             const hwKey = st.name.toUpperCase().split(' ')[0];
+             initValues[st.name] = r.result?.values?.[st.name] || hardwareData[st.name] || hardwareData[hwKey] || '';
+         });
+      }
+      if (r.result?.interpretation) {
+         if (combinedInterpretation && !combinedInterpretation.includes(r.result.interpretation)) {
+            combinedInterpretation += ' | ';
+         }
+         if (!combinedInterpretation.includes(r.result.interpretation)) {
+            combinedInterpretation += r.result.interpretation;
+         }
+      }
+    });
+
+    setResultData({
+        value: '',
+        values: initValues,
+        reference_range: '',
+        interpretation: combinedInterpretation || ''
+    });
   };
 
-  const handleSaveResult = async (e) => {
+  const handleSaveGroupResults = async (e) => {
     e.preventDefault();
-    const loadingToast = toast.loading('Publishing lab results...');
+    const loadingToast = toast.loading('Publishing all lab results...');
     try {
-      await api.post(`laboratory/requests/${selectedRequest.id}/record_result/`, {
-        ...resultData,
-        sample_type: sampleData.sample_type
-      });
-      toast.success("Results updated! Notifying doctor.", { id: loadingToast });
+      // Submit results for all pending/collected requests in the group
+      const promises = selectedRequestGroup.requests
+        .filter(req => req.status !== 'COMPLETED')
+        .map(req => {
+          const reqValues = {};
+          if (req.test_master_details?.sub_tests) {
+            req.test_master_details.sub_tests.forEach(st => {
+              if (resultData.values[st.name] !== undefined) {
+                reqValues[st.name] = resultData.values[st.name];
+              }
+            });
+          }
+          
+          return api.post(`laboratory/requests/${req.id}/record_result/`, {
+            value: resultData.value,
+            values: reqValues,
+            reference_range: resultData.reference_range,
+            interpretation: resultData.interpretation || 'Results verified.',
+            sample_type: sampleData.sample_type
+          });
+        });
+      
+      await Promise.all(promises);
+      toast.success("All lab results updated! Notifying doctor.", { id: loadingToast });
+      
+      // Clear selection
       setSelectedRequest(null);
+      setSelectedRequestGroup(null);
       setResultData({ value: '', values: {}, reference_range: '', interpretation: '' });
+      
+      // Refresh list
       fetchLabRequests();
     } catch (err) {
-      toast.error("Error saving result. Check if fields are valid.", { id: loadingToast });
+      toast.error("Error saving some results. Check if fields are valid.", { id: loadingToast });
     }
   };
 
@@ -126,19 +255,10 @@ const Laboratory = () => {
     const newValues = { ...resultData.values };
     const normalize = (str) => (str || "").toString().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 
-    const mappingDict = {
-        'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'WBC COUNT'], 
-        'rbc': ['RBC', 'RED'], 
-        'hgb': ['HGB', 'HB', 'HEMOGLOBIN', 'HGB'], 
-        'hct': ['HCT', 'PCV', 'HEMATOCRIT', 'HCT'], 
-        'plt': ['PLT', 'PLATELET'],
-        'mcv': ['MCV'], 'mch': ['MCH'], 'mchc': ['MCHC'],
-        'rdw_cv': ['RDW-CV', 'RDW_CV', 'RDW'], 
-        'rdw_sd': ['RDW-SD', 'RDW_SD']
-    };
-
-    if (selectedRequest?.test_master_details?.sub_tests) {
-        selectedRequest.test_master_details.sub_tests.forEach(st => {
+    if (selectedRequestGroup) {
+      selectedRequestGroup.requests.forEach(req => {
+        if (req.test_master_details?.sub_tests) {
+          req.test_master_details.sub_tests.forEach(st => {
             const stNameNorm = normalize(st.name);
             const stCodeNorm = normalize(st.code || "");
 
@@ -170,13 +290,15 @@ const Laboratory = () => {
                     }
                 });
             }
-        });
+          });
+        }
+      });
     }
 
     setResultData({ 
         ...resultData, 
         values: newValues, 
-        interpretation: `Differential Pulse Synced from ${record.machine_name} (${new Date(record.received_at_machine).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}): Results verified.` 
+        interpretation: `Hardware pulses synced: Results verified.` 
     });
     toast.success(`Results synced from ${record.machine_name}!`);
   };
@@ -207,10 +329,39 @@ const Laboratory = () => {
       );
     });
 
+  // Group filteredRequests by patient_id + visit
+  const groupsMap = new Map();
+  filteredRequests.forEach(r => {
+    const key = `${r.patient_id}_${r.visit}`;
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        id: key,
+        patient_id: r.patient_id,
+        patient_name: r.patient_name,
+        card_no: r.card_no,
+        employee_id: r.employee_id,
+        visit: r.visit,
+        requests: []
+      });
+    }
+    groupsMap.get(key).requests.push(r);
+  });
+
+  const groupedList = Array.from(groupsMap.values());
+  
+  // Sort grouped list in strict FIFO order (oldest request first)
+  groupedList.forEach(g => {
+    g.requests.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    g.oldest_created_at = g.requests[0]?.created_at;
+  });
+  groupedList.sort((a, b) => new Date(a.oldest_created_at) - new Date(b.oldest_created_at));
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentRequests = filteredRequests.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const currentGroups = groupedList.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(groupedList.length / itemsPerPage);
+
+  const hasPending = selectedRequestGroup && selectedRequestGroup.requests.some(r => r.status !== 'COMPLETED');
 
   return (
     <div className="fade-in">
@@ -219,11 +370,11 @@ const Laboratory = () => {
         <p style={{ color: 'var(--text-muted)' }}>Process diagnostics and manage clinical laboratory results</p>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedRequest ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: selectedRequestGroup ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue ({filteredRequests.length})</h3>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue ({groupedList.length})</h3>
                 <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>Total diagnostic requests: {labRequests.length}</p>
              </div>
              
@@ -250,7 +401,7 @@ const Laboratory = () => {
                 
                 <div style={{ background: 'var(--background)', padding: '4px', borderRadius: '12px', display: 'flex', gap: '4px', border: '1px solid var(--border)' }}>
                    <button 
-                     onClick={() => setActiveTab('PENDING')}
+                     onClick={() => { setActiveTab('PENDING'); setSelectedRequest(null); setSelectedRequestGroup(null); setCurrentPage(1); }}
                      style={{ 
                        padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
                        background: activeTab === 'PENDING' ? 'var(--surface)' : 'transparent',
@@ -266,7 +417,7 @@ const Laboratory = () => {
                      <Clock size={14} /> PENDING ({labRequests.filter(r => r.status !== 'COMPLETED').length})
                    </button>
                    <button 
-                     onClick={() => setActiveTab('COMPLETED')}
+                     onClick={() => { setActiveTab('COMPLETED'); setSelectedRequest(null); setSelectedRequestGroup(null); setCurrentPage(1); }}
                      style={{ 
                        padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
                        background: activeTab === 'COMPLETED' ? 'var(--surface)' : 'transparent',
@@ -290,75 +441,94 @@ const Laboratory = () => {
               <thead>
                 <tr>
                   <th style={{ padding: '1rem 1.25rem' }}>Patient / DHID</th>
-                  <th>Test Requested</th>
+                  <th>Test(s) Requested</th>
                   <th>Workflow Status</th>
                   <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Action</th>
                 </tr>
               </thead>
-              <tbody>
-                {currentRequests.length === 0 ? (
-                    <tr>
-                       <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#475569' }}>
-                         <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No requests found</p>
-                         <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
-                      </td>
-                    </tr>
-                 ) : (
-                    currentRequests.map(r => (
-                  <tr key={r.id} style={{ background: selectedRequest?.id === r.id ? 'var(--background)' : 'transparent' }}>
-                    <td style={{ padding: '1.25rem 1.25rem' }}>
-                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ 
-                            width: '32px', height: '32px', 
-                            background: r.status === 'COMPLETED' ? '#dcfce7' : r.status === 'COLLECTED' ? '#e0e7ff' : '#fef3c7', 
-                            color: r.status === 'COMPLETED' ? '#166534' : r.status === 'COLLECTED' ? '#4338ca' : '#92400e', 
-                            borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' 
-                          }}>
-                             {r.patient_name?.[0] || 'P'}
-                          </div>
-                          <div>
-                             <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{r.patient_name}</p>
-                             <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {r.patient_id}{r.card_no ? ` | Card: ${r.card_no}` : ''}</p>
-                          </div>
-                       </div>
-                    </td>
-                    <td>
-                        <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>{r.test_name}</p>
-                        <p style={{ fontSize: '0.625rem', color: '#475569' }}>Req by Dr. {r.ordered_by_name || 'MD'}</p>
-                    </td>
-                    <td>
-                       <span className={`badge`} style={{ 
-                         background: r.status === 'COMPLETED' ? '#dcfce7' : r.status === 'COLLECTED' ? '#e0e7ff' : '#fef2f2', 
-                         color: r.status === 'COMPLETED' ? '#166534' : r.status === 'COLLECTED' ? '#4338ca' : '#991b1b', 
-                         fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase'
-                       }}>
-                         {r.status?.replace('_', ' ') || 'PENDING'}
-                       </span>
-                    </td>
-                    <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                      <button className={`btn ${r.status === 'COMPLETED' ? 'btn-secondary' : 'btn-primary'}`} onClick={() => {
-                        setSelectedRequest(r);
-                        const hardwareData = r.result?.values || {};
-                        const initValues = {};
-                        if (r.test_master_details?.sub_tests) {
-                           r.test_master_details.sub_tests.forEach(st => {
-                               const hwKey = st.name.toUpperCase().split(' ')[0];
-                               initValues[st.name] = hardwareData[st.name] || hardwareData[hwKey] || r.result?.values?.[st.name] || '';
-                           });
-                        }
-                        setResultData({
-                            value: r.result?.value || '',
-                            values: initValues,
-                            reference_range: r.result?.reference_range || '',
-                            interpretation: r.result?.interpretation || (Object.keys(hardwareData).length > 0 ? "Data synced from hardware instrument." : '')
-                        });
-                        if (r.patient_id) fetchMatchingHardwareData(r.patient_id);
-                      }} style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}>
-                         {r.status === 'COMPLETED' ? 'View Report' : 'Process'} <ArrowRight size={14} style={{ marginLeft: '4px' }} />
-                      </button>
-                    </td>
-                  </tr>
-                )))}
+  <tbody>
+    {isLoading ? (
+        <tr>
+           <td colSpan="4" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+               <div style={{ position: 'relative', width: '60px', height: '60px' }}>
+                 <div className="pulse-loader"></div>
+                 <FlaskConical size={24} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--primary)' }} />
+               </div>
+               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Loading Lab Queue...</p>
+             </div>
+             <style>{`
+               .pulse-loader { width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--primary); animation: pulse 1.5s infinite; opacity: 0.5; }
+               @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+             `}</style>
+           </td>
+        </tr>
+    ) : currentGroups.length === 0 ? (
+        <tr>
+           <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#475569' }}>
+             <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No requests found</p>
+             <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>Try searching with a different name or ID.</p>
+          </td>
+        </tr>
+     ) : (
+                    currentGroups.map(g => {
+                       const isSelected = selectedRequestGroup?.id === g.id;
+                       const testNames = g.requests.map(r => r.test_name).join(', ');
+                       
+                       let groupStatus = 'PENDING';
+                       if (g.requests.every(r => r.status === 'COMPLETED')) {
+                         groupStatus = 'COMPLETED';
+                       } else if (g.requests.some(r => r.status === 'IN_PROGRESS')) {
+                         groupStatus = 'IN_PROGRESS';
+                       } else if (g.requests.some(r => r.status === 'COLLECTED')) {
+                         groupStatus = 'COLLECTED';
+                       }
+
+                       return (
+                          <tr key={g.id} style={{ background: isSelected ? 'var(--background)' : 'transparent' }}>
+                            <td style={{ padding: '1.25rem 1.25rem' }}>
+                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  <div style={{ 
+                                    width: '32px', height: '32px', 
+                                    background: groupStatus === 'COMPLETED' ? '#dcfce7' : groupStatus === 'COLLECTED' ? '#e0e7ff' : '#fef3c7', 
+                                    color: groupStatus === 'COMPLETED' ? '#166534' : groupStatus === 'COLLECTED' ? '#4338ca' : '#92400e', 
+                                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' 
+                                  }}>
+                                     {g.patient_name?.[0] || 'P'}
+                                  </div>
+                                  <div>
+                                     <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{g.patient_name}</p>
+                                     <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {g.patient_id}{g.card_no ? ` | Card: ${g.card_no}` : ''}</p>
+                                  </div>
+                               </div>
+                            </td>
+                            <td>
+                                <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>{testNames}</p>
+                                <p style={{ fontSize: '0.625rem', color: '#475569' }}>{g.requests.length} test request{g.requests.length > 1 ? 's' : ''}</p>
+                            </td>
+                            <td>
+                               <span className={`badge`} style={{ 
+                                 background: groupStatus === 'COMPLETED' ? '#dcfce7' : groupStatus === 'COLLECTED' ? '#e0e7ff' : '#fef2f2', 
+                                 color: groupStatus === 'COMPLETED' ? '#166534' : groupStatus === 'COLLECTED' ? '#4338ca' : '#991b1b', 
+                                 fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase'
+                               }}>
+                                 {groupStatus.replace('_', ' ')}
+                               </span>
+                            </td>
+                            <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                              <button className={`btn ${groupStatus === 'COMPLETED' ? 'btn-secondary' : 'btn-primary'}`} onClick={() => {
+                                setSelectedRequestGroup(g);
+                                setSelectedRequest(g.requests[0]);
+                                setupGroupResultForm(g);
+                                if (g.patient_id) fetchMatchingHardwareData(g.patient_id);
+                              }} style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}>
+                                 {groupStatus === 'COMPLETED' ? 'View Report' : 'Process'} <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+                              </button>
+                            </td>
+                          </tr>
+                       );
+                    })
+                 )}
               </tbody>
             </table>
           </div>
@@ -366,7 +536,7 @@ const Laboratory = () => {
              {/* Pagination Controls */}
              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                     Showing <span style={{ color: 'var(--primary)' }}>{indexOfFirstItem + 1}</span> to <span style={{ color: 'var(--primary)' }}>{Math.min(indexOfLastItem, filteredRequests.length)}</span> of {filteredRequests.length} entries
+                     Showing <span style={{ color: 'var(--primary)' }}>{indexOfFirstItem + 1}</span> to <span style={{ color: 'var(--primary)' }}>{Math.min(indexOfLastItem, groupedList.length)}</span> of {groupedList.length} entries
                  </p>
                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                      <button 
@@ -470,40 +640,46 @@ const Laboratory = () => {
              </div>
         </div>
 
-        {selectedRequest && (
+        {selectedRequestGroup && (
           <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ padding: '0.75rem', background: projectConfig?.primary_color || '#92400e', borderRadius: '14px', color: 'white' }}>
                      <FlaskConical size={24} />
                   </div>
                   <div>
                      <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Clinical Diagnostic Entry</h2>
-                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequest.patient_name}</strong> (ID: {selectedRequest.patient_id}{selectedRequest.card_no ? ` | Card: ${selectedRequest.card_no}` : ''})</p>
+                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequestGroup.patient_name}</strong> (ID: {selectedRequestGroup.patient_id}{selectedRequestGroup.card_no ? ` | Card: ${selectedRequestGroup.card_no}` : ''})</p>
                   </div>
                </div>
-               <button onClick={() => setSelectedRequest(null)} style={{ border: 'none', background: 'var(--background)', color: 'var(--text-main)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <button onClick={() => { setSelectedRequest(null); setSelectedRequestGroup(null); }} style={{ border: 'none', background: 'var(--background)', color: 'var(--text-main)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <X size={16} />
                </button>
             </div>
 
-            <div style={{ background: 'var(--background)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
-                <div style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Investigation Profile</span>
+            <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '0.625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                    <span>Investigation Profiles</span>
                 </div>
-                <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' }}>{selectedRequest.test_name}</div>
-                {selectedRequest.test_master_details?.sub_tests?.length > 0 && (
-                   <div style={{ marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {selectedRequest.test_master_details.sub_tests.filter(st => st.is_active).map(st => (
-                         <span key={st.id} style={{ fontSize: '0.625rem', background: 'var(--surface)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '8px', fontWeight: 700, border: '1px solid var(--border)' }}>
-                            {st.name} {selectedRequest.status === 'COMPLETED' ? `: ${selectedRequest.result?.values?.[st.name] || '-'} ${st.units}` : `(${st.units})`}
-                         </span>
-                      ))}
-                   </div>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {selectedRequestGroup.requests.map(req => (
+                     <div key={req.id} style={{ display: 'flex', flexDirection: 'column', borderBottom: req.id !== selectedRequestGroup.requests[selectedRequestGroup.requests.length-1].id ? '1px solid var(--border)' : 'none', paddingBottom: '0.5rem' }}>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-main)' }}>{req.test_name}</div>
+                        {req.test_master_details?.sub_tests?.length > 0 && (
+                           <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                              {req.test_master_details.sub_tests.filter(st => st.is_active).map(st => (
+                                 <span key={st.id} style={{ fontSize: '0.625rem', background: 'var(--surface)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '8px', fontWeight: 700, border: '1px solid var(--border)' }}>
+                                    {st.name} {req.status === 'COMPLETED' ? `: ${resultData.values[st.name] || '-'} ${st.units}` : `(${st.units})`}
+                                 </span>
+                              ))}
+                           </div>
+                        )}
+                     </div>
+                  ))}
+                </div>
             </div>
 
-            {selectedRequest.status !== 'COMPLETED' && (
+            {hasPending && (
                <div style={{ marginBottom: '2rem', background: 'var(--surface)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -514,87 +690,130 @@ const Laboratory = () => {
                             <p style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-main)' }}>Hardware Pulse HUB</p>
                         </div>
                     </div>
-                    <button onClick={() => fetchMatchingHardwareData(selectedRequest.patient_id)} className="btn btn-secondary" style={{ padding: '4px 8px' }}>
+                    <button onClick={() => fetchMatchingHardwareData(selectedRequestGroup.patient_id)} className="btn btn-secondary" style={{ padding: '4px 8px' }}>
                         <RefreshCw size={14} className={isFetchingMatching ? 'spin' : ''} />
                     </button>
                   </div>
                   
-                  {hardwareMatches.length > 0 ? (
-                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {hardwareMatches.map(m => (
-                           <div key={m.id} style={{ padding: '1rem', background: 'var(--background)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
-                                 <div>
-                                     <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
-                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface)', padding: '2px 8px', borderRadius: '6px' }}>
-                                            <Clock size={10} color="#64748b" />
-                                            <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>
-                                                {new Date(m.received_at_machine).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
-                                            </span>
-                                        </div>
-                                     </div>
+                  {(() => {
+                     const relevantMatches = hardwareMatches.filter(m => isRecordRelevantForGroup(m, selectedRequestGroup));
+                     if (relevantMatches.length > 0) {
+                        return (
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                              {relevantMatches.map(m => (
+                                 <div key={m.id} style={{ padding: '1rem', background: 'var(--background)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'flex-start' }}>
+                                       <div>
+                                           <p style={{ fontSize: '0.75rem', fontWeight: 900 }}>{m.machine_name} - {m.lab_id}</p>
+                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface)', padding: '2px 8px', borderRadius: '6px' }}>
+                                                  <Clock size={10} color="#64748b" />
+                                                  <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 700 }}>
+                                                      {new Date(m.received_at_machine).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}
+                                                  </span>
+                                              </div>
+                                           </div>
+                                       </div>
+                                       <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                       {Object.entries(m).filter(([k, v]) => 
+                                           v !== null && v !== undefined && v !== '' && 
+                                           !['id', 'patient_id', 'patient_name', 'machine_id', 'machine_name', 'received_at_machine', 'lab_id', 'location', 'project', 'project_id', 'sample_id', 'is_processed', 'synced_at_cloud', 'raw_data'].includes(k)
+                                       ).map(([key, value]) => (
+                                           <span key={key} style={{ fontSize: '0.6rem', padding: '2px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 800 }}>
+                                               <span style={{ color: 'var(--primary)', fontWeight: 900 }}>{key.toUpperCase()}</span>: {value}
+                                           </span>
+                                       ))}
+                                    </div>
                                  </div>
-                                 <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
-                              </div>
-                              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                 {Object.entries(m).filter(([k, v]) => 
-                                     v !== null && v !== undefined && v !== '' && 
-                                     !['id', 'patient_id', 'patient_name', 'machine_id', 'machine_name', 'received_at_machine', 'lab_id', 'location', 'project', 'project_id', 'sample_id', 'is_processed', 'synced_at_cloud', 'raw_data'].includes(k)
-                                 ).map(([key, value]) => (
-                                     <span key={key} style={{ fontSize: '0.6rem', padding: '2px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 800 }}>
-                                         <span style={{ color: 'var(--primary)', fontWeight: 900 }}>{key.toUpperCase()}</span>: {value}
-                                     </span>
-                                 ))}
-                              </div>
+                              ))}
                            </div>
-                        ))}
-                     </div>
-                  ) : (
-                     <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--background)', borderRadius: '16px' }}>
-                        <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Waiting for {selectedRequest.patient_id} machine data...</p>
-                     </div>
-                  )}
+                        );
+                     } else {
+                        return (
+                           <div style={{ textAlign: 'center', padding: '1.25rem', background: 'var(--background)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>No relevant machine pulse found for this investigation profile.</p>
+                           </div>
+                        );
+                     }
+                  })()}
                </div>
             )}
 
-            <form onSubmit={handleSaveResult} className="fade-in">
+            <form onSubmit={handleSaveGroupResults} className="fade-in">
                <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                   <div style={{ marginBottom: '2rem' }}>
                       <p style={{ fontSize: '0.9375rem', fontWeight: 950, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem' }}>
                            Verification Desk
                       </p>
                       
-                      {selectedRequest.test_master_details?.sub_tests?.length > 0 && (
-                                                   <div className="table-responsive" style={{ borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
-                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Sub-Test</th>
-                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Value</th>
-                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Units</th>
-                                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Reference Range</th>
-                                   </tr>
-                                </thead>
-                                <tbody>
-                            {selectedRequest.test_master_details.sub_tests.filter(st => st.is_active).map(st => {
-                               const val = resultData.values[st.name];
-                               const hasData = val !== undefined && val !== '';
-                               return (
-                                                                           <tr key={st.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>{st.name}</td>
-                                            <td style={{ padding: '0.75rem 1rem', fontSize: '1rem', fontWeight: 900, color: hasData ? 'var(--text-main)' : '#94a3b8' }}>
-                                               {hasData ? val : '---'}
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.units || '--'}</td>
-                                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.biological_range || '--'}</td>
-                                         </tr>
-                               );
-                            })}
-                                </tbody>
-                             </table>
-                          </div>
-                      )}
+                      {selectedRequestGroup.requests.map(req => {
+                         const activeSubTests = req.test_master_details?.sub_tests?.filter(st => st.is_active) || [];
+                         if (activeSubTests.length === 0) return null;
+                         const isCompleted = req.status === 'COMPLETED';
+
+                         return (
+                            <div key={req.id} style={{ marginBottom: '1.75rem' }}>
+                               <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', marginBottom: '0.6rem', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>{req.test_name}</span>
+                                  <span style={{ fontSize: '0.625rem', color: '#64748b' }}>Status: {req.status}</span>
+                                </div>
+                               
+                               <div className="table-responsive" style={{ borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                     <thead>
+                                        <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
+                                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Sub-Test</th>
+                                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Value</th>
+                                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Units</th>
+                                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase' }}>Reference Range</th>
+                                        </tr>
+                                     </thead>
+                                     <tbody>
+                                 {activeSubTests.map(st => {
+                                    const val = resultData.values[st.name];
+                                    const hasData = val !== undefined && val !== '';
+                                    return (
+                                             <tr key={st.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>{st.name}</td>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '1rem', fontWeight: 900, color: hasData ? 'var(--text-main)' : '#94a3b8' }}>
+                                                   {isCompleted ? (
+                                                      <span>{val || '---'}</span>
+                                                   ) : (
+                                                      <input 
+                                                         type="text" 
+                                                         value={val || ''} 
+                                                         onChange={e => {
+                                                            const updatedValues = { ...resultData.values, [st.name]: e.target.value };
+                                                            setResultData({ ...resultData, values: updatedValues });
+                                                         }}
+                                                         placeholder="---"
+                                                         style={{
+                                                            background: 'transparent',
+                                                            border: 'none',
+                                                            borderBottom: '1px dashed var(--border)',
+                                                            color: 'var(--text-main)',
+                                                            fontWeight: 900,
+                                                            fontSize: '1rem',
+                                                            width: '80px',
+                                                            outline: 'none',
+                                                            padding: '2px'
+                                                         }}
+                                                      />
+                                                   )}
+                                                </td>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.units || '--'}</td>
+                                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>{st.biological_range || '--'}</td>
+                                             </tr>
+                                    );
+                                 })}
+                                     </tbody>
+                                  </table>
+                                </div>
+                            </div>
+                         );
+                      })}
 
                       <div className="form-group" style={{ marginTop: '1.5rem' }}>
                           <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Clinical Interpretation</label>
@@ -605,7 +824,7 @@ const Laboratory = () => {
                           ></textarea>
                       </div>
 
-                      {selectedRequest.status !== 'COMPLETED' ? (
+                      {hasPending ? (
                           <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: projectConfig?.primary_color || 'var(--primary)', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
                               Finalize & Transmit <ArrowRight size={18} style={{ marginLeft: '8px' }} />
                           </button>

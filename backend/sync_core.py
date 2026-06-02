@@ -45,11 +45,12 @@ class SyncCore:
         Processes in chunks of 5000 to keep memory usage low.
         """
         try:
-            # 1. Get the last record we successfully synced
+            # 1. Get the last records we successfully synced
             last_id = self.config.get("last_synced_id", 0)
+            last_bc_id = self.config.get("last_synced_bc_id", 0)
             batch_limit = 5000
             
-            logger.info(f"Scanning for NEW records (Starting after ID: {last_id})...")
+            logger.info(f"Scanning for NEW records (CBC after ID: {last_id}, BC after ID: {last_bc_id})...")
             
             conn = mysql.connector.connect(
                 host=self.config["db_host"], port=self.config["db_port"],
@@ -57,66 +58,76 @@ class SyncCore:
                 database=self.config["db_name"], connect_timeout=5
             )
             
-            total_session_synced = 0
-            while True:
-                cursor = conn.cursor(dictionary=True)
-                # The 'WHERE id > %s' is what prevents the 'burden'
-                query = "SELECT * FROM cbc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
-                cursor.execute(query, (last_id, batch_limit))
-                rows = cursor.fetchall()
-                cursor.close()
+            def json_serial(obj):
+                from datetime import datetime, date
+                if isinstance(obj, (datetime, date)): return obj.isoformat()
+                return str(obj)
 
-                if not rows:
-                    if total_session_synced == 0:
-                        logger.info("Delta Scan: System is already up-to-date.")
-                    else:
-                        logger.info(f"Sync Complete. Total new records sent: {total_session_synced}")
-                    break
+            headers = {
+                "X-Machine-Sync-Key": self.config["sync_key"], 
+                "Content-Type": "application/json"
+            }
 
-                logger.info(f"Compressing {len(rows)} NEW records...")
+            cbc_synced = 0
+            bc_synced = 0
 
-                def json_serial(obj):
-                    from datetime import datetime, date
-                    if isinstance(obj, (datetime, date)): return obj.isoformat()
-                    return str(obj)
+            # --- SYNC CBC ---
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT * FROM cbc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
+            cursor.execute(query, (last_id, batch_limit))
+            cbc_rows = cursor.fetchall()
+            cursor.close()
 
-                headers = {
-                    "X-Machine-Sync-Key": self.config["sync_key"], 
-                    "Content-Type": "application/json"
-                }
-                
+            if cbc_rows:
+                logger.info(f"Compressing {len(cbc_rows)} NEW CBC records...")
                 response = requests.post(
                     self.config["emr_endpoint"], 
-                    data=json.dumps({"results": rows}, default=json_serial), 
+                    data=json.dumps({"results": cbc_rows}, default=json_serial), 
                     headers=headers, timeout=30
                 )
-
                 if response.status_code in [200, 201, 202]:
-                    # Batch was successful! Move the pointer forward
-                    last_id = rows[-1]['id']
-                    total_session_synced += len(rows)
-                    self.total_synced_count += len(rows)
-                    
-                    # Remember this point so we never send these records again
-                    self.update_watermark(last_id)
-                    logger.info(f"[SUCCESS] Watermark moved to ID {last_id}")
-                    
-                    if len(rows) < batch_limit: break # End of backlog
+                    last_id = cbc_rows[-1]['id']
+                    cbc_synced = len(cbc_rows)
+                    self.update_watermark(last_id, "last_synced_id")
+                    logger.info(f"[SUCCESS] CBC Watermark moved to ID {last_id}")
                 else:
-                    logger.error(f"[HALTED] Cloud Bridge is busy. Will retry later.")
-                    break
+                    logger.error(f"[HALTED] CBC Cloud Bridge error: HTTP {response.status_code}")
+
+            # --- SYNC BIOCHEMISTRY ---
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT * FROM bc_results WHERE id > %s ORDER BY id ASC LIMIT %s"
+            cursor.execute(query, (last_bc_id, batch_limit))
+            bc_rows = cursor.fetchall()
+            cursor.close()
+
+            if bc_rows:
+                logger.info(f"Compressing {len(bc_rows)} NEW Biochemistry records...")
+                response = requests.post(
+                    self.config["emr_endpoint"], 
+                    data=json.dumps({"results": bc_rows}, default=json_serial), 
+                    headers=headers, timeout=30
+                )
+                if response.status_code in [200, 201, 202]:
+                    last_bc_id = bc_rows[-1]['id']
+                    bc_synced = len(bc_rows)
+                    self.update_watermark(last_bc_id, "last_synced_bc_id")
+                    logger.info(f"[SUCCESS] Biochemistry Watermark moved to ID {last_bc_id}")
+                else:
+                    logger.error(f"[HALTED] Biochemistry Cloud Bridge error: HTTP {response.status_code}")
 
             conn.close()
+            total_session_synced = cbc_synced + bc_synced
+            self.total_synced_count += total_session_synced
             return total_session_synced
 
         except Exception as e:
             logger.error(f"[SYSTEM FAULT] {str(e)}")
         return -1
 
-    def update_watermark(self, last_id):
+    def update_watermark(self, last_id, key="last_synced_id"):
         """Remembers the last ID so we don't send duplicates next time."""
         try:
-            self.config["last_synced_id"] = last_id
+            self.config[key] = last_id
             with open(CONFIG_FILE, "w") as f:
                 json.dump(self.config, f, indent=4)
         except: pass

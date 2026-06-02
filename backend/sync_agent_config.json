@@ -4,9 +4,10 @@
     "db_name": "bc_cbc_db",
     "db_user": "root",
     "db_pass": "root_123",
-    "emr_endpoint": "http://103.174.161.68:9002/api/laboratory/requests/sync_batch/",
-    "sync_key": "84ed5ec6156e1cec0152c71c5e790c2e",
+    "emr_endpoint": "http://127.0.0.1:8000/api/laboratory/requests/sync_batch/",
+    "sync_key": "56e88f05b52227a3a5da5f755ebd3a4d",
     "interval": 6,
     "theme": "Forest",
-    "last_synced_id": 91
+    "last_synced_id": 91,
+    "last_synced_bc_id": 87
 }
