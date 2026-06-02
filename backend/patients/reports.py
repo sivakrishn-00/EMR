@@ -147,24 +147,20 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
         elements.append(create_main_bar(f"DIAGNOSTIC VISIT DATE: {v_date}", theme_color))
         elements.append(Spacer(1, 0.1 * inch))
 
-        # --- SIDE-BY-SIDE DASHBOARD ---
-        
-        hist_title = create_sub_header("PERSONAL & FAMILY HISTORY", theme_color)
-        hist_data = [
+        # --- SIDE-BY-SIDE GRID (ROW 1: PERSONAL HISTORY & SYSTEMIC EXAM) ---
+        pers_title = create_sub_header("PERSONAL HISTORY & ALLERGIES", theme_color, width=3.25*inch)
+        pers_data = [
             [Paragraph("SMOKING", theme['label_left']), Paragraph(to_str(vitals.get('smoking')), theme['value'])],
             [Paragraph("ALCOHOL", theme['label_left']), Paragraph(to_str(vitals.get('alcohol')), theme['value'])],
             [Paragraph("ACTIVITY", theme['label_left']), Paragraph(to_str(vitals.get('physical_activity')), theme['value'])],
             [Paragraph("DIET", theme['label_left']), Paragraph(to_str(vitals.get('food_habit')), theme['value'])],
-            [Paragraph("FAMILY DM", theme['label_left']), Paragraph(to_str(vitals.get('family_dm')), theme['value'])],
-            [Paragraph("FAMILY HTN", theme['label_left']), Paragraph(to_str(vitals.get('family_htn')), theme['value'])],
-            [Paragraph("FAMILY CVS", theme['label_left']), Paragraph(to_str(vitals.get('family_cvs')), theme['value'])],
-            [Paragraph("FAMILY TB", theme['label_left']), Paragraph(to_str(vitals.get('family_tb')), theme['value'])],
+            [Paragraph("FOOD ALLERGY", theme['label_left']), Paragraph(to_str(vitals.get('allergy_food')), theme['value'])],
+            [Paragraph("DRUG ALLERGY", theme['label_left']), Paragraph(to_str(vitals.get('allergy_drug')), theme['value'])],
         ]
-        hist_t = Table(hist_data, colWidths=[1.4*inch, 1.85*inch])
-        hist_t.setStyle(std_grid)
-        elements.append(Spacer(1, 0.2 * inch))
+        pers_t = Table(pers_data, colWidths=[1.4*inch, 1.85*inch])
+        pers_t.setStyle(std_grid)
 
-        sys_title = create_sub_header("SYSTEMIC EXAMINATION REVIEW", theme_color)
+        sys_title = create_sub_header("SYSTEMIC EXAMINATION REVIEW", theme_color, width=3.25*inch)
         sys_data = [
             [Paragraph("RESPIRATORY", theme['label_left']), Paragraph(to_str(vitals.get('sys_respiratory'), 'NAD'), theme['badge_green'])],
             [Paragraph("C.V.S SYSTEM", theme['label_left']), Paragraph(to_str(vitals.get('sys_cvs'), 'NAD'), theme['badge_green'])],
@@ -173,13 +169,46 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
             [Paragraph("M.S.S SYSTEM", theme['label_left']), Paragraph(to_str(vitals.get('sys_mss'), 'NAD'), theme['badge_green'])],
             [Paragraph("G.U.S SYSTEM", theme['label_left']), Paragraph(to_str(vitals.get('sys_gus'), 'NAD'), theme['badge_green'])],
         ]
-        sys_t = Table(sys_data, colWidths=[1.6*inch, 1.65*inch])
+        sys_t = Table(sys_data, colWidths=[1.4*inch, 1.85*inch])
         sys_t.setStyle(std_grid)
 
-        side_by_side = [[[hist_title, Spacer(1, 0.04*inch), hist_t], [sys_title, Spacer(1, 0.04*inch), sys_t]]]
-        sbs_t = Table(side_by_side, colWidths=[3.3*inch, 3.3*inch])
-        sbs_t.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('LEFTPADDING', (0,0), (-1,-1), 0), ('RIGHTPADDING', (0,0), (-1,-1), 0)]))
-        elements.append(sbs_t)
+        sbs_row1 = [[[pers_title, Spacer(1, 0.04*inch), pers_t], [sys_title, Spacer(1, 0.04*inch), sys_t]]]
+        sbs_t1 = Table(sbs_row1, colWidths=[3.3*inch, 3.3*inch])
+        sbs_t1.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('LEFTPADDING', (0,0), (-1,-1), 0), ('RIGHTPADDING', (0,0), (-1,-1), 0)]))
+        elements.append(sbs_t1)
+        elements.append(Spacer(1, 0.15 * inch))
+
+        # --- SIDE-BY-SIDE GRID (ROW 2: FAMILY HISTORY & KNOWN MEDICAL HISTORY) ---
+        fam_title = create_sub_header("FAMILY HISTORY (PARENTS/SIBLINGS)", theme_color, width=3.25*inch)
+        fam_data = [
+            [Paragraph("FAMILY DM", theme['label_left']), Paragraph(to_str(vitals.get('family_dm')), theme['value'])],
+            [Paragraph("FAMILY HTN", theme['label_left']), Paragraph(to_str(vitals.get('family_htn')), theme['value'])],
+            [Paragraph("FAMILY CVS", theme['label_left']), Paragraph(to_str(vitals.get('family_cvs')), theme['value'])],
+            [Paragraph("FAMILY TB", theme['label_left']), Paragraph(to_str(vitals.get('family_tb')), theme['value'])],
+            [Paragraph("FAMILY CANCER", theme['label_left']), Paragraph(to_str(vitals.get('family_cancer')), theme['value'])],
+            [Paragraph("FAMILY THYROID", theme['label_left']), Paragraph(to_str(vitals.get('family_thyroid')), theme['value'])],
+            [Paragraph("OTHER FAM HIST", theme['label_left']), Paragraph(to_str(vitals.get('family_others')), theme['value'])],
+        ]
+        fam_t = Table(fam_data, colWidths=[1.5*inch, 1.75*inch])
+        fam_t.setStyle(std_grid)
+
+        known_title = create_sub_header("KNOWN MEDICAL HISTORY", theme_color, width=3.25*inch)
+        known_data = [
+            [Paragraph("KNOWN DM", theme['label_left']), Paragraph(to_str(vitals.get('known_dm')), theme['value'])],
+            [Paragraph("KNOWN HTN", theme['label_left']), Paragraph(to_str(vitals.get('known_htn')), theme['value'])],
+            [Paragraph("KNOWN CVS", theme['label_left']), Paragraph(to_str(vitals.get('known_cvs')), theme['value'])],
+            [Paragraph("KNOWN TB", theme['label_left']), Paragraph(to_str(vitals.get('known_tb')), theme['value'])],
+            [Paragraph("KNOWN CANCER", theme['label_left']), Paragraph(to_str(vitals.get('known_cancer')), theme['value'])],
+            [Paragraph("THYROID DISORDER", theme['label_left']), Paragraph(to_str(vitals.get('known_thyroid')), theme['value'])],
+            [Paragraph("OTHER KNOWN HIST", theme['label_left']), Paragraph(to_str(vitals.get('known_others')), theme['value'])],
+        ]
+        known_t = Table(known_data, colWidths=[1.5*inch, 1.75*inch])
+        known_t.setStyle(std_grid)
+
+        sbs_row2 = [[[fam_title, Spacer(1, 0.04*inch), fam_t], [known_title, Spacer(1, 0.04*inch), known_t]]]
+        sbs_t2 = Table(sbs_row2, colWidths=[3.3*inch, 3.3*inch])
+        sbs_t2.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('LEFTPADDING', (0,0), (-1,-1), 0), ('RIGHTPADDING', (0,0), (-1,-1), 0)]))
+        elements.append(sbs_t2)
         elements.append(Spacer(1, 0.2 * inch))
 
         # C. VITALS

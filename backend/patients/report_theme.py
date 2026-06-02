@@ -35,11 +35,13 @@ def create_main_bar(text, theme_color=NAVY):
                        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                        ('ROUNDEDCORNERS', [4, 4, 4, 4])])
 
-def create_sub_header(text, theme_color=NAVY):
+def create_sub_header(text, theme_color=NAVY, width=6.6*inch):
     """Elite Signature: Typography-based divider with accent line"""
     theme = get_report_styles(theme_color)
+    left_w = width * 0.95
+    right_w = width - left_w
     return Table([[Paragraph(text.upper(), theme['sub_header']), ""]], 
-                colWidths=[3*inch, 3.6*inch],
+                colWidths=[left_w, right_w],
                 style=[('LINEBELOW', (0,0), (0,0), 1.5, theme_color),
                        ('BOTTOMPADDING', (0,0), (-1,-1), 4)])
 
