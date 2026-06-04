@@ -26,7 +26,7 @@ def notify_team(project, roles, title, message):
         users = users.filter(Q(project=project) | Q(role='ADMIN'))
     if roles:
         users = users.filter(role__in=roles)
-    notifications = [Notification(recipient=u, title=title, message=message) for u in users]
+    notifications = [Notification(recipient=u, project=project, title=title, message=message) for u in users]
     Notification.objects.bulk_create(notifications)
 
 from .permissions import HasMachineSyncKey
@@ -143,6 +143,7 @@ class LabRequestViewSet(viewsets.ModelViewSet):
             if visit.consultation and visit.consultation.doctor:
                 Notification.objects.create(
                     recipient=visit.consultation.doctor,
+                    project=visit.patient.project,
                     title='Lab Results Ready',
                     message=f"Lab Results are ready for patient {visit.patient.first_name}"
                 )
@@ -151,6 +152,7 @@ class LabRequestViewSet(viewsets.ModelViewSet):
             if visit.patient.user:
                 Notification.objects.create(
                     recipient=visit.patient.user,
+                    project=visit.patient.project,
                     title='Laboratory Results Released',
                     message=f"Your laboratory results for {lab_request.test_name} are now available in your portal."
                 )

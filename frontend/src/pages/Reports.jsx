@@ -387,6 +387,11 @@ const Reports = () => {
                 onChange={(e) => {
                   const val = e.target.value;
                   sessionStorage.setItem('reports_selected_project', val);
+                  if (val && val !== 'all') {
+                    localStorage.setItem('activeProjectId', val);
+                  } else {
+                    localStorage.removeItem('activeProjectId');
+                  }
                   window.location.reload();
                 }}
                 style={{

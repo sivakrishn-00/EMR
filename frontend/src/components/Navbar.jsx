@@ -124,7 +124,17 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await api.get('accounts/notifications/');
+      let activeProject = user?.project;
+      if (!activeProject) {
+        const reportsProj = sessionStorage.getItem('reports_selected_project');
+        if (reportsProj && reportsProj !== 'all') {
+          activeProject = reportsProj;
+        } else {
+          activeProject = localStorage.getItem('activeProjectId');
+        }
+      }
+      const url = activeProject ? `accounts/notifications/?project=${activeProject}` : 'accounts/notifications/';
+      const res = await api.get(url);
       setNotifications(Array.isArray(res.data) ? res.data : (res.data.results || []));
     } catch (err) {
       console.error("Notify fail");
@@ -151,7 +161,17 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
 
   const markRead = async () => {
     try {
-      await api.post('accounts/notifications/mark_all_as_read/');
+      let activeProject = user?.project;
+      if (!activeProject) {
+        const reportsProj = sessionStorage.getItem('reports_selected_project');
+        if (reportsProj && reportsProj !== 'all') {
+          activeProject = reportsProj;
+        } else {
+          activeProject = localStorage.getItem('activeProjectId');
+        }
+      }
+      const url = activeProject ? `accounts/notifications/mark_all_as_read/?project=${activeProject}` : 'accounts/notifications/mark_all_as_read/';
+      await api.post(url);
       fetchNotifications();
     } catch (err) {
       console.error("Mark read fail");

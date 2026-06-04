@@ -98,11 +98,29 @@ class NotificationViewSet(viewsets.ModelViewSet):
     pagination_class = None # Return full list for dropdown
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user)
+        from django.db.models import Q
+        user = self.request.user
+        queryset = Notification.objects.filter(recipient=user)
+        if user.project:
+            queryset = queryset.filter(Q(project=user.project) | Q(project__isnull=True))
+        else:
+            project_id = self.request.query_params.get('project')
+            if project_id:
+                queryset = queryset.filter(Q(project_id=project_id) | Q(project__isnull=True))
+        return queryset
 
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
-        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        from django.db.models import Q
+        user = request.user
+        queryset = Notification.objects.filter(recipient=user, is_read=False)
+        if user.project:
+            queryset = queryset.filter(Q(project=user.project) | Q(project__isnull=True))
+        else:
+            project_id = request.query_params.get('project')
+            if project_id:
+                queryset = queryset.filter(Q(project_id=project_id) | Q(project__isnull=True))
+        queryset.update(is_read=True)
         return Response({'status': 'notifications marked as read'})
 
 from .permissions import IsStaffUser

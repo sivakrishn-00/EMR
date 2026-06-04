@@ -355,6 +355,14 @@ const Patients = () => {
   }, []);
 
   useEffect(() => {
+    if (projectFilter) {
+      localStorage.setItem('activeProjectId', projectFilter);
+    } else {
+      localStorage.removeItem('activeProjectId');
+    }
+  }, [projectFilter]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('tab') === 'employee') {
       // Small delay to ensure projects are loaded for the project-aware onboarding

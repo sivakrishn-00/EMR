@@ -10,8 +10,8 @@ from django.db import transaction
 
 # Removed local log_action, using accounts.utils instead
 
-def notify_user(recipient, title, message):
-    Notification.objects.create(recipient=recipient, title=title, message=message)
+def notify_user(recipient, title, message, project=None):
+    Notification.objects.create(recipient=recipient, title=title, message=message, project=project)
 
 def notify_team(project, roles, title, message):
     """
@@ -27,7 +27,7 @@ def notify_team(project, roles, title, message):
     if roles:
         users = users.filter(role__in=roles)
         
-    notifications = [Notification(recipient=u, title=title, message=message) for u in users]
+    notifications = [Notification(recipient=u, project=project, title=title, message=message) for u in users]
     Notification.objects.bulk_create(notifications)
 
 from rest_framework.pagination import PageNumberPagination
@@ -132,7 +132,7 @@ class VisitViewSet(viewsets.ModelViewSet):
             
             # Notify Patient
             if visit.patient.user:
-                notify_user(visit.patient.user, "Vitals Recorded", "Your vital parameters have been successfully recorded and shared with your doctor.")
+                notify_user(visit.patient.user, "Vitals Recorded", "Your vital parameters have been successfully recorded and shared with your doctor.", project=project_obj)
             
             return Response(serializer.data, status=status.HTTP_201_CREATED if not vitals_instance else status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -216,15 +216,15 @@ class VisitViewSet(viewsets.ModelViewSet):
             if next_step == 'PENDING_PHARMACY':
                 notify_team(project_obj, ['PHARMACIST', 'ADMIN'], "New Prescription", f"New medication order for {visit.patient}.")
                 if visit.patient.user:
-                    notify_user(visit.patient.user, "Prescription Ready", "Your doctor has prescribed medications. Please proceed to the pharmacy.")
+                    notify_user(visit.patient.user, "Prescription Ready", "Your doctor has prescribed medications. Please proceed to the pharmacy.", project=project_obj)
             # Notify Lab if pending
             elif next_step == 'PENDING_LAB':
                 notify_team(project_obj, ['LAB_TECHNICIAN', 'ADMIN'], "New Lab Request", f"New lab tests ordered for {visit.patient}.")
                 if visit.patient.user:
-                    notify_user(visit.patient.user, "Laboratory Investigations Ordered", "Your doctor has requested laboratory tests. Please visit the lab for sample collection.")
+                    notify_user(visit.patient.user, "Laboratory Investigations Ordered", "Your doctor has requested laboratory tests. Please visit the lab for sample collection.", project=project_obj)
             elif next_step == 'COMPLETED':
                 if visit.patient.user:
-                    notify_user(visit.patient.user, "Clinical Session Completed", "Your clinical visit is now complete. You can download your report from the portal.")
+                    notify_user(visit.patient.user, "Clinical Session Completed", "Your clinical visit is now complete. You can download your report from the portal.", project=project_obj)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED if not consult_instance else status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

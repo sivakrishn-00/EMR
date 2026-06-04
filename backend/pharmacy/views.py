@@ -20,7 +20,7 @@ def notify_team(project, roles, title, message):
         users = users.filter(Q(project=project) | Q(role='ADMIN'))
     if roles:
         users = users.filter(role__in=roles)
-    notifications = [Notification(recipient=u, title=title, message=message) for u in users]
+    notifications = [Notification(recipient=u, project=project, title=title, message=message) for u in users]
     Notification.objects.bulk_create(notifications)
 
 from rest_framework.pagination import PageNumberPagination
@@ -255,6 +255,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             if prescription.ordered_by:
                 Notification.objects.create(
                     recipient=prescription.ordered_by,
+                    project=visit.patient.project,
                     title='Medication Dispensed',
                     message=f"Medications have been dispensed for your patient {visit.patient.first_name}"
                 )

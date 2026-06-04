@@ -83,6 +83,14 @@ const AdminMasters = () => {
       setViewMode("DATA");
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      localStorage.setItem('activeProjectId', selectedProject);
+    } else {
+      localStorage.removeItem('activeProjectId');
+    }
+  }, [selectedProject]);
   const [projects, setProjects] = useState([]);
   const [customProtocols, setCustomProtocols] = useState({}); // { projectId: [ protocols ] }
   const [exploringProtocolId, setExploringProtocolId] = useState("employee_master");
