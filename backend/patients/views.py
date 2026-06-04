@@ -200,10 +200,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         parent_card = parts[0]
                         suffix = '/' + parts[1]
                         
-                        member = FamilyMember.objects.filter(employee__card_no=parent_card, card_no_suffix=suffix).first()
+                        member = FamilyMember.objects.filter(employee__card_no=parent_card, employee__project=project, card_no_suffix=suffix).first()
                         if not member:
                             # Fallback: Check if this card number with slash was actually uploaded as a Primary Employee
-                            employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                            employee = EmployeeMaster.objects.filter(card_no=card_no_input, project=project).first()
                             if employee:
                                 is_family_case = False # Re-classify as Primary Employee case
                             else:
@@ -285,7 +285,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     else:
                         # 2. Primary Employee Case (e.g. 2254 or 0055/1 uploaded as primary employee)
                         if not employee:
-                            employee = EmployeeMaster.objects.filter(card_no=card_no_input).first()
+                            employee = EmployeeMaster.objects.filter(card_no=card_no_input, project=project).first()
                         if not employee:
                             # Create unlinked placeholder patient profile so it is present in reports/lists immediately!
                             patient_qs = Patient.objects.filter(card_no=card_no_input, project=project)
@@ -717,7 +717,13 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                             }
                         )
 
-                        if not created:
+                        if created:
+                            if not obj.additional_fields:
+                                obj.additional_fields = {}
+                            if 'initial_quantity' not in obj.additional_fields:
+                                obj.additional_fields['initial_quantity'] = str(qty_input)
+                                obj.save(update_fields=['additional_fields'])
+                        else:
                             # Update fields
                             obj.name = str(name).strip() or obj.name
                             obj.category = clean_data.get('category') or clean_data.get('item_group', obj.category)
@@ -729,8 +735,11 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                             obj.additional_fields.update(additional)
                             
                             if mode == 'INCREMENT' or mode == 'ADD':
+                                prev_initial = int(float(obj.additional_fields.get('initial_quantity') or obj.additional_fields.get('initial_qty') or obj.quantity))
+                                obj.additional_fields['initial_quantity'] = str(prev_initial + qty_input)
                                 obj.quantity += qty_input
                             else:
+                                obj.additional_fields['initial_quantity'] = str(qty_input)
                                 obj.quantity = qty_input
                             
                             obj.save()
@@ -816,8 +825,10 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
                                 batch_obj.expiry_date = expiry_date
                                 if mode == 'INCREMENT' or mode == 'ADD':
                                     batch_obj.quantity += qty_input
+                                    batch_obj.initial_qty += qty_input
                                 else:
                                     batch_obj.quantity = qty_input
+                                    batch_obj.initial_qty = qty_input
                                 batch_obj.unit_cost = cost_input or batch_obj.unit_cost
                                 batch_obj.save()
                                 
@@ -1063,10 +1074,11 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
 
                             emp_id_val = clean_str_field(get_val(data, 'employee_id', 'employeeid', 'emp_id', 'empid', 'emp_code', 'employee_code')) or ''
                             
+                            project_id = data.get('project')
                             EmployeeMaster.objects.update_or_create(
                                 card_no=card_no,
+                                project_id=project_id,
                                 defaults={
-                                    'project_id': data.get('project'),
                                     'name': name,
                                     'dob': dob,
                                     'gender': gender,
@@ -1111,7 +1123,8 @@ class EmployeeMasterViewSet(viewsets.ModelViewSet):
                             if parent_card_no.isdigit():
                                 parent_card_no = parent_card_no.zfill(4)
                             
-                            employee = EmployeeMaster.objects.filter(card_no=parent_card_no).first()
+                            project_id = data.get('project')
+                            employee = EmployeeMaster.objects.filter(card_no=parent_card_no, project_id=project_id).first()
                             if not employee: raise Exception(f"Parent employee {parent_card_no} not found")
 
                             gender_str = str(get_val(data, 'gender', 'sex', 'age_gender') or 'MALE').upper()
@@ -1694,7 +1707,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                         # Strict double check: Ensure no Patient record already exists
                         if Patient.objects.filter(employee_master=emp, family_member__isnull=True).exists():
                             continue
-                        if Patient.objects.filter(card_no=emp.card_no).exists():
+                        if Patient.objects.filter(card_no=emp.card_no, project=emp.project).exists():
                             continue
                             
                         # Determine unique id_proof_number
@@ -1735,7 +1748,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                         
                         emp = fm.employee
                         card_no_val = f"{emp.card_no}{fm.card_no_suffix}"
-                        if Patient.objects.filter(card_no=card_no_val).exists():
+                        if Patient.objects.filter(card_no=card_no_val, project=emp.project).exists():
                             continue
                             
                         # Determine unique id_proof_number

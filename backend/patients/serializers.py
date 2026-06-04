@@ -33,10 +33,30 @@ class RegistryDataSerializer(serializers.ModelSerializer):
     registry_type_project = serializers.IntegerField(source='registry_type.project.id', read_only=True)
     registry_type_project_name = serializers.CharField(source='registry_type.project.name', read_only=True)
     batch_info = serializers.SerializerMethodField()
+    total_uploaded = serializers.SerializerMethodField()
     
     class Meta:
         model = RegistryData
         fields = '__all__'
+
+    def get_total_uploaded(self, obj):
+        try:
+            batches = obj.batches.all()
+            if batches.exists():
+                sum_initial = sum(b.initial_qty for b in batches)
+                return max(sum_initial, obj.quantity)
+        except Exception:
+            pass
+            
+        if obj.additional_fields and isinstance(obj.additional_fields, dict):
+            for key in ['total_uploaded', 'initial_quantity', 'initial_qty']:
+                if key in obj.additional_fields:
+                    try:
+                        return int(float(obj.additional_fields[key]))
+                    except (ValueError, TypeError):
+                        pass
+        
+        return obj.quantity
 
     def get_batch_info(self, obj):
         try:

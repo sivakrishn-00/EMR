@@ -673,13 +673,6 @@ const Vitals = () => {
                     </div>
                  </div>
                  <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
-                    <button 
-                      type="button"
-                      onClick={() => setShowVitalsSection(!showVitalsSection)} 
-                      style={{ border: '1px solid #e2e8f0', background: 'white', padding: '0.5rem 0.875rem', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      {showVitalsSection ? 'HIDE VITALS' : 'SHOW VITALS'}
-                    </button>
                     <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
                        <X size={20} />
                     </button>

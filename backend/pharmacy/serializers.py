@@ -33,12 +33,36 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         return ''
 
     def get_item_group(self, obj):
-        # MNC Standard: Dynamic lookup to ensure category-aware dispensing even for legacy records
         from patients.models import RegistryData
-        clean_name = obj.medication_name.strip().split('(')[0].strip() # Handle 'Drug (Strength)' cases
-        drug = RegistryData.objects.filter(name__icontains=clean_name).first()
+        clean_name = obj.medication_name.strip().split('(')[0].strip()
+        
+        # Resolve Project
+        patient = obj.visit.patient
+        project = patient.project or (patient.employee_master.project if patient.is_employee_linked and patient.employee_master else None)
+        
+        # Try exact case-insensitive match scoped by project
+        queryset = RegistryData.objects.filter(name__iexact=clean_name)
+        if project:
+            queryset = queryset.filter(registry_type__project=project)
+        drug = queryset.first()
+        
+        # Try exact case-insensitive match globally
+        if not drug:
+            drug = RegistryData.objects.filter(name__iexact=clean_name).first()
+            
+        # Try partial match scoped by project
+        if not drug:
+            queryset_contains = RegistryData.objects.filter(name__icontains=clean_name)
+            if project:
+                queryset_contains = queryset_contains.filter(registry_type__project=project)
+            drug = queryset_contains.first()
+            
+        # Try partial match globally
+        if not drug:
+            drug = RegistryData.objects.filter(name__icontains=clean_name).first()
+
         if drug:
-            return drug.category or drug.item_group or "GENERAL"
+            return drug.category or "GENERAL"
         return "GENERAL"
 
     def get_project_id(self, obj):

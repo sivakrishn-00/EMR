@@ -58,17 +58,20 @@ class ProjectCategoryMapping(models.Model):
 
 class EmployeeMaster(models.Model):
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
-    card_no = models.CharField(max_length=20, unique=True, help_text="Primary Card Number (e.g., 0001)")
+    card_no = models.CharField(max_length=20, help_text="Primary Card Number (e.g., 0001)")
     name = models.CharField(max_length=150)
     dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
-    aadhar_no = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    aadhar_no = models.CharField(max_length=20, blank=True, null=True)
     mobile_no = models.CharField(max_length=15, blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     designation = models.CharField(max_length=100, blank=True, null=True)
     additional_fields = models.JSONField(default=dict, blank=True)
     proof_image = models.ImageField(upload_to='employee_proofs/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('project', 'card_no'), ('project', 'aadhar_no'))
 
     def __str__(self):
         return f"{self.card_no} - {self.name}"
@@ -229,6 +232,34 @@ class RegistryData(models.Model):
         unique_together = ('registry_type', 'ucode')
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            try:
+                orig = RegistryData.objects.get(pk=self.pk)
+                modified_fields = []
+                if self.quantity != orig.quantity:
+                    if self.additional_fields and isinstance(self.additional_fields, dict):
+                        for qty_key in ['qty', 'quantity', 'stock']:
+                            if qty_key in self.additional_fields:
+                                self.additional_fields[qty_key] = str(self.quantity)
+                                modified_fields.append('additional_fields')
+                if self.cost != orig.cost:
+                    if self.additional_fields and isinstance(self.additional_fields, dict):
+                        for cost_key in ['cost', 'unit_cost', 'rate']:
+                            if cost_key in self.additional_fields:
+                                self.additional_fields[cost_key] = str(self.cost)
+                                modified_fields.append('additional_fields')
+                
+                # If we modified additional_fields and update_fields is specified,
+                # we must include 'additional_fields' in update_fields so it gets persisted
+                if modified_fields and kwargs.get('update_fields'):
+                    update_fields = list(kwargs['update_fields'])
+                    for f in modified_fields:
+                        if f not in update_fields:
+                            update_fields.append(f)
+                    kwargs['update_fields'] = update_fields
+            except RegistryData.DoesNotExist:
+                pass
+
         if self.additional_fields and isinstance(self.additional_fields, dict):
             # Sync cost from dynamic fields
             for cost_key in ['cost', 'unit_cost', 'rate']:
@@ -329,7 +360,8 @@ def sync_employee_to_registry(sender, instance, **kwargs):
     try:
         from .models import Patient
         patients = Patient.objects.filter(
-            card_no=instance.card_no
+            card_no=instance.card_no,
+            project=instance.project
         )
         for p in patients:
             p.first_name = instance.name.split(' ')[0]
@@ -374,12 +406,12 @@ def sync_family_to_registry(sender, instance, **kwargs):
     except Exception as e:
         print(f"Sync Dependent Registry Error: {e}")
 
-    # Auto-resolve and link/update any Patient profiles matching this family member's card_no
     try:
         from .models import Patient
         full_card_no = f"{instance.employee.card_no}{instance.card_no_suffix}"
         patients = Patient.objects.filter(
-            card_no=full_card_no
+            card_no=full_card_no,
+            project=instance.employee.project
         )
         for p in patients:
             p.first_name = instance.name.split(' ')[0]

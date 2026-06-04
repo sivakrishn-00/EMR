@@ -389,14 +389,20 @@ const AdminMasters = () => {
   const [masterFormAttempted, setMasterFormAttempted] = useState(false);
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
 
-  const [designations, setDesignations] = useState(() => {
+  const getProjectDesignationsKey = (projId) => `emr_designations_${projId || 'global'}`;
+
+  const [designations, setDesignations] = useState([]);
+
+  useEffect(() => {
+    const projId = selectedProject || user?.project || "";
+    const key = getProjectDesignationsKey(projId);
     try {
-      const saved = localStorage.getItem('emr_designations');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem(key);
+      setDesignations(saved ? JSON.parse(saved) : []);
     } catch (e) {
-      return [];
+      setDesignations([]);
     }
-  });
+  }, [selectedProject, user?.project]);
 
   const [showAddDesignationModal, setShowAddDesignationModal] = useState(false);
   const [newDesignationInput, setNewDesignationInput] = useState("");
@@ -409,10 +415,12 @@ const AdminMasters = () => {
   const submitNewDesignation = () => {
     if (newDesignationInput && newDesignationInput.trim()) {
       const formatted = newDesignationInput.trim().toUpperCase();
+      const projId = selectedProject || user?.project || "";
+      const key = getProjectDesignationsKey(projId);
       if (!designations.includes(formatted)) {
         const updated = [...designations, formatted];
         setDesignations(updated);
-        localStorage.setItem('emr_designations', JSON.stringify(updated));
+        localStorage.setItem(key, JSON.stringify(updated));
         toast.success(`Designation "${formatted}" added successfully!`);
       }
       setMasterFormData(prev => ({ ...prev, designation: formatted }));
@@ -831,7 +839,9 @@ const AdminMasters = () => {
         if (extractedDesigs.length > 0) {
           setDesignations(prev => {
             const merged = [...new Set([...prev, ...extractedDesigs])];
-            localStorage.setItem('emr_designations', JSON.stringify(merged));
+            const projId = targetProject || user?.project || "";
+            const key = getProjectDesignationsKey(projId);
+            localStorage.setItem(key, JSON.stringify(merged));
             return merged;
           });
         }
@@ -4496,7 +4506,7 @@ const AdminMasters = () => {
                                </th>
                                {exploringProtocolId?.toLowerCase().includes("pharmacy") ? (
                                  <>
-                                   {["ITEM CODE", "ITEM NAME", "DESCRIPTION", "ITEM GROUP", "QTY", "COST"].map(h => (
+                                   {["ITEM CODE", "ITEM NAME", "DESCRIPTION", "ITEM GROUP", "TOTAL UPLOADED", "QTY", "COST"].map(h => (
                                       <th key={h} style={{ padding: "1.25rem 1.5rem", fontSize: "0.75rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                                    ))}
                                  </>
@@ -4708,6 +4718,7 @@ const AdminMasters = () => {
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.name || "--"}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.description || "--"}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.category || "--"}</td>
+                                              <td style={{ padding: "1.5rem 1.5rem", fontWeight: 900, color: "var(--primary)", fontSize: "0.875rem" }}>{m.total_uploaded ?? m.quantity ?? 0}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>{m.quantity || 0}</td>
                                               <td style={{ padding: "1.5rem 1.5rem", fontWeight: 700, color: "var(--text-main)", fontSize: "0.875rem" }}>
                                                 {m.batch_info?.has_batches && !m.batch_info.costs_match ? (
