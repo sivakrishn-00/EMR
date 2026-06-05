@@ -196,7 +196,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
               border: projectConfig?.primary_color ? `1px solid ${projectConfig.primary_color}20` : '1px solid rgba(99, 102, 241, 0.1)' 
             }}>
               <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'white' }}>System Version</p>
-              <p style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: '4px' }}>Build: v1.0.1-stable</p>
+              <p style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: '4px' }}>Build: v1.0.4-stable</p>
             </div>
           </div>
         )}

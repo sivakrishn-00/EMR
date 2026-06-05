@@ -17,7 +17,8 @@ const ProjectManagement = () => {
         accent_color: '#f43f5e',
         allow_appointments: true,
         use_registry_for_personnel: false,
-        vitals_mandatory: true
+        vitals_mandatory: true,
+        allow_custom_visit_date: false
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -65,6 +66,7 @@ const ProjectManagement = () => {
             formData.append('allow_appointments', projectFormData.allow_appointments);
             formData.append('use_registry_for_personnel', projectFormData.use_registry_for_personnel);
             formData.append('vitals_mandatory', projectFormData.vitals_mandatory);
+            formData.append('allow_custom_visit_date', projectFormData.allow_custom_visit_date);
 
             let projectId = editingProjectId;
             if (isEditing) {
@@ -84,7 +86,7 @@ const ProjectManagement = () => {
             });
 
             toast.success(isEditing ? "Project Configuration Updated!" : "Project K Initialized & Mapped!", { id: loadId });
-            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true });
+            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false });
             setLogoPreview(null);
             setIsEditing(false);
             setEditingProjectId(null);
@@ -107,7 +109,8 @@ const ProjectManagement = () => {
             accent_color: p.accent_color || '#f43f5e',
             allow_appointments: p.allow_appointments ?? true,
             use_registry_for_personnel: p.use_registry_for_personnel ?? false,
-            vitals_mandatory: p.vitals_mandatory ?? true
+            vitals_mandatory: p.vitals_mandatory ?? true,
+            allow_custom_visit_date: p.allow_custom_visit_date ?? false
         });
         setLogoPreview(p.logo ? (p.logo.startsWith('http') ? p.logo : `${MEDIA_URL}${p.logo}`) : null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -227,7 +230,7 @@ const ProjectManagement = () => {
                             <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>{isEditing ? 'Update Configuration' : 'Initialize New Project'}</h2>
                             {isEditing && (
                                 <button 
-                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true }); setLogoPreview(null); }}
+                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false }); setLogoPreview(null); }}
                                     style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                                 >
                                     CANCEL EDIT
@@ -445,6 +448,33 @@ const ProjectManagement = () => {
                                         <div>
                                             <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enforce Mandatory Vitals</p>
                                             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>When enabled, Temp and Weight are required for every intake assessment.</p>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="form-group">
+                                    <label 
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '1rem', 
+                                            padding: '1.25rem', 
+                                            background: projectFormData.allow_custom_visit_date ? 'rgba(79, 70, 229, 0.03)' : 'var(--surface)',
+                                            border: '1px solid ' + (projectFormData.allow_custom_visit_date ? 'var(--primary)' : 'var(--border)'),
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: '0.2s'
+                                        }}
+                                    >
+                                        <input 
+                                            type="checkbox"
+                                            style={{ width: '20px', height: '20px' }}
+                                            checked={projectFormData.allow_custom_visit_date}
+                                            onChange={e => setProjectFormData({ ...projectFormData, allow_custom_visit_date: e.target.checked })}
+                                        />
+                                        <div>
+                                            <p style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>Enable Late Entry / Backdated Visits</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>Allow users to retroactively backdate clinical visits with strict AHIMA-compliant audit logs.</p>
                                         </div>
                                     </label>
                                 </div>

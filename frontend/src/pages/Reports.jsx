@@ -932,6 +932,25 @@ const Reports = () => {
                                 <User size={14} style={{ color: '#6366f1' }} />
                                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}>{visit.patient_name}</span>
                                 <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: '4px' }}>{visit.patient_id}</span>
+                                {visit.is_late_entry && (
+                                  <span 
+                                    style={{ 
+                                      fontSize: '0.625rem', 
+                                      background: 'rgba(245, 158, 11, 0.1)', 
+                                      color: '#d97706', 
+                                      padding: '0.15rem 0.4rem', 
+                                      borderRadius: '6px', 
+                                      fontWeight: 800,
+                                      border: '1px solid rgba(245, 158, 11, 0.2)',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.02em',
+                                      display: 'inline-block'
+                                    }}
+                                    title={`Justification: ${visit.late_entry_justification || 'N/A'}`}
+                                  >
+                                    Late Entry
+                                  </span>
+                                )}
                             </div>
                           </div>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{visit.medications.length} Line Items</span>

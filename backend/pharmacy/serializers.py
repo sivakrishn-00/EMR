@@ -19,6 +19,8 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     employee_id = serializers.SerializerMethodField()
     uhid = serializers.SerializerMethodField()
     visit_id = serializers.IntegerField(source='visit.id', read_only=True)
+    visit_is_late_entry = serializers.BooleanField(source='visit.is_late_entry', read_only=True, default=False)
+    visit_late_entry_justification = serializers.CharField(source='visit.late_entry_justification', read_only=True, default='')
     project_id = serializers.SerializerMethodField()
     item_group = serializers.SerializerMethodField()
 

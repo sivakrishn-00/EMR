@@ -2,6 +2,8 @@ from django.db import models
 from django.conf import settings
 from patients.models import Patient
 
+from django.utils import timezone
+
 class Visit(models.Model):
     STATUS_CHOICES = (
         ('PENDING_VITALS', 'Pending Vitals'),
@@ -13,13 +15,35 @@ class Visit(models.Model):
     )
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='visits')
-    visit_date = models.DateTimeField(auto_now_add=True)
+    visit_date = models.DateTimeField(default=timezone.now, db_index=True)
     reason = models.TextField()
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='PENDING_VITALS')
     is_active = models.BooleanField(default=True)
+    
+    # Late Entry Provenance
+    entered_at = models.DateTimeField(null=True, blank=True)
+    is_late_entry = models.BooleanField(default=False)
+    late_entry_justification = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        choices=(
+            ('OFFLINE_CHARTING', 'Offline/Paper Charting Reconciliation'),
+            ('DELAYED_DOCUMENTATION', 'Delayed Administrative Documentation'),
+            ('EMERGENCY_BACKLOG', 'Emergency Backlog Prioritization'),
+            ('SYSTEM_DOWNTIME', 'System/Network Downtime Recovery'),
+        )
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.id and not self.entered_at:
+            self.entered_at = timezone.now()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Visit for {self.patient} on {self.visit_date.strftime('%Y-%m-%d')} ({self.status})"
+        # Format date safely since it can be parsed as timezone aware
+        formatted_date = self.visit_date.strftime('%Y-%m-%d') if self.visit_date else 'N/A'
+        return f"Visit for {self.patient} on {formatted_date} ({self.status})"
 
 class Vitals(models.Model):
     visit = models.OneToOneField(Visit, on_delete=models.CASCADE, related_name='vitals')
@@ -76,12 +100,14 @@ class Vitals(models.Model):
     symptoms = models.TextField(blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
     
-    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_at = models.DateTimeField(default=timezone.now)
 
     def save(self, *args, **kwargs):
         if self.weight_kg and self.height_cm:
             height_m = self.height_cm / 100
             self.bmi = self.weight_kg / (height_m * height_m)
+        if not self.id and self.visit:
+            self.recorded_at = self.visit.visit_date
         super().save(*args, **kwargs)
 
     class Meta:
@@ -95,7 +121,12 @@ class Consultation(models.Model):
     physical_examination = models.TextField(blank=True, null=True)
     diagnosis = models.TextField(blank=True, null=True)
     plan = models.TextField(blank=True, null=True)
-    conducted_at = models.DateTimeField(auto_now_add=True)
+    conducted_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if not self.id and self.visit:
+            self.conducted_at = self.visit.visit_date
+        super().save(*args, **kwargs)
 
 class Appointment(models.Model):
     STATUS_CHOICES = (

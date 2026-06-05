@@ -603,7 +603,9 @@ class ConsumptionReportView(views.APIView):
             'prescription__visit__patient__patient_id',
             'prescription__visit__patient__card_no',
             'prescription__visit__patient__first_name',
-            'prescription__visit__patient__last_name'
+            'prescription__visit__patient__last_name',
+            'prescription__visit__is_late_entry',
+            'prescription__visit__late_entry_justification'
         )
 
         def get_clinical_units(item):
@@ -673,6 +675,8 @@ class ConsumptionReportView(views.APIView):
                     "patient_id": rec['prescription__visit__patient__patient_id'] or "N/A",
                     "card_no": rec['prescription__visit__patient__card_no'] or "N/A",
                     "patient_name": full_name or "N/A",
+                    "is_late_entry": rec.get('prescription__visit__is_late_entry', False),
+                    "late_entry_justification": rec.get('prescription__visit__late_entry_justification', ''),
                     "items": [],
                     "total_visit_units": 0
                 }
@@ -714,6 +718,8 @@ class ConsumptionReportView(views.APIView):
                 "patient_id": data['patient_id'],
                 "card_no": data.get('card_no', 'N/A'),
                 "patient_name": data['patient_name'],
+                "is_late_entry": data.get('is_late_entry', False),
+                "late_entry_justification": data.get('late_entry_justification', ''),
                 "medications": processed_items,
                 "total_visit_units": data['total_visit_units'],
                 "total_visit_cost": round(total_visit_cost, 2)

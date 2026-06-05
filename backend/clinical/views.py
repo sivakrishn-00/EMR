@@ -44,7 +44,15 @@ class VisitViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         from django.db.models import F
-        queryset = Visit.objects.all().order_by(F('vitals__recorded_at').asc(nulls_last=True), 'visit_date')
+        queryset = Visit.objects.all().select_related(
+            'patient',
+            'patient__project',
+            'patient__employee_master',
+            'patient__employee_master__project'
+        ).prefetch_related(
+            'lab_requests',
+            'prescriptions'
+        ).order_by(F('vitals__recorded_at').asc(nulls_last=True), 'visit_date')
         
         user = self.request.user
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()

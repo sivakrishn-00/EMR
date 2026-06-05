@@ -68,6 +68,8 @@ class LabSubTest(models.Model):
     def __str__(self):
         return f"{self.name} for {self.lab_test.name}"
 
+from django.utils import timezone
+
 class LabRequest(models.Model):
     STATUS_CHOICES = (
         ('PENDING', 'Pending'),
@@ -89,7 +91,12 @@ class LabRequest(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     remarks = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if not self.id and self.visit:
+            self.created_at = self.visit.visit_date
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.test_name} for {self.visit.patient}"
@@ -105,7 +112,12 @@ class LabResult(models.Model):
     value = models.CharField(max_length=255, blank=True, null=True) # Legacy support
     reference_range = models.CharField(max_length=255, blank=True, null=True)
     interpretation = models.TextField(blank=True, null=True)
-    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if not self.id and self.lab_request and self.lab_request.visit:
+            self.recorded_at = self.lab_request.visit.visit_date
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Result for {self.lab_request}"

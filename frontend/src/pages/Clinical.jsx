@@ -534,7 +534,30 @@ const Clinical = () => {
                                {v.patient_details?.first_name[0].toLowerCase()}
                             </div>
                             <div>
-                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)' }}>{v.patient_details?.first_name} {v.patient_details?.last_name}</p>
+                               <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}>
+                                 {v.patient_details?.first_name} {v.patient_details?.last_name}
+                                 {v.is_late_entry && (
+                                   <span 
+                                     style={{ 
+                                       marginLeft: '0.5rem', 
+                                       fontSize: '0.625rem', 
+                                       background: 'rgba(245, 158, 11, 0.1)', 
+                                       color: '#d97706', 
+                                       padding: '0.15rem 0.4rem', 
+                                       borderRadius: '6px', 
+                                       fontWeight: 800,
+                                       border: '1px solid rgba(245, 158, 11, 0.2)',
+                                       textTransform: 'uppercase',
+                                       letterSpacing: '0.02em',
+                                       verticalAlign: 'middle',
+                                       display: 'inline-block'
+                                     }}
+                                     title={`Justification: ${v.late_entry_justification || 'N/A'}`}
+                                   >
+                                     Late Entry
+                                   </span>
+                                 )}
+                               </p>
                                <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
                             </div>
                          </div>
@@ -889,7 +912,28 @@ const Clinical = () => {
                     </div>
                     <div>
                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}</p>
+                      <p style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}> 
+                        ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}
+                        {selectedVisit.is_late_entry && (
+                          <span 
+                            style={{ 
+                              fontSize: '0.625rem', 
+                              background: 'rgba(245, 158, 11, 0.1)', 
+                              color: '#d97706', 
+                              padding: '0.15rem 0.4rem', 
+                              borderRadius: '6px', 
+                              fontWeight: 800,
+                              border: '1px solid rgba(245, 158, 11, 0.2)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.02em',
+                              display: 'inline-block'
+                            }}
+                            title={`Justification: ${selectedVisit.late_entry_justification || 'N/A'}`}
+                          >
+                            Late Entry
+                          </span>
+                        )}
+                      </p>
                     </div>
                  </div>
                  <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: 'var(--background)', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>

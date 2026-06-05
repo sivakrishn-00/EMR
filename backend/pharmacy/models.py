@@ -1,6 +1,7 @@
 from django.db import models
 from clinical.models import Visit
 from django.conf import settings
+from django.utils import timezone
 
 class Prescription(models.Model):
     STATUS_CHOICES = (
@@ -18,7 +19,12 @@ class Prescription(models.Model):
     ordered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='medications_ordered')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     remarks = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if not self.id and self.visit:
+            self.created_at = self.visit.visit_date
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.medication_name} for {self.visit.patient}"
@@ -46,8 +52,13 @@ class DispensingRecord(models.Model):
     quantity = models.IntegerField()
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     total_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
-    dispensed_at = models.DateTimeField(auto_now_add=True)
+    dispensed_at = models.DateTimeField(default=timezone.now)
     remarks = models.TextField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.id and self.prescription and self.prescription.visit:
+            self.dispensed_at = self.prescription.visit.visit_date
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Dispensed {self.quantity} for {self.prescription}"

@@ -32,6 +32,11 @@ import { useAuth } from '../context/AuthContext';
 
 const Patients = () => {
   const { user } = useAuth();
+
+  const getLocalISOString = () => {
+    const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+    return (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
+  };
   const [patients, setPatients] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +76,9 @@ const Patients = () => {
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [triagePatient, setTriagePatient] = useState(null);
   const [triageReason, setTriageReason] = useState('Routine Checkup');
+  const [isLateEntry, setIsLateEntry] = useState(false);
+  const [visitDate, setVisitDate] = useState('');
+  const [lateEntryJustification, setLateEntryJustification] = useState('OFFLINE_CHARTING');
   const [showAckModal, setShowAckModal] = useState(false);
   const [ackAppointment, setAckAppointment] = useState(null);
   const [ackForm, setAckForm] = useState({ date: '', startTime: '', endTime: '' });
@@ -506,11 +514,18 @@ const Patients = () => {
       const patientRes = await api.post('patients/patients/', submitData);
       const newPatient = patientRes.data;
       
-      await api.post('clinical/visits/', {
+      const visitPayload = {
         patient: newPatient.id,
         reason: formData.reason || 'Initial Consultation',
         status: 'PENDING_VITALS'
-      });
+      };
+      const pId = newPatient.project || newPatient.project_id || formData.project;
+      const matchedProj = projects.find(p => p.id == pId);
+      if (matchedProj && matchedProj.allow_custom_visit_date && isLateEntry) {
+        visitPayload.visit_date = new Date(visitDate).toISOString();
+        visitPayload.late_entry_justification = lateEntryJustification;
+      }
+      await api.post('clinical/visits/', visitPayload);
 
       toast.success("Patient registered and queued for Vitals!", { id: loadingToast });
       setShowModal(false);
@@ -532,11 +547,18 @@ const Patients = () => {
     setIsTriaging(true);
      const loadingToast = toast.loading('Initiating instant intake...');
     try {
-      await api.post('clinical/visits/', {
+      const payload = {
         patient: triagePatient.id,
         reason: triageReason || 'OPD Consultation',
         status: 'PENDING_VITALS'
-      });
+      };
+      const pId = triagePatient.project || triagePatient.project_id;
+      const matchedProj = projects.find(p => p.id == pId);
+      if (matchedProj && matchedProj.allow_custom_visit_date && isLateEntry) {
+        payload.visit_date = new Date(visitDate).toISOString();
+        payload.late_entry_justification = lateEntryJustification;
+      }
+      await api.post('clinical/visits/', payload);
       toast.success('Patient moved to Intake/Vitals queue!', { id: loadingToast });
       setShowTriageModal(false);
       setTriagePatient(null);
@@ -893,7 +915,13 @@ const Patients = () => {
             </>
           )}
 
-          <button className="btn" onClick={() => { resetForm(); setShowModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+          <button className="btn" onClick={() => {
+            resetForm();
+            setVisitDate(getLocalISOString());
+            setIsLateEntry(false);
+            setLateEntryJustification('OFFLINE_CHARTING');
+            setShowModal(true);
+          }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
             <UserPlus size={18} /> Register New Patient
           </button>
         </div>
@@ -1212,6 +1240,9 @@ const Patients = () => {
                                 onClick={() => {
                                     setTriagePatient(p);
                                     setTriageReason('Routine Checkup');
+                                    setVisitDate(getLocalISOString());
+                                    setIsLateEntry(false);
+                                    setLateEntryJustification('OFFLINE_CHARTING');
                                     setShowTriageModal(true);
                                 }}
                             >
@@ -1780,6 +1811,57 @@ const Patients = () => {
                         value={formData.abha_id} onChange={e => setFormData({...formData, abha_id: e.target.value})} placeholder="14-digit ABHA Number" 
                     />
                 </div>
+              
+                {activeRegProject?.allow_custom_visit_date && (
+                  <div style={{ gridColumn: 'span 2', marginTop: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem', color: '#334155' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isLateEntry} 
+                        onChange={(e) => setIsLateEntry(e.target.checked)} 
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      Late Entry / Backdated Visit
+                    </label>
+                    
+                    {isLateEntry && (
+                      <div className="fade-in" style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
+                            Visit Date & Time
+                          </label>
+                          <input 
+                            type="datetime-local" 
+                            className="form-control" 
+                            value={visitDate}
+                            onChange={(e) => setVisitDate(e.target.value)}
+                            max={getLocalISOString()}
+                            required
+                            style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
+                          />
+                        </div>
+                        
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
+                            Late Entry Justification
+                          </label>
+                          <select 
+                            className="form-control"
+                            value={lateEntryJustification}
+                            onChange={(e) => setLateEntryJustification(e.target.value)}
+                            required
+                            style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
+                          >
+                            <option value="OFFLINE_CHARTING">Offline/Paper Charting Reconciliation</option>
+                            <option value="DELAYED_DOCUMENTATION">Delayed Administrative Documentation</option>
+                            <option value="EMERGENCY_BACKLOG">Emergency Backlog Prioritization</option>
+                            <option value="SYSTEM_DOWNTIME">System/Network Downtime Recovery</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Modal Footer */}
@@ -1867,6 +1949,57 @@ const Patients = () => {
                   <option value="Diagnostic Review">Diagnostic Review</option>
                 </select>
               </div>
+              
+              {projects.find(p => p.id == (triagePatient.project || triagePatient.project_id))?.allow_custom_visit_date && (
+                <div style={{ marginBottom: '2rem', background: '#f8fafc', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem', color: '#334155' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isLateEntry} 
+                      onChange={(e) => setIsLateEntry(e.target.checked)} 
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    Late Entry / Backdated Visit
+                  </label>
+                  
+                  {isLateEntry && (
+                    <div className="fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div>
+                        <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
+                          Visit Date & Time
+                        </label>
+                        <input 
+                          type="datetime-local" 
+                          className="form-control" 
+                          value={visitDate}
+                          onChange={(e) => setVisitDate(e.target.value)}
+                          max={getLocalISOString()}
+                          required
+                          style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
+                          Late Entry Justification
+                        </label>
+                        <select 
+                          className="form-control"
+                          value={lateEntryJustification}
+                          onChange={(e) => setLateEntryJustification(e.target.value)}
+                          required
+                          style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
+                        >
+                          <option value="OFFLINE_CHARTING">Offline/Paper Charting Reconciliation</option>
+                          <option value="DELAYED_DOCUMENTATION">Delayed Administrative Documentation</option>
+                          <option value="EMERGENCY_BACKLOG">Emergency Backlog Prioritization</option>
+                          <option value="SYSTEM_DOWNTIME">System/Network Downtime Recovery</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <button 

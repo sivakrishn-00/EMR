@@ -108,6 +108,8 @@ const Pharmacy = () => {
                 card_no: curr.card_no,
                 employee_id: curr.employee_id,
                 project_id: curr.project_id,
+                is_late_entry: curr.visit_is_late_entry,
+                late_entry_justification: curr.visit_late_entry_justification,
                 items: []
             };
             grouped.push(newGroup);
@@ -298,7 +300,30 @@ const Pharmacy = () => {
                     currentPrescriptions.map(p => (
                   <tr key={p.visit_id}>
                     <td style={{ padding: '1.25rem' }}>
-                       <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{p.patient_name}</p>
+                       <p style={{ fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
+                          {p.patient_name}
+                          {p.is_late_entry && (
+                            <span 
+                              style={{ 
+                                marginLeft: '0.5rem', 
+                                fontSize: '0.625rem', 
+                                background: 'rgba(245, 158, 11, 0.1)', 
+                                color: '#d97706', 
+                                padding: '0.15rem 0.4rem', 
+                                borderRadius: '6px', 
+                                fontWeight: 800,
+                                border: '1px solid rgba(245, 158, 11, 0.2)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em',
+                                verticalAlign: 'middle',
+                                display: 'inline-block'
+                              }}
+                              title={`Justification: ${p.late_entry_justification || 'N/A'}`}
+                            >
+                              Late Entry
+                            </span>
+                          )}
+                       </p>
                        <p style={{ fontSize: '0.625rem', color: '#64748b' }}>UHID: #{p.uhid}{p.card_no ? ` | Card: ${p.card_no}` : ''}</p>
                     </td>
                     <td style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--primary)' }}>
