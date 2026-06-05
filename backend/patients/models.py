@@ -280,6 +280,14 @@ class RegistryData(models.Model):
                         break
                     except (ValueError, TypeError):
                         pass
+
+            # Sync category/group from dynamic fields
+            for cat_key in ['category', 'item_group', 'group', 'type']:
+                if cat_key in self.additional_fields:
+                    val = self.additional_fields[cat_key]
+                    if val:
+                        self.category = str(val).strip()
+                        break
                         
         super().save(*args, **kwargs)
 

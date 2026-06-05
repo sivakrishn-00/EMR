@@ -39,6 +39,24 @@ class RegistryDataSerializer(serializers.ModelSerializer):
         model = RegistryData
         fields = '__all__'
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Expose common keys at root level for seamless frontend consumption
+        if instance.additional_fields and isinstance(instance.additional_fields, dict):
+            for key in ['item_group', 'item_code', 'item_name', 'qty', 'cost']:
+                if key in instance.additional_fields and data.get(key) is None:
+                    data[key] = instance.additional_fields[key]
+            # Ensure category is populated in representation even if database column was null
+            if not data.get('category'):
+                for cat_key in ['item_group', 'category', 'group']:
+                    if cat_key in instance.additional_fields:
+                        data['category'] = instance.additional_fields[cat_key]
+                        break
+        # Also ensure item_group is set from category if category exists but item_group doesn't
+        if not data.get('item_group') and data.get('category'):
+            data['item_group'] = data['category']
+        return data
+
     def get_total_uploaded(self, obj):
         try:
             batches = obj.batches.all()

@@ -50,6 +50,11 @@ const Clinical = () => {
   const [searchLab, setSearchLab] = useState("");
   const [drugSearch, setDrugSearch] = useState("");
   const [showDrugDropdown, setShowDrugDropdown] = useState(false);
+
+  const getDrugGroup = (d) => {
+    if (!d) return 'General';
+    return d.item_group || d.category || d.additional_fields?.item_group || d.additional_fields?.category || 'General';
+  };
   const [showLabSearch, setShowLabSearch] = useState(false);
 
   const [showHistory, setShowHistory] = useState(false);
@@ -122,12 +127,12 @@ const Clinical = () => {
       }
 
       // Filter strictly for pharmacy-drugs protocol and isolate by project if specified
-      let url = `patients/registry-data/?registry_type=${slug}&page_size=1000`;
-      if (projectId && slug !== 'pharmacy-drugs') url += `&project=${projectId}`;
+      let url = `patients/registry-data/?registry_type=${slug}&all=true`;
+      if (projectId) url += `&project=${projectId}`;
       const res = await api.get(url);
       const data = res.data.results || res.data;
       setPharmacyInventory(Array.isArray(data) ? data : []);
-      setTotalInventoryCount(res.data.count || (Array.isArray(data) ? data.length : 0));
+      setTotalInventoryCount(Array.isArray(data) ? data.length : (res.data.count || 0));
     } catch (err) {
       console.error("Pharmacy link offline:", err);
     }
@@ -1146,30 +1151,27 @@ const Clinical = () => {
                         style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 700 }}
                       >
                         <option value="">SELECT GROUP</option>
-                        {[...new Set(pharmacyInventory.map(d => d.category || d.item_group || 'General'))].sort().map(g => (
-                          <option key={g} value={g}>{g.toUpperCase()}</option>
+                        {[...new Set(pharmacyInventory.map(d => getDrugGroup(d).toUpperCase()))].sort().map(g => (
+                          <option key={g} value={g}>{g}</option>
                         ))}
                       </select>
 
                       <div style={{ position: 'relative' }}>
                         <div style={{ position: 'relative' }}>
                             <input 
-                              placeholder={selectedGroup ? "SEARCH DRUG..." : "Select Group First..."} 
+                              placeholder="SEARCH DRUG..." 
                               value={drugSearch} 
                               onFocus={(e) => {
-                                if (selectedGroup) {
-                                  setShowDrugDropdown(true);
-                                  e.target.select();
-                                }
+                                setShowDrugDropdown(true);
+                                e.target.select();
                               }}
                               onBlur={() => setTimeout(() => setShowDrugDropdown(false), 200)}
                               onChange={e => {
                                 setDrugSearch(e.target.value);
-                                setShowDrugDropdown(true);
-                                if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
+                                  setShowDrugDropdown(true);
+                                  if (newMed.name) setNewMed({...newMed, name: '', item_code: ''});
                               }} 
-                              disabled={!selectedGroup}
-                              style={{ background: selectedGroup ? 'var(--surface)' : '#f1f5f9', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 2.25rem 0 0.75rem', fontWeight: 800, color: 'var(--text-main)', cursor: selectedGroup ? 'text' : 'not-allowed' }} 
+                              style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', width: '100%', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 2.25rem 0 0.75rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'text' }} 
                             />
                             {drugSearch && (
                                 <button 
@@ -1195,17 +1197,19 @@ const Clinical = () => {
                         {showDrugDropdown && (
                             <div className="search-dropdown" style={{ position: 'absolute', top: '40px', left: 0, right: 0, borderRadius: '12px', zIndex: 1000, maxHeight: '250px', overflowY: 'auto' }}>
                                 {pharmacyInventory
-                                    .filter(d => !selectedGroup || (d.category || d.item_group) === selectedGroup)
+                                    .filter(d => !selectedGroup || getDrugGroup(d).toUpperCase() === selectedGroup.toUpperCase())
                                     .filter(d => !drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()) || (d.ucode && d.ucode.toLowerCase().includes(drugSearch.toLowerCase())))
                                     .map(d => (
                                         <div 
                                             key={d.id} 
                                             onMouseDown={() => {
+                                                const group = getDrugGroup(d);
+                                                setSelectedGroup(group.toUpperCase());
                                                 setNewMed({
                                                     ...newMed, 
                                                     name: d.name, 
                                                     item_code: d.ucode || d.item_code || '',
-                                                    item_group: d.category || d.item_group || ''
+                                                    item_group: group
                                                 });
                                                 setDrugSearch(d.name);
                                                 setShowDrugDropdown(false);
@@ -1219,7 +1223,7 @@ const Clinical = () => {
                                             </p>
                                         </div>
                                     ))}
-                                {pharmacyInventory.filter(d => (!selectedGroup || (d.category || d.item_group) === selectedGroup) && (!drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()))).length === 0 && (
+                                {pharmacyInventory.filter(d => (!selectedGroup || getDrugGroup(d).toUpperCase() === selectedGroup.toUpperCase()) && (!drugSearch || d.name.toLowerCase().includes(drugSearch.toLowerCase()))).length === 0 && (
                                     <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#475569', fontSize: '0.75rem', fontWeight: 600 }}>
                                         No matching drugs found in this group
                                     </div>

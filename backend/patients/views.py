@@ -409,6 +409,12 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['ucode', 'name']
 
+    @property
+    def paginator(self):
+        if self.request.query_params.get('all') == 'true' or self.request.query_params.get('page_size') == 'all':
+            return None
+        return super().paginator
+
     def perform_create(self, serializer):
         data = serializer.save()
         log_action(self.request.user, 'Registry', 'Data Entry Created', f"Record {data.ucode} added to registry {data.registry_type.name}")
@@ -504,7 +510,7 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
         Dynamically filters the Clinical Repository based on the active registry scope (Protocol).
         Ensures that data is strictly isolated between different clinical workstreams.
         """
-        queryset = RegistryData.objects.all().select_related('registry_type').order_by('id')
+        queryset = RegistryData.objects.all().select_related('registry_type', 'registry_type__project').prefetch_related('batches').order_by('id')
         
         # Project Isolation: Filter by associated project (Enforced globally for all actions)
         project_id = self.request.query_params.get('project')
