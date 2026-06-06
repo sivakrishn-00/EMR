@@ -107,8 +107,8 @@ class Vitals(models.Model):
         if self.weight_kg and self.height_cm:
             height_m = self.height_cm / 100
             self.bmi = self.weight_kg / (height_m * height_m)
-        if not self.id and self.visit:
-            self.recorded_at = self.visit.visit_date
+        if not self.id and not self.recorded_at:
+            self.recorded_at = timezone.now()
         super().save(*args, **kwargs)
 
     class Meta:
