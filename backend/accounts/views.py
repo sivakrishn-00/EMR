@@ -57,8 +57,16 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        queryset = AuditLog.objects.all().order_by('-timestamp')
+        queryset = AuditLog.objects.all().select_related('user').order_by('-timestamp')
         
+        user = self.request.user
+        project_param = self.request.query_params.get('project')
+        
+        if user.project:
+            queryset = queryset.filter(user__project=user.project)
+        elif project_param:
+            queryset = queryset.filter(user__project_id=project_param)
+            
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
@@ -91,6 +99,34 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             )
             
         return queryset
+
+    @action(detail=False, methods=['get'])
+    def download_csv(self, request):
+        # Disable pagination for download
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        import csv
+        from django.http import HttpResponse
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="audit_logs.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow(['User', 'Module', 'Action', 'Details', 'IP Address', 'Timestamp'])
+        
+        for log in queryset:
+            username = log.user.username if log.user else 'System'
+            timestamp_str = log.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            writer.writerow([
+                username,
+                log.module,
+                log.action,
+                log.details,
+                log.ip_address or '127.0.0.1',
+                timestamp_str
+            ])
+            
+        return response
 
 class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer

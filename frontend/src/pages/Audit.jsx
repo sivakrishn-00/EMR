@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { ClipboardList, Search, Calendar, Filter, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ClipboardList, Search, Calendar, Filter, User, ChevronLeft, ChevronRight, X, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Audit = () => {
+    const { user } = useAuth();
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -15,17 +17,34 @@ const Audit = () => {
     const [endDate, setEndDate] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
 
+    const [projects, setProjects] = useState([]);
+    const [selectedProject, setSelectedProject] = useState(user?.project || '');
+
     useEffect(() => {
-        fetchLogs();
+        fetchProjects();
     }, []);
 
-    const fetchLogs = async (pageNum = 1, startStr = startDate, endStr = endDate, searchStr = searchQuery) => {
+    useEffect(() => {
+        fetchLogs(1, startDate, endDate, searchQuery, selectedProject);
+    }, [selectedProject]);
+
+    const fetchProjects = async () => {
+        try {
+            const res = await api.get('patients/projects/');
+            setProjects(Array.isArray(res.data) ? res.data : (res.data.results || []));
+        } catch (err) {
+            console.error("Failed to load projects", err);
+        }
+    };
+
+    const fetchLogs = async (pageNum = 1, startStr = startDate, endStr = endDate, searchStr = searchQuery, projId = selectedProject) => {
         setIsLoading(true);
         try {
             let url = `accounts/audit-logs/?page=${pageNum}`;
             if (startStr) url += `&start_date=${startStr}`;
             if (endStr) url += `&end_date=${endStr}`;
             if (searchStr) url += `&search=${encodeURIComponent(searchStr)}`;
+            if (projId) url += `&project=${projId}`;
 
             const res = await api.get(url);
             if (res.data.results) {
@@ -47,7 +66,38 @@ const Audit = () => {
         setStartDate('');
         setEndDate('');
         setSearchQuery('');
-        fetchLogs(1, '', '', '');
+        fetchLogs(1, '', '', '', selectedProject);
+    };
+
+    const handleDownloadCSV = async () => {
+        try {
+            let url = `accounts/audit-logs/download_csv/`;
+            const params = [];
+            if (startDate) params.push(`start_date=${startDate}`);
+            if (endDate) params.push(`end_date=${endDate}`);
+            if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
+            if (selectedProject) params.push(`project=${selectedProject}`);
+            
+            if (params.length > 0) {
+                url += `?${params.join('&')}`;
+            }
+            
+            toast.loading("Preparing CSV download...", { id: 'download-csv' });
+            const response = await api.get(url, { responseType: 'blob' });
+            
+            const blob = new Blob([response.data], { type: 'text/csv' });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success("Audit logs downloaded successfully", { id: 'download-csv' });
+        } catch (err) {
+            toast.error("Failed to download audit logs", { id: 'download-csv' });
+        }
     };
 
     return (
@@ -58,17 +108,50 @@ const Audit = () => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>System-wide compliance and security tracking</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    {!user?.project && (
+                        <select
+                            value={selectedProject}
+                            onChange={(e) => setSelectedProject(e.target.value)}
+                            style={{
+                                padding: '0 2.25rem 0 1rem',
+                                borderRadius: '12px',
+                                border: '1.5px solid var(--border)',
+                                background: 'var(--surface) url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") no-repeat right 0.75rem center',
+                                backgroundSize: '16px',
+                                color: 'var(--text-main)',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
+                                cursor: 'pointer',
+                                height: '44px',
+                                outline: 'none',
+                                appearance: 'none',
+                                WebkitAppearance: 'none',
+                                MozAppearance: 'none',
+                                minWidth: '160px'
+                            }}
+                        >
+                            <option value="">All Projects</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    )}
                     {(startDate || endDate || searchQuery) && (
                         <button 
                             className="btn btn-secondary" 
                             style={{ 
-                                padding: '0.625rem 1rem', 
+                                height: '44px',
+                                padding: '0 1.25rem',
+                                borderRadius: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                whiteSpace: 'nowrap',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
                                 color: '#ef4444', 
                                 borderColor: '#fee2e2', 
-                                background: '#fef2f2',
-                                borderRadius: '14px',
-                                fontSize: '0.875rem',
-                                fontWeight: 700
+                                background: '#fef2f2'
                             }}
                             onClick={handleClearFilters}
                         >
@@ -78,7 +161,15 @@ const Audit = () => {
                     <button 
                         className="btn btn-secondary" 
                         style={{ 
-                            padding: '0.625rem 1rem',
+                            height: '44px',
+                            padding: '0 1.25rem',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 700,
+                            fontSize: '0.875rem',
                             background: showDatePicker ? 'rgba(99, 102, 241, 0.1)' : 'var(--surface)',
                             borderColor: showDatePicker ? 'var(--primary)' : 'var(--border)'
                         }}
@@ -92,7 +183,15 @@ const Audit = () => {
                     <button 
                         className="btn btn-secondary" 
                         style={{ 
-                            padding: '0.625rem 1rem',
+                            height: '44px',
+                            padding: '0 1.25rem',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 700,
+                            fontSize: '0.875rem',
                             background: showFilters ? 'rgba(99, 102, 241, 0.1)' : 'var(--surface)',
                             borderColor: showFilters ? 'var(--primary)' : 'var(--border)'
                         }}
@@ -102,6 +201,24 @@ const Audit = () => {
                         }}
                     >
                         <Filter size={18} color={showFilters ? 'var(--primary)' : 'currentColor'} /> Filters
+                    </button>
+                    <button 
+                        className="btn btn-primary" 
+                        style={{ 
+                            height: '44px',
+                            padding: '0 1.25rem',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 700,
+                            fontSize: '0.875rem',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                        }}
+                        onClick={handleDownloadCSV}
+                    >
+                        <Download size={18} /> Export CSV
                     </button>
                 </div>
             </header>
@@ -260,13 +377,13 @@ const Audit = () => {
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Page {page} of {Math.ceil(totalCount / 10)}</span>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
-                                className="btn btn-secondary" disabled={page === 1} onClick={() => fetchLogs(page - 1, startDate, endDate, searchQuery)}
+                                className="btn btn-secondary" disabled={page === 1} onClick={() => fetchLogs(page - 1, startDate, endDate, searchQuery, selectedProject)}
                                 style={{ padding: '0.25rem 0.5rem', opacity: page === 1 ? 0.5 : 1 }}
                             >
                                 <ChevronLeft size={16} />
                             </button>
                             <button 
-                                className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchLogs(page + 1, startDate, endDate, searchQuery)}
+                                className="btn btn-secondary" disabled={page >= Math.ceil(totalCount / 10)} onClick={() => fetchLogs(page + 1, startDate, endDate, searchQuery, selectedProject)}
                                 style={{ padding: '0.25rem 0.5rem', opacity: page >= Math.ceil(totalCount / 10) ? 0.5 : 1 }}
                             >
                                 <ChevronRight size={16} />
