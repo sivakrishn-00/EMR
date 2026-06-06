@@ -64,6 +64,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         status_param = self.request.query_params.get('status')
         if status_param:
             queryset = queryset.filter(status=status_param)
+            if status_param == 'PENDING':
+                queryset = queryset.filter(visit__status='PENDING_PHARMACY')
 
         search_query = self.request.query_params.get('search', '').strip()
         if search_query:

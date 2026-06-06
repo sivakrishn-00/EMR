@@ -19,6 +19,7 @@ class Visit(models.Model):
     reason = models.TextField()
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='PENDING_VITALS')
     is_active = models.BooleanField(default=True)
+    reversion_note = models.TextField(blank=True, null=True)
     
     # Late Entry Provenance
     entered_at = models.DateTimeField(null=True, blank=True)

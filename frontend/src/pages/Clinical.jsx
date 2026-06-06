@@ -557,6 +557,27 @@ const Clinical = () => {
                                      Late Entry
                                    </span>
                                  )}
+                                 {v.reversion_note && (
+                                   <span 
+                                     style={{ 
+                                       marginLeft: '0.5rem', 
+                                       fontSize: '0.625rem', 
+                                       background: 'rgba(239, 68, 68, 0.1)', 
+                                       color: '#dc2626', 
+                                       padding: '0.15rem 0.4rem', 
+                                       borderRadius: '6px', 
+                                       fontWeight: 800,
+                                       border: '1px solid rgba(239, 68, 68, 0.2)',
+                                       textTransform: 'uppercase',
+                                       letterSpacing: '0.02em',
+                                       verticalAlign: 'middle',
+                                       display: 'inline-block'
+                                     }}
+                                     title={`Pharmacy Note: ${v.reversion_note}`}
+                                   >
+                                     Pharmacy Review
+                                   </span>
+                                 )}
                                </p>
                                <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
                             </div>
@@ -977,6 +998,16 @@ const Clinical = () => {
                      <span className="examining-badge" style={{ fontSize: '0.6875rem', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content' }}>EXAMINING</span>
                   </div>
               </div>
+
+              {selectedVisit.reversion_note && (
+                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '1.25rem', borderRadius: '16px', margin: '0 0.5rem 2rem 0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                    <AlertCircle size={20} color="#dc2626" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                       <p style={{ fontSize: '0.875rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>Sent Back from Pharmacy (Review Requested)</p>
+                       <p style={{ fontSize: '0.8125rem', color: '#b91c1c', fontWeight: 600, margin: 0 }}>Note: <strong>{selectedVisit.reversion_note}</strong></p>
+                    </div>
+                 </div>
+              )}
 
              {/* Clinic History & Lab Results */}
              <div style={{ marginBottom: '1.5rem' }}>

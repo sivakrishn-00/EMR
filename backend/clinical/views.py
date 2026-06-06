@@ -192,6 +192,8 @@ class VisitViewSet(viewsets.ModelViewSet):
                 medications = request.data.get('medications', [])
                 
                 with transaction.atomic():
+                    # Clear any existing prescriptions for this visit to prevent duplicates on send-back
+                    Prescription.objects.filter(visit=visit).delete()
                     for med in medications:
                         med_name = med.get('name')
                         dosage = med.get('dosage', 'As directed')
@@ -217,6 +219,8 @@ class VisitViewSet(viewsets.ModelViewSet):
             if next_step == 'COMPLETED':
                 visit.is_active = False
                 
+            # Clear reversion note once the consultation is updated/saved by doctor
+            visit.reversion_note = None
             visit.save()
             log_action(request.user, 'Clinical', 'Consultation Saved', f"Saved consult for visit {visit.id}")
 
@@ -236,6 +240,41 @@ class VisitViewSet(viewsets.ModelViewSet):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED if not consult_instance else status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def revert_to_doctor(self, request, pk=None):
+        visit = self.get_object()
+        reversion_note = request.data.get('reversion_note', '')
+        
+        visit.status = 'FINAL_CONSULTATION'
+        visit.reversion_note = reversion_note
+        visit.is_active = True
+        visit.save()
+        
+        log_action(
+            request.user, 
+            'Clinical', 
+            'Visit Sent Back to Doctor', 
+            f"Visit ID {visit.id} sent back to doctor. Reason: {reversion_note}"
+        )
+        
+        p_project = visit.patient.project
+        if not p_project and visit.patient.employee_master:
+            p_project = visit.patient.employee_master.project
+            
+        notify_team(p_project, ['DOCTOR', 'ADMIN'], "Prescription Sent Back", f"Pharmacy sent back visit for {visit.patient}. Reason: {reversion_note}")
+        
+        # If there is a doctor linked to the consultation, notify them personally
+        consultation = getattr(visit, 'consultation', None)
+        if consultation and consultation.doctor:
+            Notification.objects.create(
+                recipient=consultation.doctor,
+                project=p_project,
+                title="Prescription Sent Back",
+                message=f"Pharmacy has sent back the prescription for {visit.patient}. Reason: {reversion_note}"
+            )
+            
+        return Response({'status': 'reverted to doctor'})
 
 class VitalsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Vitals.objects.all()

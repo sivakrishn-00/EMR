@@ -55,9 +55,18 @@ const Pharmacy = () => {
     }
   }, [user]);
 
+  const [showRevertSection, setShowRevertSection] = useState(false);
+  const [revertNote, setRevertNote] = useState('');
+  const [isReverting, setIsReverting] = useState(false);
+  const [toggleHovered, setToggleHovered] = useState(false);
+  const [textareaFocused, setTextareaFocused] = useState(false);
+  const [confirmHovered, setConfirmHovered] = useState(false);
+
   useEffect(() => {
     if (selectedPresc) {
       fetchStockForPresc(selectedPresc);
+      setShowRevertSection(false);
+      setRevertNote('');
     } else {
       setPharmacyInventory([]);
     }
@@ -191,6 +200,27 @@ const Pharmacy = () => {
         toast.error("Dispensing failed", { id: loadingToast });
     } finally {
         setIsDispensing(false);
+    }
+  };
+  const handleSendBackToDoctor = async () => {
+    if (!revertNote.trim()) {
+      toast.error("Please enter a reason for sending back to doctor");
+      return;
+    }
+    setIsReverting(true);
+    const loadingToast = toast.loading('Sending patient back to doctor...');
+    try {
+      await api.post(`clinical/visits/${selectedPresc.visit_id}/revert_to_doctor/`, {
+        reversion_note: revertNote
+      });
+      toast.success("Case successfully sent back to doctor.", { id: loadingToast });
+      setSelectedPresc(null);
+      fetchPrescriptionsAndInventory();
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to send back to doctor", { id: loadingToast });
+    } finally {
+      setIsReverting(false);
     }
   };
 
@@ -606,21 +636,103 @@ const Pharmacy = () => {
                </div>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleSmartDispenseClose(selectedPresc.visit_id); }}>
-               <div className="form-group" style={{ marginBottom: '2rem' }}>
-                  <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Pharmacist Notes / Counseling</label>
-                  <textarea rows="3" onChange={e => setDispenseData({...dispenseData, remarks: e.target.value})} placeholder="Caution: Take after food. Avoid driving..."></textarea>
-               </div>
+             <form onSubmit={(e) => { e.preventDefault(); handleSmartDispenseClose(selectedPresc.visit_id); }}>
+                <div className="form-group" style={{ marginBottom: '2rem' }}>
+                   <label style={{ color: projectConfig?.primary_color || 'var(--text-main)', fontWeight: 800 }}>Pharmacist Notes / Counseling</label>
+                   <textarea rows="3" onChange={e => setDispenseData({...dispenseData, remarks: e.target.value})} placeholder="Caution: Take after food. Avoid driving..."></textarea>
+                </div>
+ 
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+                   <CheckCircle size={20} color="#15803d" />
+                   <p style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 500 }}>Dispense & Discharge will automatically dispense all in-stock medicines, mark out-of-stock items, and safely discharge the patient.</p>
+                </div>
+ 
+                <button type="submit" disabled={isDispensing} className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: projectConfig?.primary_color || '#10b981', borderColor: projectConfig?.primary_color || '#10b981', fontSize: '1rem', fontWeight: 800, opacity: isDispensing ? 0.7 : 1, cursor: isDispensing ? 'not-allowed' : 'pointer' }}>
+                   {isDispensing ? 'Processing Dispensation...' : 'Dispense & Discharge Patient'} <ArrowRight size={18} style={{ marginLeft: '10px' }} />
+                </button>
+             </form>
 
-               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-                  <CheckCircle size={20} color="#15803d" />
-                  <p style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 500 }}>Dispense & Discharge will automatically dispense all in-stock medicines, mark out-of-stock items, and safely discharge the patient.</p>
-               </div>
-
-               <button type="submit" disabled={isDispensing} className="btn btn-primary" style={{ width: '100%', padding: '1.125rem', background: projectConfig?.primary_color || '#10b981', borderColor: projectConfig?.primary_color || '#10b981', fontSize: '1rem', fontWeight: 800, opacity: isDispensing ? 0.7 : 1, cursor: isDispensing ? 'not-allowed' : 'pointer' }}>
-                  {isDispensing ? 'Processing Dispensation...' : 'Dispense & Discharge Patient'} <ArrowRight size={18} style={{ marginLeft: '10px' }} />
-               </button>
-            </form>
+              <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px dashed var(--border)' }}>
+                 <button
+                    type="button"
+                    onClick={() => setShowRevertSection(!showRevertSection)}
+                    style={{ 
+                       width: '100%', 
+                       padding: '0.75rem 1.25rem', 
+                       border: '1.5px solid #fca5a5', 
+                       color: '#dc2626', 
+                       background: toggleHovered ? '#fff5f5' : 'transparent', 
+                       fontSize: '0.8125rem', 
+                       fontWeight: 800,
+                       cursor: 'pointer',
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       gap: '8px',
+                       borderRadius: '12px',
+                       transition: 'all 0.2s ease',
+                       boxShadow: toggleHovered ? '0 4px 12px rgba(220, 38, 38, 0.05)' : 'none'
+                    }}
+                    onMouseEnter={() => setToggleHovered(true)}
+                    onMouseLeave={() => setToggleHovered(false)}
+                 >
+                    <AlertCircle size={16} /> {showRevertSection ? 'Hide Send Back Form' : 'Send Back to Doctor (Request Edit)'}
+                 </button>
+ 
+                 {showRevertSection && (
+                   <div className="fade-in" style={{ marginTop: '1rem', padding: '1.25rem', background: '#fffcfc', border: '1px solid #fecaca', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(220, 38, 38, 0.04), 0 8px 10px -6px rgba(220, 38, 38, 0.04)' }}>
+                       <label style={{ color: '#991b1b', fontWeight: 900, fontSize: '0.7rem', display: 'block', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason / Correction Needed</label>
+                       <textarea
+                          rows="3"
+                          value={revertNote}
+                          onChange={e => setRevertNote(e.target.value)}
+                          placeholder="Explain what needs to be changed (e.g. out of stock, dosage clarification...)"
+                          style={{ 
+                             width: '100%', 
+                             padding: '0.75rem 1rem', 
+                             borderRadius: '12px', 
+                             border: textareaFocused ? '1.5px solid #f87171' : '1.5px solid var(--border)',
+                             boxShadow: textareaFocused ? '0 0 0 4px rgba(220, 38, 38, 0.08)' : 'none',
+                             background: 'var(--surface)',
+                             color: 'var(--text-main)',
+                             fontSize: '0.8125rem', 
+                             marginBottom: '0.75rem',
+                             outline: 'none',
+                             fontFamily: 'inherit',
+                             transition: 'all 0.2s ease',
+                             resize: 'vertical',
+                             minHeight: '80px'
+                          }}
+                          onFocus={() => setTextareaFocused(true)}
+                          onBlur={() => setTextareaFocused(false)}
+                       ></textarea>
+                       <button
+                          type="button"
+                          onClick={handleSendBackToDoctor}
+                          disabled={isReverting}
+                          style={{ 
+                             width: '100%', 
+                             padding: '0.875rem', 
+                             background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                             color: 'white', 
+                             border: 'none', 
+                             borderRadius: '12px', 
+                             fontSize: '0.8125rem', 
+                             fontWeight: 800, 
+                             cursor: isReverting ? 'not-allowed' : 'pointer',
+                             opacity: isReverting ? 0.7 : 1,
+                             boxShadow: confirmHovered ? '0 6px 16px rgba(220, 38, 38, 0.35)' : '0 4px 12px rgba(220, 38, 38, 0.25)',
+                             transform: confirmHovered && !isReverting ? 'translateY(-1px)' : 'none',
+                             transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={() => setConfirmHovered(true)}
+                          onMouseLeave={() => setConfirmHovered(false)}
+                       >
+                          {isReverting ? 'Sending Back...' : 'Confirm Send Back to Doctor'}
+                       </button>
+                   </div>
+                 )}
+              </div>
           </div>
         )}
       </div>
