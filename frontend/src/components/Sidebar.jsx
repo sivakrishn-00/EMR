@@ -285,25 +285,36 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
           transform: rotate(180deg);
         }
 
+        .collapsed nav {
+          overflow: visible !important;
+        }
+
         /* Tooltip for collapsed mode */
         .tooltip {
           position: absolute;
-          left: calc(100% + 15px);
+          left: calc(100% + 10px);
           background: #1e293b;
           color: white;
-          padding: 0.5rem 0.75rem;
-          border-radius: 6px;
+          padding: 0.4rem 0.75rem;
+          border-radius: 8px;
           font-size: 0.75rem;
+          font-weight: 700;
           opacity: 0;
           pointer-events: none;
-          transition: 0.2s;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           white-space: nowrap;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-          display: none;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          transform: translateX(-8px);
+          z-index: 999;
+          display: none; /* Hide in expanded sidebar to prevent horizontal scrollbars */
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .collapsed .tooltip {
+          display: block; /* Enable in collapsed mode so it can animate on hover */
         }
         .collapsed .nav-link:hover .tooltip {
           opacity: 1;
-          display: block;
+          transform: translateX(0);
         }
 
         @media (max-width: 1024px) {
