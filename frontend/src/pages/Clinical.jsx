@@ -184,8 +184,17 @@ const Clinical = () => {
     fetchVisitsToSee();
   }, []);
 
-  const fetchVisitsToSee = async (pageNum = 1, search = searchTerm) => {
-    setIsLoading(true);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && !selectedVisit) {
+        fetchVisitsToSee(page, searchTerm, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [page, searchTerm, selectedVisit]);
+
+  const fetchVisitsToSee = async (pageNum = 1, search = searchTerm, isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
       // Fetch only visits that need consultation
       const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=100&search=${encodeURIComponent(search)}`);
@@ -205,9 +214,9 @@ const Clinical = () => {
           fetchProjectLabMasters(pid);
       }
     } catch (err) {
-      toast.error("Failed to fetch doctor's queue");
+      if (!isBackground) toast.error("Failed to fetch doctor's queue");
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
   };
 

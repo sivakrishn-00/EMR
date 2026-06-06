@@ -95,6 +95,15 @@ const Vitals = () => {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && !selectedVisit) {
+        fetchActiveVisits(page, searchTerm, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [page, searchTerm, selectedVisit]);
+
+  useEffect(() => {
     if (user?.project) {
         fetchProjectConfig();
         
@@ -114,8 +123,8 @@ const Vitals = () => {
     }
   };
 
-  const fetchActiveVisits = async (pageNum = 1, search = searchTerm) => {
-    setIsLoading(true);
+  const fetchActiveVisits = async (pageNum = 1, search = searchTerm, isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
       const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}&page_size=100&search=${encodeURIComponent(search)}`);
       if (res.data.results) {
@@ -127,9 +136,9 @@ const Vitals = () => {
       }
       setPage(pageNum);
     } catch (err) {
-      toast.error("Failed to fetch intake queue");
+      if (!isBackground) toast.error("Failed to fetch intake queue");
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
   };
 

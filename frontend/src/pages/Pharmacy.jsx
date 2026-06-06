@@ -55,6 +55,15 @@ const Pharmacy = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchPrescriptionsAndInventory(searchTerm, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [searchTerm, selectedPresc]);
+
   const [showRevertSection, setShowRevertSection] = useState(false);
   const [revertNote, setRevertNote] = useState('');
   const [isReverting, setIsReverting] = useState(false);
@@ -97,8 +106,8 @@ const Pharmacy = () => {
     }
   };
 
-  const fetchPrescriptionsAndInventory = async (search = searchTerm) => {
-    setIsLoading(true);
+  const fetchPrescriptionsAndInventory = async (search = searchTerm, isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
       const prescRes = await api.get(`pharmacy/prescriptions/?status=PENDING&page_size=1000&search=${encodeURIComponent(search)}`);
       
@@ -140,10 +149,10 @@ const Pharmacy = () => {
 
       return grouped;
     } catch (err) {
-      toast.error("Failed to fetch medication queue");
+      if (!isBackground) toast.error("Failed to fetch medication queue");
       return [];
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
   };
 

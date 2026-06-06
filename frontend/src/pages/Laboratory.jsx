@@ -138,6 +138,15 @@ const Laboratory = () => {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchLabRequests(searchTerm, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [searchTerm]);
+
+  useEffect(() => {
     if (user?.project) {
       fetchProjectConfig(user.project);
     } else {
@@ -154,16 +163,16 @@ const Laboratory = () => {
     }
   };
 
-  const fetchLabRequests = async (search = searchTerm) => {
-    setIsLoading(true);
+  const fetchLabRequests = async (search = searchTerm, isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
       const res = await api.get(`laboratory/requests/?page_size=1000&search=${encodeURIComponent(search)}`);
       const data = res.data.results || res.data;
       setLabRequests(Array.isArray(data) ? data : []);
     } catch (err) {
-      toast.error("Failed to fetch lab workload");
+      if (!isBackground) toast.error("Failed to fetch lab workload");
     } finally {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
     }
   };
 

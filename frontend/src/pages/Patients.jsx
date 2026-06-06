@@ -363,6 +363,16 @@ const Patients = () => {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      const noModalsOpen = !showModal && !showTriageModal && !showAckModal && !showDownloadModal && !showMasterModal && !showFamilyModal && !showBulkEnrollModal;
+      if (document.visibilityState === 'visible' && noModalsOpen) {
+        fetchPatients(page, viewMode, projectFilter, searchQuery, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [page, viewMode, projectFilter, searchQuery, showModal, showTriageModal, showAckModal, showDownloadModal, showMasterModal, showFamilyModal, showBulkEnrollModal]);
+
+  useEffect(() => {
     if (projectFilter) {
       localStorage.setItem('activeProjectId', projectFilter);
     } else {
@@ -441,9 +451,9 @@ const Patients = () => {
     } catch (err) {}
   };
 
-  const fetchPatients = async (pageNum = 1, currentView = viewMode, proj = projectFilter, search = searchQuery) => {
+  const fetchPatients = async (pageNum = 1, currentView = viewMode, proj = projectFilter, search = searchQuery, isBackground = false) => {
     const requestId = ++latestRequestRef.current;
-    setIsLoading(true);
+    if (!isBackground) setIsLoading(true);
     try {
       const viewParam = currentView.toLowerCase();
       let url = `patients/patients/?page=${pageNum}&view=${viewParam}&search=${search}`;
@@ -469,11 +479,11 @@ const Patients = () => {
     } catch (err) {
       if (requestId === latestRequestRef.current) {
           console.error(err);
-          toast.error("Cloud synchronization delay. Please refresh.");
+          if (!isBackground) toast.error("Cloud synchronization delay. Please refresh.");
       }
     } finally {
       if (requestId === latestRequestRef.current) {
-          setIsLoading(false);
+          if (!isBackground) setIsLoading(false);
       }
     }
   };
