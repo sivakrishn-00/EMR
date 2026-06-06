@@ -1610,6 +1610,205 @@ class RegistryReportView(viewsets.ViewSet):
             'batches': batches_list
         })
 
+    @action(detail=False, methods=['get'])
+    def operations_hub(self, request):
+        from django.db.models import Count, Sum, Q
+        from clinical.models import Visit, Vitals, Consultation
+        from pharmacy.models import DispensingRecord, Prescription
+        from patients.models import RegistryType, RegistryData, Project, Patient
+        from collections import Counter
+        import re
+
+        user = request.user
+        project_id = request.query_params.get('project')
+        is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
+
+        active_project = None
+        if user.is_superuser:
+            if project_id:
+                active_project = Project.objects.filter(id=project_id).first()
+        elif user.project:
+            active_project = user.project
+        elif is_admin:
+            if project_id:
+                active_project = Project.objects.filter(id=project_id).first()
+
+        # Base filter sets
+        patient_qs = Patient.objects.all()
+        visit_qs = Visit.objects.all()
+        vitals_qs = Vitals.objects.all()
+        consult_qs = Consultation.objects.all()
+        dispense_qs = DispensingRecord.objects.all()
+
+        if active_project:
+            patient_qs = patient_qs.filter(Q(project=active_project) | Q(employee_master__project=active_project))
+            visit_qs = visit_qs.filter(Q(patient__project=active_project) | Q(patient__employee_master__project=active_project))
+            vitals_qs = vitals_qs.filter(Q(visit__patient__project=active_project) | Q(visit__patient__employee_master__project=active_project))
+            consult_qs = consult_qs.filter(Q(visit__patient__project=active_project) | Q(visit__patient__employee_master__project=active_project))
+            dispense_qs = dispense_qs.filter(Q(prescription__visit__patient__project=active_project) | Q(prescription__visit__patient__employee_master__project=active_project))
+
+        # 1. Top Diagnoses (Diseases) Analysis
+        diagnoses = consult_qs.exclude(Q(diagnosis__isnull=True) | Q(diagnosis=''))
+        diag_counter = Counter()
+        for c in diagnoses:
+            parts = re.split(r'[,;\n]', c.diagnosis)
+            for part in parts:
+                cleaned = part.strip().upper()
+                if cleaned and len(cleaned) > 2 and cleaned not in ['N/A', 'NONE', 'NIL', 'NO', 'NORMAL']:
+                    diag_counter[cleaned] += 1
+
+        top_diseases = [{'name': name, 'count': count} for name, count in diag_counter.most_common(10)]
+
+        # 2. Drug Utilization / Top Drugs Dispensed
+        drug_counter = Counter()
+        for dr in dispense_qs.select_related('prescription'):
+            med_name = dr.prescription.medication_name.strip().upper() if dr.prescription else None
+            if med_name:
+                drug_counter[med_name] += dr.quantity
+
+        top_drugs = [{'name': name, 'quantity': quantity} for name, quantity in drug_counter.most_common(10)]
+
+        # 3. Live Counts (Deductions, workflow steps)
+        total_registered = patient_qs.count()
+        total_vitals = vitals_qs.count()
+        total_consultations = consult_qs.count()
+        total_dispenses = dispense_qs.count()
+        total_units_dispensed = dispense_qs.aggregate(total=Sum('quantity'))['total'] or 0
+        active_queue = visit_qs.filter(is_active=True).count()
+
+        # 4. Recent Transaction/Deduction Stream
+        recent_activity = []
+        # Recent dispensings
+        recent_disp = dispense_qs.select_related('prescription__visit__patient').order_by('-dispensed_at')[:10]
+        for dr in recent_disp:
+            pat_name = f"{dr.prescription.visit.patient.first_name} {dr.prescription.visit.patient.last_name}" if dr.prescription and dr.prescription.visit else "Unknown Patient"
+            med = dr.prescription.medication_name if dr.prescription else "Unknown Medication"
+            recent_activity.append({
+                'id': f"disp_{dr.id}",
+                'type': 'DISPENSE',
+                'timestamp': dr.dispensed_at.isoformat(),
+                'title': 'Medication Dispensed',
+                'description': f"Dispensed {dr.quantity} units of {med} to {pat_name}"
+            })
+
+        # Recent consultations
+        recent_cons = consult_qs.select_related('visit__patient', 'doctor').order_by('-conducted_at')[:10]
+        for c in recent_cons:
+            pat_name = f"{c.visit.patient.first_name} {c.visit.patient.last_name}" if c.visit else "Unknown Patient"
+            doc_name = f"Dr. {c.doctor.username}" if c.doctor else "Doctor"
+            diag_str = f" (Diagnosis: {c.diagnosis[:40]}...)" if c.diagnosis else ""
+            recent_activity.append({
+                'id': f"cons_{c.id}",
+                'type': 'CONSULTATION',
+                'timestamp': c.conducted_at.isoformat(),
+                'title': 'Consultation Completed',
+                'description': f"Consultation completed for {pat_name} by {doc_name}{diag_str}"
+            })
+
+        # Recent vitals checks
+        recent_vit = vitals_qs.select_related('visit__patient', 'recorded_by').order_by('-recorded_at')[:10]
+        for v in recent_vit:
+            pat_name = f"{v.visit.patient.first_name} {v.visit.patient.last_name}" if v.visit else "Unknown Patient"
+            by_name = v.recorded_by.username if v.recorded_by else "Staff"
+            recent_activity.append({
+                'id': f"vit_{v.id}",
+                'type': 'VITALS',
+                'timestamp': v.recorded_at.isoformat(),
+                'title': 'Vitals Recorded',
+                'description': f"Recorded vitals for {pat_name} (BP: {v.blood_pressure_sys or 'N/A'}/{v.blood_pressure_dia or 'N/A'}, Temp: {v.temperature_c or 'N/A'}°C) by {by_name}"
+            })
+
+        # Sort recent activity combined
+        recent_activity = sorted(recent_activity, key=lambda x: x['timestamp'], reverse=True)[:15]
+
+        # 5. Stock Health calculations
+        pharmacy_type = RegistryType.objects.filter(Q(icon='Pill') | Q(slug__icontains='pharmacy') | Q(name__icontains='pharmacy')).first()
+        inventory_items = RegistryData.objects.filter(registry_type=pharmacy_type).exclude(name='').exclude(ucode='') if pharmacy_type else RegistryData.objects.none()
+        if active_project:
+            inventory_items = inventory_items.filter(registry_type__project=active_project)
+
+        low_stock_count = inventory_items.filter(quantity__lt=10, quantity__gt=0).count()
+        depleted_count = inventory_items.filter(quantity=0).count()
+
+        # 6. Project breakdown (Multi-Project Comparison)
+        project_breakdown = []
+        for p in Project.objects.all():
+            p_patients = Patient.objects.filter(Q(project=p) | Q(employee_master__project=p)).count()
+            p_active = Visit.objects.filter(Q(patient__project=p) | Q(patient__employee_master__project=p), is_active=True).count()
+            p_vitals = Vitals.objects.filter(Q(visit__patient__project=p) | Q(visit__patient__employee_master__project=p)).count()
+            p_consultations = Consultation.objects.filter(Q(visit__patient__project=p) | Q(visit__patient__employee_master__project=p)).count()
+            p_dispensed = DispensingRecord.objects.filter(Q(prescription__visit__patient__project=p) | Q(prescription__visit__patient__employee_master__project=p)).aggregate(total=Sum('quantity'))['total'] or 0
+            
+            # Count lab requests ordered for this project
+            from laboratory.models import LabRequest
+            p_labs = LabRequest.objects.filter(Q(visit__patient__project=p) | Q(visit__patient__employee_master__project=p)).count()
+            
+            project_breakdown.append({
+                'id': p.id,
+                'name': p.name,
+                'patients': p_patients,
+                'active_queue': p_active,
+                'vitals': p_vitals,
+                'consultations': p_consultations,
+                'lab_requests': p_labs,
+                'units_dispensed': p_dispensed
+            })
+
+        # 7. Lab Cloud Sync Telemetry
+        from laboratory.models import LabMachine, LabSyncAudit, LabMachineData
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        fifteen_mins_ago = timezone.now() - timedelta(minutes=15)
+        
+        lab_telemetry = {
+            'total_machines': LabMachine.objects.count(),
+            'online_machines': LabMachine.objects.filter(last_synced_at__gte=fifteen_mins_ago).count(),
+            'total_raw_results': LabMachineData.objects.count(),
+            'total_audits': LabSyncAudit.objects.count(),
+            'successful_audits': LabSyncAudit.objects.filter(is_success=True).count(),
+            'machines_list': []
+        }
+        
+        # Get recently active machines
+        active_machines = LabMachine.objects.select_related('project').order_by('-last_synced_at')[:5]
+        for m in active_machines:
+            status = 'OFFLINE'
+            if m.last_synced_at and m.last_synced_at >= fifteen_mins_ago:
+                status = 'ONLINE'
+            lab_telemetry['machines_list'].append({
+                'id': m.id,
+                'name': m.machine_name,
+                'project_name': m.project.name if m.project else 'Global Station',
+                'location': m.location,
+                'status': status,
+                'last_synced': m.last_synced_at.isoformat() if m.last_synced_at else None
+            })
+
+        # 8. Project Name
+        project_name = active_project.name if active_project else "All Projects"
+
+        return Response({
+            'project_name': project_name,
+            'top_diseases': top_diseases,
+            'top_drugs': top_drugs,
+            'counts': {
+                'total_registered': total_registered,
+                'total_vitals': total_vitals,
+                'total_consultations': total_consultations,
+                'total_dispenses': total_dispenses,
+                'total_units_dispensed': total_units_dispensed,
+                'active_queue': active_queue
+            },
+            'recent_activity': recent_activity,
+            'stock_alerts': {
+                'low': low_stock_count,
+                'depleted': depleted_count
+            },
+            'project_breakdown': project_breakdown,
+            'lab_telemetry': lab_telemetry
+        })
+
 from .reports import generate_patient_pdf_report
 from django.http import HttpResponse
 

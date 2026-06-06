@@ -11,6 +11,7 @@ const SYSTEM_MODULES = [
     { id: '/lab', name: 'Laboratory', icon: 'Microscope' },
     { id: '/pharmacy', name: 'Pharmacy', icon: 'Pill' },
     { id: '/reports', name: 'Analytics Hub', icon: 'BarChart3' },
+    { id: '/operations-hub', name: 'Executive Operations Hub', icon: 'TrendingUp' },
     { id: '/reports/bulk-import', name: 'Reports - Bulk Import History', icon: 'Upload' },
     { id: '/users', name: 'System Users', icon: 'UserCircle' },
     { id: '/audit', name: 'Audit Logs', icon: 'History' },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -13,37 +13,86 @@ import {
   Calendar as CalendarIcon
 } from 'lucide-react';
 
-const StatCard = ({ title, value, icon: Icon, color, gradient }) => (
-  <div className="card fade-in" style={{ 
-    background: gradient || 'var(--surface)', 
-    borderRadius: '16px', 
-    padding: '0.75rem 1.125rem', 
-    color: 'white',
-    boxShadow: '0 6px 12px -3px rgba(0,0,0,0.1)',
-    position: 'relative',
-    overflow: 'hidden',
-    border: '1px solid rgba(255,255,255,0.08)',
-    transition: 'transform 0.3s ease',
-    cursor: 'default',
-    minWidth: '180px'
-  }}
-  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-  >
-    <div style={{ position: 'relative', zIndex: 2 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-        <div style={{ background: 'rgba(255,255,255,0.15)', padding: '0.4rem', borderRadius: '10px' }}>
-          <Icon size={14} strokeWidth={3} />
+// Animated CountUp Component
+const CountUp = ({ to, duration = 1.0 }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = parseInt(to) || 0;
+    if (start === end) {
+      setCount(end);
+      return;
+    }
+
+    const totalMiliseconds = duration * 1000;
+    const incrementTime = 25; 
+    const totalSteps = Math.round(totalMiliseconds / incrementTime);
+    let step = 0;
+
+    const timer = setInterval(() => {
+      step++;
+      const current = Math.round(end * (step / totalSteps));
+      if (step >= totalSteps) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(current);
+      }
+    }, incrementTime);
+
+    return () => clearInterval(timer);
+  }, [to, duration]);
+
+  return <>{count.toLocaleString()}</>;
+};
+
+const StatCard = ({ title, value, icon: Icon, color, gradient }) => {
+  const valString = String(value);
+  // Match leading numbers followed by any text suffix
+  const match = valString.match(/^(\d+)(.*)$/);
+
+  return (
+    <div className="card fade-in" style={{ 
+      background: gradient || 'var(--surface)', 
+      borderRadius: '16px', 
+      padding: '0.75rem 1.125rem', 
+      color: 'white',
+      boxShadow: '0 6px 12px -3px rgba(0,0,0,0.1)',
+      position: 'relative',
+      overflow: 'hidden',
+      border: '1px solid rgba(255,255,255,0.08)',
+      transition: 'transform 0.3s ease',
+      cursor: 'default',
+      minWidth: '180px'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+      <div style={{ position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+          <div style={{ background: 'rgba(255,255,255,0.15)', padding: '0.4rem', borderRadius: '10px' }}>
+            <Icon size={14} strokeWidth={3} />
+          </div>
+          <div style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.8, background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '10px' }}>Live</div>
         </div>
-        <div style={{ fontSize: '0.55rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.8, background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '10px' }}>Live</div>
+        <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.01em' }}>
+          {match ? (
+            <>
+              <CountUp to={match[1]} />
+              {match[2]}
+            </>
+          ) : (
+            value
+          )}
+        </div>
+        <div style={{ fontSize: '0.6875rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.01em' }}>{title}</div>
       </div>
-      <div style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '0.1rem', letterSpacing: '-0.01em' }}>{value}</div>
-      <div style={{ fontSize: '0.6875rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.01em' }}>{title}</div>
+      {/* Abstract Background Shapes */}
+      <div style={{ position: 'absolute', right: '-10%', bottom: '-15%', width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', zIndex: 1 }}></div>
     </div>
-    {/* Abstract Background Shapes */}
-    <div style={{ position: 'absolute', right: '-10%', bottom: '-15%', width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', zIndex: 1 }}></div>
-  </div>
-);
+  );
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -158,7 +207,7 @@ const Dashboard = () => {
               <div key={dept.name}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.625rem', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <span style={{ color: 'var(--text-muted)' }}>{dept.name}</span>
-                  <span style={{ color: 'var(--text-main)' }}>{dept.value}%</span>
+                  <span style={{ color: 'var(--text-main)' }}><CountUp to={dept.value} />%</span>
                 </div>
                 <div style={{ height: '10px', background: 'var(--background)', borderRadius: '5px', overflow: 'hidden' }}>
                   <div style={{ 

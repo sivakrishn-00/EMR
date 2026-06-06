@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   BarChart3,
   HardDrive,
-  Radio
+  Radio,
+  TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -51,6 +52,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
     { name: 'Lab Hub', icon: FlaskConical, path: '/lab' },
     { name: 'Pharmacy', icon: Pill, path: '/pharmacy' },
     { name: 'Reports', icon: BarChart3, path: '/reports' },
+    { name: 'Operations Hub', icon: TrendingUp, path: '/operations-hub' },
   ];
 
   const adminItems = [

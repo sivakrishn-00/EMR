@@ -18,6 +18,7 @@ import ProjectManagement from './pages/ProjectManagement';
 import RoleManagement from './pages/RoleManagement';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
+import OperationsHub from './pages/OperationsHub';
 import BridgeHub from './pages/BridgeHub';
 import PatientDashboard from './pages/Portal/PatientDashboard';
 import { Toaster } from 'react-hot-toast';
@@ -293,6 +294,14 @@ function App() {
             <MainLayout>
               <ProtectedRoute requiredModule="/reports">
                 <Reports />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
+          <Route path="/operations-hub" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/operations-hub">
+                <OperationsHub />
               </ProtectedRoute>
             </MainLayout>
           } />

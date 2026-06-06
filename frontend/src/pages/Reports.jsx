@@ -36,9 +36,64 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+// Animated CountUp Component
+const CountUp = ({ to, duration = 1.0 }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = parseFloat(String(to).replace(/[^\d.-]/g, '')) || 0;
+    if (start === end) {
+      setCount(end);
+      return;
+    }
+
+    const totalMiliseconds = duration * 1000;
+    const incrementTime = 25; 
+    const totalSteps = Math.round(totalMiliseconds / incrementTime);
+    let step = 0;
+
+    const timer = setInterval(() => {
+      step++;
+      const current = end * (step / totalSteps);
+      if (step >= totalSteps) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(current);
+      }
+    }, incrementTime);
+
+    return () => clearInterval(timer);
+  }, [to, duration]);
+
+  // Format the output
+  const str = String(to);
+  const match = str.match(/^([^0-9.-]*)([0-9.,-]+)([^0-9.-]*)$/);
+  if (match) {
+    const prefix = match[1];
+    const numPart = match[2];
+    const suffix = match[3];
+    
+    // Check if the number has a decimal point
+    const hasDecimal = numPart.includes('.');
+    const decimalPlaces = hasDecimal ? numPart.split('.')[1].length : 0;
+    
+    const formattedNum = count.toLocaleString(undefined, {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces
+    });
+    
+    return <>{prefix}{formattedNum}{suffix}</>;
+  }
+
+  return <>{Math.round(count).toLocaleString()}</>;
+};
+
 const Reports = () => {
   const { user } = useAuth();
   const dropdownRef = React.useRef(null);
+  const projDropdownRef = React.useRef(null);
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -57,6 +112,7 @@ const Reports = () => {
   const [employeePage, setEmployeePage] = useState(1);
   const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [isProjDropdownOpen, setIsProjDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchProjects();
@@ -74,6 +130,9 @@ const Reports = () => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
+      }
+      if (projDropdownRef.current && !projDropdownRef.current.contains(event.target)) {
+        setIsProjDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -375,44 +434,101 @@ const Reports = () => {
         </div>
 
         {activeTab === 'GENERAL' && (
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--surface)', padding: '6px 12px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-              <CalendarDays size={14} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)' }}>Last 7 Days</span>
-            </div>
-
-            <div style={{ position: 'relative' }}>
-              <select 
-                value={selectedProject}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  sessionStorage.setItem('reports_selected_project', val);
-                  if (val && val !== 'all') {
-                    localStorage.setItem('activeProjectId', val);
-                  } else {
-                    localStorage.removeItem('activeProjectId');
-                  }
-                  window.location.reload();
-                }}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* 🌟 CUSTOM PROFESSIONAL DROPDOWN */}
+            <div style={{ position: 'relative' }} ref={projDropdownRef}>
+              <button 
+                onClick={() => !user?.project && setIsProjDropdownOpen(!isProjDropdownOpen)}
                 style={{
-                  padding: '6px 2.5rem 6px 1rem',
+                  padding: '10px 1.25rem',
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
-                  borderRadius: '12px',
-                  fontSize: '0.8125rem',
-                  fontWeight: 700,
+                  borderRadius: '14px',
+                  fontSize: '0.875rem',
+                  fontWeight: 800,
                   color: 'var(--text-main)',
-                  minWidth: '180px',
+                  minWidth: '220px',
                   cursor: user?.project ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   outline: 'none',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
                 }}
-                disabled={user?.project}
+                disabled={!!user?.project}
               >
-                <option value="all" disabled={user?.project}>Enterprise Global</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <Filter size={12} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Filter size={14} style={{ color: '#6366f1' }} />
+                  <span>{selectedProject === 'all' ? 'Enterprise Global' : currentProjectName}</span>
+                </div>
+                <span style={{ fontSize: '8px', color: 'var(--text-muted)', marginLeft: '8px' }}>▼</span>
+              </button>
+
+              {isProjDropdownOpen && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    minWidth: '240px',
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                    padding: '6px'
+                  }}
+                >
+                  <div 
+                    onClick={() => {
+                      sessionStorage.setItem('reports_selected_project', 'all');
+                      localStorage.removeItem('activeProjectId');
+                      setIsProjDropdownOpen(false);
+                      window.location.reload();
+                    }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      fontSize: '0.8125rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      background: selectedProject === 'all' ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                      color: selectedProject === 'all' ? '#6366f1' : 'var(--text-main)',
+                      transition: '0.15s',
+                    }}
+                    className="dropdown-item-hover"
+                  >
+                    Enterprise Global
+                  </div>
+                  {projects.map(p => (
+                    <div 
+                      key={p.id}
+                      onClick={() => {
+                        const val = String(p.id);
+                        sessionStorage.setItem('reports_selected_project', val);
+                        localStorage.setItem('activeProjectId', val);
+                        setIsProjDropdownOpen(false);
+                        window.location.reload();
+                      }}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        fontSize: '0.8125rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        background: selectedProject === String(p.id) ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                        color: selectedProject === String(p.id) ? '#6366f1' : 'var(--text-main)',
+                        transition: '0.15s',
+                      }}
+                      className="dropdown-item-hover"
+                    >
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -500,7 +616,7 @@ const Reports = () => {
                 </div>
                 <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <p style={{ margin: 0, fontSize: '0.625rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1 }}>{stat.label}</p>
-                  <h3 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{stat.val || 0}</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1 }}><CountUp to={stat.val || 0} /></h3>
                 </div>
                 <div style={{ position: 'absolute', right: '-12px', bottom: '-12px', width: '60px', height: '60px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%' }} />
               </motion.div>
@@ -575,13 +691,13 @@ const Reports = () => {
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '1rem', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>Low Stock</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.25rem', fontWeight: 800 }}>
-                      <AlertCircle size={16} color="#f59e0b" /> {reportData?.stock_health?.low || 0}
+                      <AlertCircle size={16} color="#f59e0b" /> <CountUp to={reportData?.stock_health?.low || 0} />
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '1rem', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>Depleted</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.25rem', fontWeight: 800 }}>
-                      <AlertCircle size={16} color="#ef4444" /> {reportData?.stock_health?.out || 0}
+                      <AlertCircle size={16} color="#ef4444" /> <CountUp to={reportData?.stock_health?.out || 0} />
                     </div>
                   </div>
                 </div>
@@ -611,7 +727,7 @@ const Reports = () => {
                       <div key={i}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{g.gender || 'Unknown'}</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}>{pct}%</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}><CountUp to={pct} />%</span>
                         </div>
                         <div style={{ height: '8px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
                           <motion.div 
@@ -889,7 +1005,7 @@ const Reports = () => {
                 </div>
                 <div style={{ zIndex: 1 }}>
                   <p style={{ margin: 0, fontSize: '0.625rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</p>
-                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900 }}>{s.val || 0}</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900 }}><CountUp to={s.val || 0} /></h3>
                 </div>
               </div>
             ))}
@@ -977,7 +1093,7 @@ const Reports = () => {
                               <tr style={{ background: 'var(--background)' }}>
                                 <td colSpan={3} style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Visit Total:</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                                   ₹{visit.medications.reduce((sum, m) => sum + m.total_cost, 0).toFixed(2)}
+                                   ₹<CountUp to={visit.medications.reduce((sum, m) => sum + m.total_cost, 0).toFixed(2)} />
                                 </td>
                               </tr>
                           </tbody>
@@ -999,12 +1115,12 @@ const Reports = () => {
                 <div style={{ display: 'flex', gap: '2rem', flex: 1 }}>
                   <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.625rem', opacity: 0.6, fontWeight: 800, textTransform: 'uppercase' }}>Units Dispensed</span>
-                    <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}>{consumptionData?.grand_total_units || 0}</p>
+                    <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}><CountUp to={consumptionData?.grand_total_units || 0} /></p>
                   </div>
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)' }} />
                   <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.625rem', opacity: 0.6, fontWeight: 800, textTransform: 'uppercase' }}>Grand Total Cost</span>
-                    <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}>₹{consumptionData?.grand_total_cost?.toLocaleString()}</p>
+                    <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#ef4444' }}>₹<CountUp to={consumptionData?.grand_total_cost || 0} /></p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', minWidth: '150px' }} className="print-only-block">
@@ -1059,6 +1175,7 @@ const Reports = () => {
           }
         }
         .print-only-block, .print-only-inline { display: none; }
+        .dropdown-item-hover:hover { background: var(--background) !important; color: var(--text-main) !important; }
       `}</style>
       {/* Bulk Upload Modal */}
       {showBulkModal && (
