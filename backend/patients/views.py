@@ -1623,6 +1623,12 @@ class RegistryReportView(viewsets.ViewSet):
         project_id = request.query_params.get('project')
         is_admin = user.role == 'ADMIN' or user.is_superuser or user.user_roles.filter(name='ADMIN').exists()
 
+        low_threshold_str = request.query_params.get('low_threshold', '10')
+        try:
+            low_threshold = int(low_threshold_str)
+        except ValueError:
+            low_threshold = 10
+
         active_project = None
         if user.is_superuser:
             if project_id:
@@ -1727,7 +1733,7 @@ class RegistryReportView(viewsets.ViewSet):
         if active_project:
             inventory_items = inventory_items.filter(registry_type__project=active_project)
 
-        low_stock_count = inventory_items.filter(quantity__lt=10, quantity__gt=0).count()
+        low_stock_count = inventory_items.filter(quantity__lt=low_threshold, quantity__gt=0).count()
         depleted_count = inventory_items.filter(quantity=0).count()
 
         # 6. Project breakdown (Multi-Project Comparison)
@@ -1767,6 +1773,7 @@ class RegistryReportView(viewsets.ViewSet):
             'total_raw_results': LabMachineData.objects.count(),
             'total_audits': LabSyncAudit.objects.count(),
             'successful_audits': LabSyncAudit.objects.filter(is_success=True).count(),
+            'total_locations': LabMachine.objects.values('location').exclude(location='').exclude(location__isnull=True).distinct().count(),
             'machines_list': []
         }
         
@@ -1806,7 +1813,8 @@ class RegistryReportView(viewsets.ViewSet):
                 'depleted': depleted_count
             },
             'project_breakdown': project_breakdown,
-            'lab_telemetry': lab_telemetry
+            'lab_telemetry': lab_telemetry,
+            'low_threshold': low_threshold
         })
 
 from .reports import generate_patient_pdf_report

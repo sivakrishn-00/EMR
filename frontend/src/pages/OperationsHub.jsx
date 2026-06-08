@@ -426,7 +426,9 @@ const OperationsHub = () => {
       <div style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
           <Building2 size={20} style={{ color: 'var(--primary)' }} />
-          <span style={{ fontSize: '1.05rem', fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Project Telemetry Dashboard (10 Active Projects)</span>
+          <span style={{ fontSize: '1.05rem', fontWeight: 950, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            Project Telemetry Dashboard ({projectBreakdown.length > 0 ? `${projectBreakdown.length} Active Projects` : 'Active Projects'})
+          </span>
         </div>
 
         <div style={{ 
@@ -552,7 +554,7 @@ const OperationsHub = () => {
             </div>
             <div>
               <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Drug Utilization</h3>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Top 10 dispensed medications</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Top {topDrugs.length} dispensed medications</p>
             </div>
           </div>
 
@@ -791,7 +793,9 @@ const OperationsHub = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem' }}>
               <Server size={20} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>Lab cloud Sync Telemetry (1000+ Locations)</span>
+              <span style={{ fontSize: '0.9375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+                Lab cloud Sync Telemetry ({labTelemetry.total_locations !== undefined ? `${labTelemetry.total_locations} Connected Locations` : 'Locations'})
+              </span>
             </div>
 
             {/* Colorful Sync Counters Grid */}
@@ -919,7 +923,7 @@ const OperationsHub = () => {
             textAlign: 'center',
             fontWeight: 650
           }}>
-            Critical thresholds configured at &lt; 10 units.
+            Critical thresholds configured at &lt; {data?.low_threshold || 10} units.
           </div>
         </div>
 
