@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachineData, LabMachine, LabProjectBridge
+from .models import LabRequest, LabResult, LabResultAttachment, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachineData, LabMachine, LabProjectBridge
 
 class LabTestTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,10 +25,37 @@ class LabTestMasterSerializer(serializers.ModelSerializer):
         model = LabTestMaster
         fields = '__all__'
 
+class LabResultAttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabResultAttachment
+        fields = ['id', 'file', 'file_url', 'uploaded_at']
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file:
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
 class LabResultSerializer(serializers.ModelSerializer):
+    attachment_url = serializers.SerializerMethodField()
+    attachments = LabResultAttachmentSerializer(many=True, read_only=True)
+
     class Meta:
         model = LabResult
         fields = '__all__'
+        read_only_fields = ['lab_request', 'recorded_by', 'recorded_at']
+
+    def get_attachment_url(self, obj):
+        request = self.context.get('request')
+        if obj.attachment:
+            if request:
+                return request.build_absolute_uri(obj.attachment.url)
+            return obj.attachment.url
+        return None
 
 class LabRequestSerializer(serializers.ModelSerializer):
     result = LabResultSerializer(read_only=True)

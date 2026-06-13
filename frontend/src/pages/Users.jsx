@@ -378,7 +378,7 @@ const Users = () => {
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxWidth: '300px' }}>
                                                 {roles.filter(r => {
                                                     if (u.role === 'PATIENT') return r.name === 'PATIENT';
-                                                    return r.name !== 'PATIENT';
+                                                    return r.name !== 'PATIENT' && (r.project === u.project || (!r.project && !u.project));
                                                 }).map(r => {
                                                     const isChecked = tempUserRoles.includes(r.id);
                                                     return (

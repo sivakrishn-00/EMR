@@ -44,9 +44,16 @@ class RequestOTPView(APIView):
                     username=patient.patient_id,
                     phone=phone,
                     role='PATIENT',
+                    project=patient.project,
                     first_name=patient.first_name,
                     last_name=patient.last_name
                 )
+                from accounts.models import UserRole
+                patient_role = UserRole.objects.filter(name='PATIENT', project=patient.project).first()
+                if not patient_role:
+                    patient_role = UserRole.objects.filter(name='PATIENT', project__isnull=True).first()
+                if patient_role:
+                    user.user_roles.add(patient_role)
             
             # CRITICAL HANDSHAKE: Bond patient to user
             patient.user = user

@@ -22,11 +22,12 @@ def create_default_superuser(sender, **kwargs):
         for name, description in default_roles:
             UserRole.objects.get_or_create(
                 name=name, 
+                project=None,
                 defaults={'description': description}
             )
         
         # Specifically fetch ADMIN role for superuser assignment
-        admin_role = UserRole.objects.get(name='ADMIN')
+        admin_role = UserRole.objects.filter(name='ADMIN', project=None).first()
         
         username = 'admin'
         email = 'admin@emr.com'

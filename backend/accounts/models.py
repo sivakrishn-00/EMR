@@ -3,14 +3,18 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 
 class UserRole(models.Model):
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     description = models.TextField(blank=True)
+    project = models.ForeignKey('patients.Project', on_delete=models.CASCADE, null=True, blank=True, related_name='roles')
     data_isolation = models.BooleanField(default=False, help_text="If True, users with this role can only see records they created.")
     permissions = models.JSONField(default=list, blank=True, help_text="List of allowed module paths, e.g., ['/patients', '/vitals']")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ('name', 'project')
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.project.name if self.project else 'Global'})"
 
 class User(AbstractUser):
     # Dynamic Role system: role names now fetched from UserRole model in the DB

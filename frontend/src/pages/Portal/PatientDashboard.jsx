@@ -73,6 +73,18 @@ const PatientDashboard = () => {
 
     // 📄 REPORT GENERATION ENGINE (MNC Standard - Backend PDF)
     const handleDownloadReport = async (v) => {
+        const correctId = (dossier?.patient_id || dossier?.registry_metadata?.patient_id || "").trim().toUpperCase();
+        const enteredPassword = window.prompt("Enter your Patient ID (e.g. BHSPL10636) to access your secure clinical report:");
+        
+        if (enteredPassword === null) {
+            return; // User cancelled
+        }
+        
+        if (enteredPassword.trim().toUpperCase() !== correctId) {
+            toast.error("Incorrect Patient ID. Access denied.");
+            return;
+        }
+
         const loadId = toast.loading("Connecting to Secure Report Engine...");
         try {
             const vDate = v.visit_date ? v.visit_date.split('T')[0] : '';

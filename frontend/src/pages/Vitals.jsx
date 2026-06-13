@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import Indents from './Indents';
 import { 
   Activity, 
   Search, 
@@ -14,12 +16,19 @@ import {
   Wind, 
   Droplet, 
   Clipboard, 
+  ClipboardList,
   FileText,
   Scale,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  Phone,
+  Hash
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
 
 const RANGES = {
   weight_kg: { min: 1, max: 350, label: 'Weight', unit: 'KG' },
@@ -31,8 +40,12 @@ const RANGES = {
   spo2: { min: 50, max: 100, label: 'SPO2', unit: '%' },
 };
 
+
 const Vitals = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAssessRoute = location.pathname === '/vitals/assess';
   const [activeVisits, setActiveVisits] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,10 +102,46 @@ const Vitals = () => {
   const [projectConfig, setProjectConfig] = useState({ vitals_mandatory: false });
   const [showVitalsSection, setShowVitalsSection] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: 'visit_date', direction: 'asc' });
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const stateTab = location.state?.activeTab || location.state?.activeSubTab;
+    if (stateTab === 'inventory' || stateTab === 'stock') return 'stock';
+    return 'queue';
+  });
+
+  useEffect(() => {
+    if (location.state?.activeTab || location.state?.activeSubTab) {
+      const stateTab = location.state.activeTab || location.state.activeSubTab;
+      if (stateTab === 'inventory' || stateTab === 'stock') {
+        setActiveSubTab('stock');
+      } else {
+        setActiveSubTab('queue');
+      }
+    }
+  }, [location.state]);
+
 
   useEffect(() => {
     fetchActiveVisits();
   }, []);
+
+
+  useEffect(() => {
+    // If the path is /vitals/assess but there is no selected visit, redirect to /vitals queue
+    if (isAssessRoute && !selectedVisit) {
+      navigate('/vitals', { replace: true });
+    }
+  }, [isAssessRoute, selectedVisit, navigate]);
+
+
+  useEffect(() => {
+    // If user clicks sidebar or navigates back to /vitals, reset selectedVisit to null and refresh list
+    if (location.pathname === '/vitals') {
+      setSelectedVisit(null);
+      fetchActiveVisits(1, searchTerm);
+    }
+  }, [location.pathname]);
+
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -103,16 +152,19 @@ const Vitals = () => {
     return () => clearInterval(interval);
   }, [page, searchTerm, selectedVisit]);
 
+
   useEffect(() => {
     if (user?.project) {
         fetchProjectConfig();
         
+
         // Re-fetch when tab gets focus (user switched back from Admin tab)
         const onFocus = () => fetchProjectConfig();
         window.addEventListener('focus', onFocus);
         return () => window.removeEventListener('focus', onFocus);
     }
   }, [user]);
+
 
   const fetchProjectConfig = async () => {
     try {
@@ -123,10 +175,11 @@ const Vitals = () => {
     }
   };
 
+
   const fetchActiveVisits = async (pageNum = 1, search = searchTerm, isBackground = false) => {
     if (!isBackground) setIsLoading(true);
     try {
-      const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}&page_size=100&search=${encodeURIComponent(search)}`);
+      const res = await api.get(`clinical/visits/?status=PENDING_VITALS&page=${pageNum}&page_size=30&search=${encodeURIComponent(search)}`);
       if (res.data.results) {
           setActiveVisits(res.data.results);
           setTotalCount(res.data.count);
@@ -142,15 +195,18 @@ const Vitals = () => {
     }
   };
 
+
   const handleSaveVitals = async (e) => {
     e.preventDefault();
     if (isRecording) return;
+
 
     // Normalize temperature to Celsius for backend storage
     let finalTemp = vitalsData.temperature_c;
     if (vitalsData.temp_unit === 'F' && finalTemp) {
       finalTemp = ((parseFloat(finalTemp) - 32) * 5/9).toFixed(1);
     }
+
 
     const cleanedData = Object.fromEntries(
       Object.entries(vitalsData).map(([key, value]) => {
@@ -164,6 +220,7 @@ const Vitals = () => {
       })
     );
       
+
     if (projectConfig.vitals_mandatory) {
         const mandatoryFields = [
             { key: 'weight_kg', label: 'Weight', min: 0.1, max: 650 },
@@ -175,6 +232,7 @@ const Vitals = () => {
             { key: 'blood_pressure_dia', label: 'BP (Dia)', min: 40, max: 130 },
             { key: 'spo2', label: 'SPO2', min: 50, max: 100 }
         ];
+
 
         for (const field of mandatoryFields) {
             if (!cleanedData[field.key]) {
@@ -200,6 +258,7 @@ const Vitals = () => {
             { key: 'spo2', min: 50, max: 100 }
         ];
 
+
         for (const field of fieldsToCheck) {
             if (cleanedData[field.key] && (cleanedData[field.key] < field.min || cleanedData[field.key] > field.max)) {
                 toast.error(`Invalid ${field.key.replace('_', ' ')} detected`);
@@ -207,6 +266,7 @@ const Vitals = () => {
             }
         }
     }
+
 
     setIsRecording(true);
     const loadingToast = toast.loading('Recording vitals...');
@@ -216,13 +276,14 @@ const Vitals = () => {
       setSelectedVisit(null);
       resetForm();
       setFormAttempted(false);
-      fetchActiveVisits();
+      navigate('/vitals');
     } catch (err) {
       toast.error("Validation error. Please check formatting.", { id: loadingToast });
     } finally {
       setIsRecording(false);
     }
   };
+
 
   const resetForm = () => {
     setVitalsData({ 
@@ -237,13 +298,16 @@ const Vitals = () => {
     setFormAttempted(false);
   };
 
+
   const updateBiometrics = (updates) => {
     let newData = { ...vitalsData, ...updates };
     
+
     // Hard limits for typing sanity (Human Scale)
     if (newData.weight_kg > 500) newData.weight_kg = 500;
     if (newData.height_ft > 8) newData.height_ft = 8;
     if (newData.height_in > 11) newData.height_in = 11;
+
 
     // Calculate Height in CM
     const ft = parseFloat(newData.height_ft) || 0;
@@ -251,6 +315,7 @@ const Vitals = () => {
     const totalInches = (ft * 12) + inch;
     const heightCm = totalInches > 0 ? (totalInches * 2.54).toFixed(2) : '';
     
+
     // Calculate BMI
     let bmiValue = '';
     if (newData.weight_kg && heightCm && heightCm > 0) {
@@ -258,6 +323,7 @@ const Vitals = () => {
       bmiValue = (newData.weight_kg / (heightM * heightM)).toFixed(1);
     }
     
+
     setVitalsData({
       ...newData,
       height_cm: heightCm,
@@ -265,11 +331,13 @@ const Vitals = () => {
     });
   };
 
+
   const blockInvalidChar = (e) => {
     if (['e', 'E', '+', '-'].includes(e.key)) {
       e.preventDefault();
     }
   };
+
 
   const getBMIStatus = (bmi) => {
     if (!bmi) return { label: 'PENDING', color: '#94a3b8' };
@@ -280,10 +348,12 @@ const Vitals = () => {
     return { label: 'Obese', color: '#ef4444' };
   };
 
+
   const getRangeError = (field, value) => {
     if (!value || isNaN(value)) return null;
     const val = parseFloat(value);
     
+
     // Temperature Specific Validation
     if (field === 'temperature_c') {
       const unit = vitalsData.temp_unit || 'C';
@@ -294,6 +364,7 @@ const Vitals = () => {
       }
       return null;
     }
+
 
     // BP Logic check: DIA must be < SYS
     if (field === 'blood_pressure_dia' && vitalsData.blood_pressure_sys) {
@@ -308,6 +379,7 @@ const Vitals = () => {
     }
     return null;
   };
+
 
   const getAge = (dobString) => {
     if (!dobString) return 'N/A';
@@ -324,6 +396,7 @@ const Vitals = () => {
       return 'N/A';
     }
   };
+
 
   const fetchPastVitalsAndHistory = async (patientId) => {
     try {
@@ -356,9 +429,11 @@ const Vitals = () => {
     }
   };
 
+
   const filteredVisits = activeVisits.filter(visit => {
     const searchLow = searchTerm.toLowerCase().trim();
     if (!searchLow) return true;
+
 
     // Smart card group matching: check if search term is a card base/suffix and extract the base
     const cardMatch = searchLow.match(/(?:bhspl)?(\d{4})(?:\/\d+)?/i) || searchLow.match(/(\d+)(?:\/\d+)?/);
@@ -371,25 +446,101 @@ const Vitals = () => {
       }
     }
 
+
     const patientName = `${visit.patient_details?.first_name || ''} ${visit.patient_details?.last_name || ''}`.toLowerCase();
     const patientId = String(visit.patient_details?.patient_id || '').toLowerCase();
     const cardNo = String(visit.patient_details?.card_no || '').toLowerCase();
     const phone = String(visit.patient_details?.phone || '').toLowerCase();
     const employeeId = String(visit.patient_details?.employee_details?.additional_fields?.employee_id || '').toLowerCase();
 
+
     return patientName.includes(searchLow) || patientId.includes(searchLow) || cardNo.includes(searchLow) || phone.includes(searchLow) || employeeId.includes(searchLow);
   });
+
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+
+  const sortedVisits = [...filteredVisits].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+
+    let aVal = '';
+    let bVal = '';
+    
+
+    if (sortConfig.key === 'patient_name') {
+      aVal = `${a.patient_details?.first_name || ''} ${a.patient_details?.last_name || ''}`.trim().toLowerCase();
+      bVal = `${b.patient_details?.first_name || ''} ${b.patient_details?.last_name || ''}`.trim().toLowerCase();
+    } else if (sortConfig.key === 'reason') {
+      aVal = (a.reason || 'Routine Checkup...').toLowerCase();
+      bVal = (b.reason || 'Routine Checkup...').toLowerCase();
+    } else if (sortConfig.key === 'visit_date') {
+      aVal = new Date(a.visit_date).getTime();
+      bVal = new Date(b.visit_date).getTime();
+    }
+    
+
+    if (aVal < bVal) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (aVal > bVal) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
  
+
   return (
     <div className="fade-in">
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
-      </header>
+      {!selectedVisit && (
+        <>
+          <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
+              <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
+            </div>
+          </header>
+
+          <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
+            <button 
+                onClick={() => setActiveSubTab('queue')}
+                style={{ 
+                    padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                    borderBottom: activeSubTab === 'queue' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                    fontWeight: 800, color: activeSubTab === 'queue' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                    cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
+                }}
+            >
+                Nurse Queue ({totalCount})
+            </button>
+            {(user?.role === 'ADMIN' || user?.permissions?.includes('/indents/inventory')) && (
+              <button 
+                  onClick={() => setActiveSubTab('stock')}
+                  style={{ 
+                      padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                      borderBottom: activeSubTab === 'stock' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                      fontWeight: 800, color: activeSubTab === 'stock' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                      cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
+                  }}
+              >
+                  Room Stock
+              </button>
+            )}
+          </div>
+        </>
+      )}
  
+
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting List - Only show if NO patient is selected */}
-        {!selectedVisit && (
+        {!selectedVisit && activeSubTab === 'queue' && (
           <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', minWidth: '0' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
@@ -422,13 +573,44 @@ const Vitals = () => {
                </div>
             </div>
             
+
             <div className="table-responsive" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--background)', borderBottom: '2px solid var(--border)' }}>
-                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Patient Name</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reason</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Registration</th>
+                     <th 
+                       onClick={() => handleSort('patient_name')}
+                       style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Patient Name
+                         {sortConfig.key === 'patient_name' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
+                     <th 
+                       onClick={() => handleSort('reason')}
+                       style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Reason
+                         {sortConfig.key === 'reason' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
+                     <th 
+                       onClick={() => handleSort('visit_date')}
+                       style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Registration
+                         {sortConfig.key === 'visit_date' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Action</th>
                   </tr>
                 </thead>
@@ -457,7 +639,7 @@ const Vitals = () => {
                        </td>
                      </tr>
                    ) : 
-                     filteredVisits.map(v => (
+                     sortedVisits.map(v => (
                     <tr key={v.id} style={{ background: selectedVisit?.id === v.id ? '#f8fafc' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -489,7 +671,7 @@ const Vitals = () => {
                                    </span>
                                  )}
                                </p>
-                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}{v.patient_details?.registered_by_username ? ` | Registered By: ${v.patient_details.registered_by_username}` : ''}</p>
                             </div>
                          </div>
                       </td>
@@ -546,9 +728,10 @@ const Vitals = () => {
                                   resetForm();
                                   fetchPastVitalsAndHistory(v.patient);
                               }
+                              navigate('/vitals/assess');
                           }}
                           style={{ 
-                            background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '0.625rem 1.5rem',
@@ -559,7 +742,7 @@ const Vitals = () => {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.25)',
+                            boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px var(--primary-shadow)',
                             transition: 'all 0.2s ease'
                           }}
                           onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
@@ -597,12 +780,14 @@ const Vitals = () => {
                        </button>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                            {(() => {
-                               const totalPages = Math.ceil(totalCount / 100);
+                               const totalPages = Math.ceil(totalCount / 30);
                                if (totalPages <= 1) return null;
+
 
                                const buttons = [];
                                const maxVisiblePages = 5;
                                
+
                                // Always show page 1
                                buttons.push(
                                    <button 
@@ -619,8 +804,10 @@ const Vitals = () => {
                                    </button>
                                );
 
+
                                let startPage = Math.max(2, page - 1);
                                let endPage = Math.min(totalPages - 1, page + 1);
+
 
                                if (page <= 3) {
                                    endPage = Math.min(totalPages - 1, maxVisiblePages - 1);
@@ -629,9 +816,11 @@ const Vitals = () => {
                                    startPage = Math.max(2, totalPages - maxVisiblePages + 2);
                                }
 
+
                                if (startPage > 2) {
                                    buttons.push(<span key="ellipsis1" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
                                }
+
 
                                for (let i = startPage; i <= endPage; i++) {
                                    if (i > 1 && i < totalPages) {
@@ -652,9 +841,11 @@ const Vitals = () => {
                                    }
                                }
 
+
                                if (endPage < totalPages - 1) {
                                    buttons.push(<span key="ellipsis2" style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 700 }}>...</span>);
                                }
+
 
                                // Always show last page
                                if (totalPages > 1) {
@@ -674,14 +865,15 @@ const Vitals = () => {
                                    );
                                }
 
+
                                return buttons;
                            })()}
                        </div>
                        <button 
                            className="btn btn-secondary" 
-                           disabled={page >= Math.ceil(totalCount / 100)}
+                           disabled={page >= Math.ceil(totalCount / 30)}
                            onClick={() => fetchActiveVisits(page + 1, searchTerm)}
-                           style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContents: 'center' }}
+                           style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 30) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContents: 'center' }}
                        >
                            <ChevronRight size={18} />
                        </button>
@@ -690,83 +882,138 @@ const Vitals = () => {
           </div>
         )}
 
+        {!selectedVisit && activeSubTab === 'stock' && (
+          <div className="fade-in">
+             <Indents isEmbed={true} embedRoom="Nurse Room" />
+          </div>
+        )}
+
+
         {/* Vitals & Observations Form - Only show if a patient is selected */}
         {selectedVisit && (
-          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-            <div className="card fade-in" style={{ border: `1px solid ${projectConfig?.primary_color || 'var(--primary)'}`, borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '0.5rem' }}>
-                 <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                    <div style={{ padding: '0.875rem', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2) ' }}>
-                       <Activity size={24} color="white" />
-                    </div>
-                    <div>
-                       <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                       <p style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600, marginTop: '2px' }}> ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}
-                          {selectedVisit.is_late_entry && (
-                            <span 
-                              style={{ 
-                                fontSize: '0.625rem', 
-                                background: 'rgba(245, 158, 11, 0.1)', 
-                                color: '#d97706', 
-                                padding: '0.15rem 0.4rem', 
-                                borderRadius: '6px', 
-                                fontWeight: 800,
-                                border: '1px solid rgba(245, 158, 11, 0.2)',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.02em',
-                                display: 'inline-block',
-                                marginLeft: '8px'
-                              }}
-                              title={`Justification: ${selectedVisit.late_entry_justification || 'N/A'}`}
-                            >
-                              Late Entry
-                            </span>
-                          )}</p>
-                    </div>
-                 </div>
-                 <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
-                    <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
-                       <X size={20} />
-                    </button>
+           <div style={{ width: '100%', margin: '0 auto' }}>
+             <div className="card fade-in" style={{ padding: '2rem 1.5rem', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', background: 'var(--surface)' }}>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                     
+                     <div>
+                        <div style={{ width: 'fit-content' }}>
+                           <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em', margin: 0 }}>Clinical Assessment</h2>
+                           <div style={{ 
+                             height: '3px', 
+                             width: '100%', 
+                             background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%)', 
+                             borderRadius: '4px', 
+                             marginTop: '6px',
+                             marginBottom: '8px'
+                           }}></div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>                           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 800 }}> 
+                              ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}
+                           </p>
+                           {selectedVisit.is_late_entry && (
+                             <span 
+                               style={{ 
+                                 fontSize: '0.625rem', 
+                                 background: 'rgba(245, 158, 11, 0.1)', 
+                                 color: '#d97706', 
+                                 padding: '0.15rem 0.4rem', 
+                                 borderRadius: '6px', 
+                                 fontWeight: 800,
+                                 border: '1px solid rgba(245, 158, 11, 0.2)',
+                                 textTransform: 'uppercase',
+                                 letterSpacing: '0.02em',
+                                 display: 'inline-block'
+                               }}
+                               title={`Justification: ${selectedVisit.late_entry_justification || 'N/A'}`}
+                             >
+                               Late Entry
+                             </span>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
+                     <button 
+                        onClick={() => { setSelectedVisit(null); navigate('/vitals'); }} 
+                        style={{ 
+                          border: 'none',
+                          background: 'var(--primary)', 
+                          padding: '0.6rem 1.25rem', 
+                          borderRadius: '12px', 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s ease', 
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontWeight: 800,
+                          fontSize: '0.8125rem',
+                          boxShadow: '0 4px 12px var(--primary-shadow)'
+                        }}
+                        onMouseOver={e => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.background = 'var(--primary-dark)';
+                        }}
+                        onMouseOut={e => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.background = 'var(--primary)';
+                        }}
+                     >
+                        <ChevronLeft size={16} strokeWidth={2.5} /> Back to Queue
+                     </button>
                  </div>
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
+              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <User size={18} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       {selectedVisit.patient_details?.card_no ? 'Card Number' : 'Aadhaar Number'}
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <Phone size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
+                 </div>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <ClipboardList size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.reason || 'OPD Consultation'}</p>
+                 </div>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <Hash size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
                        {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
-                    </p>
+                     </p>
                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
-                 </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason || 'OPD Consultation'}</p>
-                 </div>
-                 <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'right' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Status</p>
-                    <span style={{ fontSize: '0.6875rem', background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 800, width: 'fit-content', marginLeft: 'auto' }}>WAITING</span>
-                 </div>
-              </div>
-
+                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                     <span className="examining-badge pulse-badge" style={{ 
+                        fontSize: '0.6875rem', 
+                        background: 'rgba(34, 197, 94, 0.1)', 
+                        color: '#16a34a', 
+                        padding: '0.4rem 1rem', 
+                        borderRadius: '10px', 
+                        fontWeight: 900, 
+                        width: 'fit-content', 
+                        border: '1px solid rgba(34, 197, 94, 0.2)',
+                        letterSpacing: '0.05em',
+                        animation: 'pulse-glow-green 2s infinite'
+                     }}>WAITING</span>
+                  </div>
+              </div>  
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0 0.5rem 1.5rem 0.5rem' }}>
+               <div style={{ height: '2px', flex: 1, background: `linear-gradient(90deg, ${projectConfig?.primary_color || 'var(--primary)'}40, transparent)` }}></div>
+               <p style={{ fontSize: '0.6875rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Vitals & Observations</p>
+               <div style={{ height: '2px', flex: 1, background: `linear-gradient(90deg, transparent, ${projectConfig?.primary_color || 'var(--primary)'}40)` }}></div>
+             </div>
             <form onSubmit={handleSaveVitals}>
                 {showVitalsSection && (
                   <div className="fade-in">
-                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Biometrics & BMI</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '3px', height: '14px', borderRadius: '2px', background: projectConfig?.primary_color || 'var(--primary)' }}></span>Biometrics & BMI</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1.25rem', marginBottom: '2rem', alignItems: 'end' }}>
                     <div className="form-group">
-                       <label><Scale size={14} /> Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
-                       <div style={{ position: 'relative' }}>
+                       <label>Weight {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div className="prefix-icon-container">
+                          <Scale size={18} strokeWidth={2} color="var(--primary)" />
                           <input type="number" step="0.01" min="0.1" max="650" value={vitalsData.weight_kg} onKeyDown={blockInvalidChar} onChange={e => updateBiometrics({weight_kg: e.target.value})} placeholder="70.5" style={{ paddingRight: '3rem !important', border: (formAttempted && projectConfig.vitals_mandatory && (vitalsData.weight_kg > 650 || !vitalsData.weight_kg)) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                           <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>KG</span>
                        </div>
@@ -774,6 +1021,7 @@ const Vitals = () => {
                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.weight_kg && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
                    
+
                     <div className="form-group">
                        <label>Height (Feet/Inches) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
                        <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -789,6 +1037,7 @@ const Vitals = () => {
                       {(vitalsData.height_ft > 7) && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Warning: Unusual Height Range</p>}
                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.height_ft && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
+
 
                    <div className="form-group" style={{ background: 'var(--background)', padding: '0.875rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <label style={{ margin: 0, fontSize: '0.7rem' }}>BMI {vitalsData.bmi && <span style={{ color: getBMIStatus(vitalsData.bmi).color, fontWeight: 900 }}>• Auto Calculated</span>}</label>
@@ -812,11 +1061,12 @@ const Vitals = () => {
                    </div>
                 </div>
 
-                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Vital Signs</p>
+
+                <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '3px', height: '14px', borderRadius: '2px', background: projectConfig?.primary_color || 'var(--primary)' }}></span>Vital Signs</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                    <div className="form-group">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <label style={{ margin: 0 }}><Thermometer size={14} /> Temperature {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                        <label style={{ margin: 0 }}>Temperature {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
                        <div className="segmented-control">
                          {['C', 'F'].map(u => (
                            <button
@@ -826,6 +1076,7 @@ const Vitals = () => {
                                const currentUnit = vitalsData.temp_unit || 'C';
                                if (currentUnit === u) return;
                                
+
                                let newVal = vitalsData.temperature_c;
                                if (newVal) {
                                  if (u === 'F') {
@@ -852,7 +1103,8 @@ const Vitals = () => {
                          ))}
                        </div>
                       </div>
-                      <div style={{ position: 'relative' }}>
+                      <div className="prefix-icon-container">
+                         <Thermometer size={18} strokeWidth={2} color="var(--primary)" />
                          <input type="number" step="0.1" value={vitalsData.temperature_c} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, temperature_c: e.target.value})} placeholder={ (vitalsData.temp_unit || 'C') === 'F' ? '98.6' : '36.5' } style={{ paddingRight: '2.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.temperature_c) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                          <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>°{vitalsData.temp_unit || 'C'}</span>
                       </div>
@@ -860,8 +1112,9 @@ const Vitals = () => {
                       {formAttempted && projectConfig.vitals_mandatory && !vitalsData.temperature_c && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                    </div>
                     <div className="form-group">
-                       <label><Heart size={14} /> Pulse {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
-                       <div style={{ position: 'relative' }}>
+                       <label>Pulse {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div className="prefix-icon-container">
+                          <Heart size={18} strokeWidth={2} color="var(--primary)" />
                           <input type="number" value={vitalsData.heart_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, heart_rate: e.target.value})} placeholder="72" style={{ paddingRight: '3.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.heart_rate) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                           <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>BPM</span>
                        </div>
@@ -869,8 +1122,9 @@ const Vitals = () => {
                        {formAttempted && projectConfig.vitals_mandatory && !vitalsData.heart_rate && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                     <div className="form-group">
-                       <label><Wind size={14} /> Resp Rate {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
-                       <div style={{ position: 'relative' }}>
+                       <label>Resp Rate {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div className="prefix-icon-container">
+                          <Wind size={18} strokeWidth={2} color="var(--primary)" />
                           <input type="number" value={vitalsData.respiratory_rate} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, respiratory_rate: e.target.value})} placeholder="18" style={{ paddingRight: '3.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.respiratory_rate) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                           <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>B/M</span>
                        </div>
@@ -878,6 +1132,7 @@ const Vitals = () => {
                        {formAttempted && projectConfig.vitals_mandatory && !vitalsData.respiratory_rate && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                     </div>
                 </div>
+
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
                     <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
@@ -899,8 +1154,9 @@ const Vitals = () => {
                        </div>
                     </div>
                     <div className="form-group" style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                       <label><Droplet size={14} /> Oxygen (SPO2) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
-                       <div style={{ position: 'relative' }}>
+                       <label>Oxygen (SPO2) {projectConfig.vitals_mandatory && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                       <div className="prefix-icon-container">
+                          <Droplet size={18} strokeWidth={2} color="var(--primary)" />
                           <input type="number" value={vitalsData.spo2} onKeyDown={blockInvalidChar} onChange={e => setVitalsData({...vitalsData, spo2: e.target.value})} placeholder="98" style={{ paddingRight: '2.5rem !important', border: (formAttempted && projectConfig.vitals_mandatory && !vitalsData.spo2) ? '1px solid #ef4444' : '1px solid #e2e8f0' }} />
                           <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>%</span>
                        </div>
@@ -911,16 +1167,19 @@ const Vitals = () => {
               </div>
             )}
 
-               <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em' }}>Observations</p>
+
+               <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '3px', height: '14px', borderRadius: '2px', background: projectConfig?.primary_color || 'var(--primary)' }}></span>Observations</p>
                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                  <label><Clipboard size={14} /> Current Symptoms</label>
+                  <label>Current Symptoms</label>
                   <textarea rows="2" value={vitalsData.symptoms} onChange={e => setVitalsData({...vitalsData, symptoms: e.target.value})} placeholder="Chief complaints noted during intake..."></textarea>
                </div>
                
+
                <div className="form-group" style={{ marginBottom: '2.5rem' }}>
-                  <label><FileText size={14} /> Nursing Notes</label>
+                  <label>Nursing Notes</label>
                   <textarea rows="2" value={vitalsData.notes} onChange={e => setVitalsData({...vitalsData, notes: e.target.value})} placeholder="Any additional observations or patient behavioral notes..."></textarea>
                </div>
+
 
                {/* Medical History Sections */}
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
@@ -936,6 +1195,7 @@ const Vitals = () => {
                         <ToggleField label="Allergy: Drug" value={vitalsData.allergy_drug} onChange={val => setVitalsData({...vitalsData, allergy_drug: val})} options={['YES', 'NO']} />
                      </div>
                   </div>
+
 
                   {/* Family History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
@@ -954,6 +1214,7 @@ const Vitals = () => {
                      </div>
                   </div>
 
+
                   {/* Systemic Examination */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
                      <p style={{ fontSize: '0.75rem', fontWeight: 900, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem', letterSpacing: '0.06em' }}>Systemic Examination</p>
@@ -966,6 +1227,7 @@ const Vitals = () => {
                         <ToggleField label="G.U.S" value={vitalsData.sys_gus} onChange={val => setVitalsData({...vitalsData, sys_gus: val})} options={['FND', 'NAD']} />
                      </div>
                   </div>
+
 
                   {/* Known History */}
                   <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
@@ -985,8 +1247,9 @@ const Vitals = () => {
                   </div>
                </div>
 
+
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', boxShadow: projectConfig?.primary_color ? `0 10px 15px -3px ${projectConfig.primary_color}4d` : '0 10px 15px -3px rgba(79, 70, 229, 0.3)', transition: 'all 0.3s ease' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', boxShadow: projectConfig?.primary_color ? `0 10px 15px -3px ${projectConfig.primary_color}4d` : '0 10px 15px -3px var(--primary-shadow)', transition: 'all 0.3s ease' }}>
                      Complete Assessment <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>
@@ -995,6 +1258,7 @@ const Vitals = () => {
         </div>
         )}
       </div>
+
 
       <style>{`
          .form-group label { display: flex; alignItems: center; gap: 0.5rem; color: #475569; margin-bottom: 0.6rem; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -1018,6 +1282,7 @@ const Vitals = () => {
             transform: translateY(-1px);
          }
          
+
          /* Dark Mode Overrides */
          .dark-theme input, .dark-theme select, .dark-theme textarea { 
             background: #1e293b !important;
@@ -1030,6 +1295,7 @@ const Vitals = () => {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
          }
          
+
          .segmented-control {
             display: flex;
             gap: 2px;
@@ -1047,6 +1313,7 @@ const Vitals = () => {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
          }
          
+
          .dark-theme .segmented-control {
             background: #1e293b;
          }
@@ -1058,6 +1325,7 @@ const Vitals = () => {
             color: white;
          }
          
+
          .search-container {
             position: relative;
             width: 250px;
@@ -1069,6 +1337,7 @@ const Vitals = () => {
             background: var(--background) !important;
          }
          
+
          @media (max-width: 640px) {
             .search-container {
                width: 100%;
@@ -1081,10 +1350,50 @@ const Vitals = () => {
          .card:hover {
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
          }
+         
+
+         .prefix-icon-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+         }
+         .prefix-icon-container svg {
+            position: absolute;
+            left: 1rem;
+            color: #94a3b8;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 5;
+            transition: color 0.3s;
+         }
+         .prefix-icon-container input {
+            padding-left: 2.75rem !important;
+         }
+         .prefix-icon-container input:focus ~ svg {
+            color: var(--primary);
+         }
+
+         @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+         }
+         @keyframes pulse-glow-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+         }
+         .hover-glow-card:hover {
+            border-color: var(--primary) !important;
+            box-shadow: 0 12px 30px -8px var(--primary-shadow) !important;
+            transform: translateY(-2px);
+         }
       `}</style>
     </div>
   );
 };
+
 
 const ToggleField = ({ label, value, onChange, options }) => (
    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0' }}>
@@ -1112,5 +1421,6 @@ const ToggleField = ({ label, value, onChange, options }) => (
       </div>
    </div>
 );
+
 
 export default Vitals;

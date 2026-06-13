@@ -26,6 +26,33 @@ class UserSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None)
         if password:
             instance.set_password(password)
+            
+        project = validated_data.get('project', instance.project)
+        user_roles_data = validated_data.get('user_roles', None)
+        
+        if user_roles_data is not None:
+            # Map/filter user roles to only the user's assigned project facility
+            mapped_roles = []
+            for role in user_roles_data:
+                r_proj = UserRole.objects.filter(name=role.name, project=project).first()
+                if not r_proj:
+                    r_proj = UserRole.objects.filter(name=role.name, project__isnull=True).first()
+                if r_proj and r_proj not in mapped_roles:
+                    mapped_roles.append(r_proj)
+            validated_data['user_roles'] = mapped_roles
+        else:
+            # If roles are not modified but the project facility was changed, automatically align existing roles
+            if 'project' in validated_data and validated_data['project'] != instance.project:
+                new_project = validated_data['project']
+                mapped_roles = []
+                for r in instance.user_roles.all():
+                    r_proj = UserRole.objects.filter(name=r.name, project=new_project).first()
+                    if not r_proj:
+                        r_proj = UserRole.objects.filter(name=r.name, project__isnull=True).first()
+                    if r_proj and r_proj not in mapped_roles:
+                        mapped_roles.append(r_proj)
+                instance.user_roles.set(mapped_roles)
+
         return super().update(instance, validated_data)
 
     def get_permissions(self, obj):
@@ -65,6 +92,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user_roles_data = validated_data.pop('user_roles', [])
+        project = validated_data.get('project', None)
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
@@ -73,10 +101,18 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             phone=validated_data.get('phone', ''),
-            project=validated_data.get('project', None)
+            project=project
         )
         if user_roles_data:
-            user.user_roles.set(user_roles_data)
+            # Map/filter user roles to only the user's assigned project facility
+            mapped_roles = []
+            for role in user_roles_data:
+                r_proj = UserRole.objects.filter(name=role.name, project=project).first()
+                if not r_proj:
+                    r_proj = UserRole.objects.filter(name=role.name, project__isnull=True).first()
+                if r_proj and r_proj not in mapped_roles:
+                    mapped_roles.append(r_proj)
+            user.user_roles.set(mapped_roles)
         return user
 
 class AuditLogSerializer(serializers.ModelSerializer):

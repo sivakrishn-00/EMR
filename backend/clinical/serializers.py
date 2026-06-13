@@ -3,6 +3,7 @@ from clinical.models import Visit, Vitals, Consultation, Appointment
 from patients.serializers import PatientSerializer
 
 class VitalsSerializer(serializers.ModelSerializer):
+    recorded_by_username = serializers.CharField(source='recorded_by.username', read_only=True)
     class Meta:
         model = Vitals
         fields = '__all__'

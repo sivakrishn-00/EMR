@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MEDIA_URL } from './services/api';
 import Sidebar from './components/Sidebar';
@@ -20,6 +20,7 @@ import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import OperationsHub from './pages/OperationsHub';
 import BridgeHub from './pages/BridgeHub';
+import Indents from './pages/Indents';
 import PatientDashboard from './pages/Portal/PatientDashboard';
 import { Toaster } from 'react-hot-toast';
 
@@ -51,6 +52,10 @@ const ProtectedRoute = ({ children, requiredModule }) => {
   // Dynamic permission check based on tokens assigned by admin UI
   const userPerms = user.permissions || [];
   let hasAccess = user.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(requiredModule);
+  if (requiredModule === '/indents' && !hasAccess) {
+    hasAccess = userPerms.includes('/indents/inventory') ||
+                userPerms.includes('/indents/approval');
+  }
   if (requiredModule === '/admin-masters' && !hasAccess) {
     hasAccess = userPerms.includes('/admin-masters/protocols') ||
                 userPerms.includes('/admin-masters/diagnostics') ||
@@ -87,6 +92,7 @@ const ProtectedRoute = ({ children, requiredModule }) => {
 };
 
 const MainLayout = ({ children }) => {
+  const { loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
@@ -99,6 +105,16 @@ const MainLayout = ({ children }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  if (loading) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+      <div className="loader"></div>
+      <style>{`
+        .loader { width: 48px; height: 48px; border: 5px solid #e2e8f0; border-bottom-color: #6366f1; border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
 
   const toggleSidebar = () => {
     if (window.innerWidth > 1024) {
@@ -166,8 +182,9 @@ const MainLayout = ({ children }) => {
 
 const ThemedApp = ({ children }) => {
   const { user } = useAuth();
+  const location = useLocation();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (user?.branding) {
       const { primary_color, secondary_color, accent_color } = user.branding;
       const root = document.documentElement;
@@ -178,16 +195,18 @@ const ThemedApp = ({ children }) => {
       // Compute helper colors for gradients and lights
       root.style.setProperty('--primary-dark', primary_color + 'dd'); 
       root.style.setProperty('--primary-light', primary_color + '44');
+      root.style.setProperty('--primary-shadow', primary_color + '33');
     } else {
-      // System defaults
+      // System defaults (Admin portal theme / One unique color)
       const root = document.documentElement;
       root.style.setProperty('--primary', '#6366f1');
       root.style.setProperty('--secondary', '#10b981');
       root.style.setProperty('--accent', '#f59e0b');
       root.style.setProperty('--primary-dark', '#4f46e5');
       root.style.setProperty('--primary-light', '#818cf8');
+      root.style.setProperty('--primary-shadow', 'rgba(99, 102, 241, 0.25)');
     }
-  }, [user]);
+  }, [user, location.pathname]);
 
   return children;
 };
@@ -202,8 +221,8 @@ const RootRedirect = () => {
 function App() {
   return (
     <AuthProvider>
-      <ThemedApp>
-        <BrowserRouter>
+      <BrowserRouter>
+        <ThemedApp>
         <Toaster position="top-right" 
           containerStyle={{ zIndex: 9999999 }}
           toastOptions={{
@@ -266,7 +285,23 @@ function App() {
             </MainLayout>
           } />
 
+          <Route path="/vitals/assess" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/vitals">
+                <Vitals />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
           <Route path="/consultations" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/consultations">
+                <Clinical />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
+          <Route path="/consultations/examine" element={
             <MainLayout>
               <ProtectedRoute requiredModule="/consultations">
                 <Clinical />
@@ -282,10 +317,34 @@ function App() {
             </MainLayout>
           } />
 
+          <Route path="/lab/examine" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/lab">
+                <Laboratory />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
           <Route path="/pharmacy" element={
             <MainLayout>
               <ProtectedRoute requiredModule="/pharmacy">
                 <Pharmacy />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
+          <Route path="/pharmacy/examine" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/pharmacy">
+                <Pharmacy />
+              </ProtectedRoute>
+            </MainLayout>
+          } />
+
+          <Route path="/indents" element={
+            <MainLayout>
+              <ProtectedRoute requiredModule="/indents">
+                <Indents />
               </ProtectedRoute>
             </MainLayout>
           } />
@@ -374,8 +433,8 @@ function App() {
 
           <Route path="*" element={<RootRedirect />} />
         </Routes>
+        </ThemedApp>
       </BrowserRouter>
-      </ThemedApp>
     </AuthProvider>
   );
 }

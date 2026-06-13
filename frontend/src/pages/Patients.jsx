@@ -100,7 +100,7 @@ const Patients = () => {
   const [showMasterModal, setShowMasterModal] = useState(false);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
   const [masterFormData, setMasterFormData] = useState({
-    project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", additional_fields: {},
+    project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", is_active: true, additional_fields: {},
   });
   const [familyFormData, setFamilyFormData] = useState({
     card_no_suffix: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", relationship: "SPOUSE", additional_fields: {},
@@ -204,6 +204,9 @@ const Patients = () => {
       toast.success("Personnel Master Onboarded Successfully!", { id: loadId });
       setShowMasterModal(false);
       setMasterFormAttempted(false);
+      setMasterFormData({
+        project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", is_active: true, additional_fields: {},
+      });
       fetchEmployeeMasters();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to onboard personnel. Check for duplicate Card ID/Aadhar.", { id: loadId });
@@ -456,7 +459,7 @@ const Patients = () => {
     if (!isBackground) setIsLoading(true);
     try {
       const viewParam = currentView.toLowerCase();
-      let url = `patients/patients/?page=${pageNum}&view=${viewParam}&search=${search}`;
+      let url = `patients/patients/?page=${pageNum}&page_size=30&view=${viewParam}&search=${search}`;
       if (proj) url += `&project=${proj}`;
       const res = await api.get(url);
       
@@ -827,8 +830,8 @@ const Patients = () => {
     if (!showDownloadModal || !selectedPatientForDownload) return null;
 
     // Dynamically retrieve the currently selected project-specific theme colors for consistent page styling
-    const primaryColor = currentProject?.primary_color || '#6366f1';
-    const secondaryColor = currentProject?.secondary_color || primaryColor;
+    const primaryColor = currentProject?.primary_color || 'var(--primary)';
+    const secondaryColor = currentProject?.secondary_color || 'var(--primary-dark)';
     const fullName = `${selectedPatientForDownload.first_name} ${selectedPatientForDownload.last_name || ''}`.trim();
 
     return createPortal(
@@ -931,7 +934,7 @@ const Patients = () => {
             setIsLateEntry(false);
             setLateEntryJustification('OFFLINE_CHARTING');
             setShowModal(true);
-          }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+          }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px var(--primary-shadow)' }}>
             <UserPlus size={18} /> Register New Patient
           </button>
         </div>
@@ -943,8 +946,8 @@ const Patients = () => {
             onClick={() => { setSearchQuery(''); setViewMode('ACTIVE'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                borderBottom: viewMode === 'ACTIVE' ? '3px solid var(--primary)' : '3px solid transparent',
-                fontWeight: 800, color: viewMode === 'ACTIVE' ? 'var(--primary)' : 'var(--text-muted)',
+                borderBottom: viewMode === 'ACTIVE' ? `3px solid ${currentProject?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                fontWeight: 800, color: viewMode === 'ACTIVE' ? (currentProject?.primary_color || 'var(--primary)') : 'var(--text-muted)',
                 cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
             }}
         >
@@ -954,8 +957,8 @@ const Patients = () => {
             onClick={() => { setSearchQuery(''); setViewMode('SCHEDULED'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                borderBottom: viewMode === 'SCHEDULED' ? '3px solid var(--primary)' : '3px solid transparent',
-                fontWeight: 800, color: viewMode === 'SCHEDULED' ? 'var(--primary)' : 'var(--text-muted)',
+                borderBottom: viewMode === 'SCHEDULED' ? `3px solid ${currentProject?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                fontWeight: 800, color: viewMode === 'SCHEDULED' ? (currentProject?.primary_color || 'var(--primary)') : 'var(--text-muted)',
                 cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
             }}
         >
@@ -965,8 +968,8 @@ const Patients = () => {
             onClick={() => { setSearchQuery(''); setViewMode('COMPLETED'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                borderBottom: viewMode === 'COMPLETED' ? '3px solid var(--primary)' : '3px solid transparent',
-                fontWeight: 800, color: viewMode === 'COMPLETED' ? 'var(--primary)' : 'var(--text-muted)',
+                borderBottom: viewMode === 'COMPLETED' ? `3px solid ${currentProject?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                fontWeight: 800, color: viewMode === 'COMPLETED' ? (currentProject?.primary_color || 'var(--primary)') : 'var(--text-muted)',
                 cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
             }}
         >
@@ -976,8 +979,8 @@ const Patients = () => {
             onClick={() => { setSearchQuery(''); setViewMode('ALL'); }}
             style={{ 
                 padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                borderBottom: viewMode === 'ALL' ? '3px solid var(--primary)' : '3px solid transparent',
-                fontWeight: 800, color: viewMode === 'ALL' ? 'var(--primary)' : 'var(--text-muted)',
+                borderBottom: viewMode === 'ALL' ? `3px solid ${currentProject?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                fontWeight: 800, color: viewMode === 'ALL' ? (currentProject?.primary_color || 'var(--primary)') : 'var(--text-muted)',
                 cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
             }}
         >
@@ -1332,7 +1335,7 @@ const Patients = () => {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     {(() => {
-                        const totalPages = Math.ceil(totalCount / 100);
+                        const totalPages = Math.ceil(totalCount / 30);
                         if (totalPages <= 1) return null;
 
                         const buttons = [];
@@ -1414,9 +1417,9 @@ const Patients = () => {
                 </div>
                 <button 
                     className="btn btn-secondary" 
-                    disabled={page >= Math.ceil(totalCount / 100)}
+                    disabled={page >= Math.ceil(totalCount / 30)}
                     onClick={() => fetchPatients(page + 1)}
-                    style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1 }}
+                    style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 30) ? 0.5 : 1 }}
                 >
                     <ChevronRight size={18} />
                 </button>
@@ -1456,9 +1459,9 @@ const Patients = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 <div style={{ 
                     padding: '0.75rem', 
-                    background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                    background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
                     borderRadius: '16px', 
-                    boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)' 
+                    boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px var(--primary-shadow)' 
                 }}>
                   <UserPlus size={24} color="white" />
                 </div>
@@ -1892,9 +1895,9 @@ const Patients = () => {
                         padding: '0.75rem 2.5rem', 
                         borderRadius: '16px', 
                         fontWeight: 800,
-                        background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
                         border: 'none',
-                        boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)',
+                        boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px var(--primary-shadow)',
                         opacity: isRegistering ? 0.5 : 1
                     }}
                     disabled={isRegistering}
@@ -2017,8 +2020,8 @@ const Patients = () => {
                   className="btn btn-primary" 
                   style={{ 
                     padding: '1rem', borderRadius: '18px', fontWeight: 900, letterSpacing: '0.01em',
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', border: 'none',
-                    boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.2)',
+                    background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', border: 'none',
+                    boxShadow: '0 10px 15px -3px var(--primary-shadow)',
                     opacity: isTriaging ? 0.5 : 1
                   }}
                   disabled={isTriaging}
@@ -2045,7 +2048,7 @@ const Patients = () => {
           <div className="card fade-in" style={{ width: "100%", maxWidth: "600px", padding: 0, borderRadius: "32px", background: "white", boxShadow: "0 20px 40px rgba(0,0,0,0.08)", border: "1px solid var(--border)" }}>
             <div style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
+                <div style={{ padding: '0.75rem', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', borderRadius: '16px', boxShadow: '0 4px 12px var(--primary-shadow)' }}>
                   <ShieldCheck size={24} color="white" />
                 </div>
                 <div>

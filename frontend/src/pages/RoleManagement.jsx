@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Check, Pencil, Trash2 } from 'lucide-react';
+import { Shield, Check, Pencil, Trash2, Briefcase, ChevronDown } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const SYSTEM_MODULES = [
     { id: '/dashboard', name: 'Dashboard Analytics', icon: 'LayoutDashboard' },
@@ -10,6 +11,8 @@ const SYSTEM_MODULES = [
     { id: '/consultations', name: 'Consult Desk', icon: 'ShieldPlus' },
     { id: '/lab', name: 'Laboratory', icon: 'Microscope' },
     { id: '/pharmacy', name: 'Pharmacy', icon: 'Pill' },
+    { id: '/indents/inventory', name: 'Room Stock - Inventory & Requests', icon: 'Package' },
+    { id: '/indents/approval', name: 'Room Stock - Doctor Approval Desk', icon: 'UserCheck' },
     { id: '/reports', name: 'Analytics Hub', icon: 'BarChart3' },
     { id: '/operations-hub', name: 'Executive Operations Hub', icon: 'TrendingUp' },
     { id: '/reports/bulk-import', name: 'Reports - Bulk Import History', icon: 'Upload' },
@@ -28,19 +31,55 @@ const SYSTEM_MODULES = [
 // Removed PREDEFINED_ROLES as role creation should be fully dynamic
 
 const RoleManagement = () => {
+    const { user } = useAuth();
     const [roles, setRoles] = useState([]);
+    const [projects, setProjects] = useState([]);
+    const [selectedProjectId, setSelectedProjectId] = useState('');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
     const [roleForm, setRoleForm] = useState({ name: '', description: '', data_isolation: false, permissions: [] });
     const [isEditingRole, setIsEditingRole] = useState(false);
     const [editingRoleId, setEditingRoleId] = useState(null);
 
     useEffect(() => {
-        fetchRoles();
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.project-selector-container')) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const fetchRoles = async () => {
+    useEffect(() => {
+        if (user) {
+            if (user.project) {
+                setSelectedProjectId(user.project);
+            } else {
+                fetchProjects();
+            }
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (selectedProjectId) {
+            fetchRoles(selectedProjectId);
+        }
+    }, [selectedProjectId]);
+
+    const fetchProjects = async () => {
         try {
-            const res = await api.get('accounts/user-roles/');
+            const res = await api.get('patients/projects/');
+            const pList = res.data.results || res.data;
+            setProjects(pList);
+        } catch (err) {
+            toast.error("Failed to load projects.");
+        }
+    };
+
+    const fetchRoles = async (projId) => {
+        try {
+            const res = await api.get(`accounts/user-roles/?project=${projId}`);
             setRoles(res.data.results || res.data);
         } catch (err) {
             toast.error("Failed to load roles.");
@@ -51,17 +90,21 @@ const RoleManagement = () => {
         e.preventDefault();
         const loadId = toast.loading("Saving role...");
         try {
+            const payload = {
+                ...roleForm,
+                project: selectedProjectId
+            };
             if (isEditingRole) {
-                await api.put(`accounts/user-roles/${editingRoleId}/`, roleForm);
+                await api.put(`accounts/user-roles/${editingRoleId}/`, payload);
                 toast.success("Role updated!", { id: loadId });
             } else {
-                await api.post('accounts/user-roles/', roleForm);
+                await api.post('accounts/user-roles/', payload);
                 toast.success("New role created!", { id: loadId });
             }
             setRoleForm({ name: '', description: '', data_isolation: false, permissions: [] });
             setIsEditingRole(false);
             setEditingRoleId(null);
-            fetchRoles();
+            fetchRoles(selectedProjectId);
         } catch (err) {
             toast.error("Error saving role.", { id: loadId });
         }
@@ -74,7 +117,135 @@ const RoleManagement = () => {
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 500 }}>Define access policies and explicitly map users to roles.</p>
             </header>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2.5rem', alignItems: 'start' }} className="fade-in">
+            {!user?.project && projects.length > 0 && (
+                <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '1.5rem', 
+                    background: 'var(--surface)', 
+                    padding: '1.25rem 2rem', 
+                    borderRadius: '20px', 
+                    border: '1px solid var(--border)', 
+                    marginBottom: '2rem',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.02)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>Active Project Context:</span>
+                    </div>
+
+                    <div className="project-selector-container" style={{ position: 'relative', width: '320px' }}>
+                        {/* Dropdown Trigger */}
+                        <div 
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '0.75rem 1.25rem',
+                                background: 'var(--background)',
+                                border: isDropdownOpen ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
+                                borderRadius: '14px',
+                                color: 'var(--text-main)',
+                                fontWeight: 700,
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                transition: 'all 0.2s ease',
+                                boxShadow: isDropdownOpen ? '0 0 0 4px rgba(99, 102, 241, 0.1)' : 'none'
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <Briefcase size={16} color="var(--primary)" />
+                                <span>{projects.find(p => p.id == selectedProjectId)?.name || 'Select Project'}</span>
+                            </div>
+                            <ChevronDown 
+                                size={16} 
+                                color="var(--text-muted)" 
+                                style={{ 
+                                    transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s ease'
+                                }} 
+                            />
+                        </div>
+
+                        {/* Dropdown List */}
+                        {isDropdownOpen && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '115%',
+                                left: 0,
+                                right: 0,
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '16px',
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                                zIndex: 1000,
+                                padding: '0.5rem',
+                                maxHeight: '260px',
+                                overflowY: 'auto'
+                            }}>
+                                {projects.map(p => {
+                                    const isSelected = p.id == selectedProjectId;
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            onClick={() => {
+                                                setSelectedProjectId(p.id);
+                                                setIsDropdownOpen(false);
+                                            }}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.75rem',
+                                                padding: '0.75rem 1rem',
+                                                borderRadius: '10px',
+                                                cursor: 'pointer',
+                                                background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                                                color: isSelected ? 'var(--primary)' : 'var(--text-main)',
+                                                fontWeight: isSelected ? 800 : 600,
+                                                fontSize: '0.875rem',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!isSelected) {
+                                                    e.currentTarget.style.background = 'var(--background)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!isSelected) {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '8px',
+                                                height: '8px',
+                                                borderRadius: '50%',
+                                                background: isSelected ? 'var(--primary)' : 'transparent',
+                                                border: isSelected ? 'none' : '1.5px solid var(--border)'
+                                            }} />
+                                            <span>{p.name}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {!selectedProjectId ? (
+                <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center', background: 'var(--surface)', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                        <Briefcase size={40} />
+                    </div>
+                    <div>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>Select Project Context</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', marginTop: '0.5rem', maxWidth: '400px', margin: '0.5rem auto 0', lineHeight: '1.6' }}>Please select a project facility from the dropdown above to view and manage its roles and access policies.</p>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2.5rem', alignItems: 'start' }} className="fade-in">
                 {/* Role Definitions */}
                 <div className="card" style={{ padding: '2.5rem', background: 'var(--surface)', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.03)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' }}>
@@ -207,7 +378,7 @@ const RoleManagement = () => {
                                         ) : (
                                             <>
                                                 <button onClick={() => { setEditingRoleId(r.id); setIsEditingRole(true); setRoleForm({ name: r.name, description: r.description, data_isolation: r.data_isolation, permissions: r.permissions || [] }); window.scrollTo({top:0, behavior:'smooth'}) }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Pencil size={14} /></button>
-                                                <button onClick={async () => { if(window.confirm(`Delete role ${r.name}?`)) { await api.delete(`accounts/user-roles/${r.id}/`); fetchRoles(); } }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Trash2 size={14} /></button>
+                                                <button onClick={async () => { if(window.confirm(`Delete role ${r.name}?`)) { await api.delete(`accounts/user-roles/${r.id}/`); fetchRoles(selectedProjectId); } }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Trash2 size={14} /></button>
                                             </>
                                         )}
                                     </div>
@@ -220,7 +391,8 @@ const RoleManagement = () => {
                         ))}
                     </div>
                 </div>
-            </div>
+                </div>
+            )}
 
             <style>{`
                 .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }

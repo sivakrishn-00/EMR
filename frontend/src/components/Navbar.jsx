@@ -92,11 +92,16 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
   useEffect(() => {
     if (user) {
       fetchAppointments();
-      fetchMasters();
       const interval = setInterval(fetchAppointments, 60000);
       return () => clearInterval(interval);
     }
   }, [user, scheduleDate]);
+
+  useEffect(() => {
+    if (user && showBookingModal && masters.length === 0) {
+      fetchMasters();
+    }
+  }, [user, showBookingModal, masters.length]);
 
   const fetchMasters = async () => {
     try {

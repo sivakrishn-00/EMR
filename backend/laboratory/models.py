@@ -29,6 +29,7 @@ class LabTestMaster(models.Model):
     test_type = models.ForeignKey(LabTestType, on_delete=models.SET_NULL, null=True, blank=True, related_name='tests')
     department = models.ForeignKey(LabDepartment, on_delete=models.SET_NULL, null=True, blank=True, related_name='tests')
     description = models.TextField(blank=True, null=True)
+    supports_attachments = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -112,6 +113,7 @@ class LabResult(models.Model):
     value = models.CharField(max_length=255, blank=True, null=True) # Legacy support
     reference_range = models.CharField(max_length=255, blank=True, null=True)
     interpretation = models.TextField(blank=True, null=True)
+    attachment = models.FileField(upload_to='lab_results/attachments/', blank=True, null=True)
     recorded_at = models.DateTimeField(default=timezone.now)
 
     def save(self, *args, **kwargs):
@@ -121,6 +123,16 @@ class LabResult(models.Model):
 
     def __str__(self):
         return f"Result for {self.lab_request}"
+
+
+class LabResultAttachment(models.Model):
+    result = models.ForeignKey(LabResult, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='lab_results/attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Attachment for {self.result.lab_request.test_name}"
+
 
 
 class LabProjectBridge(models.Model):

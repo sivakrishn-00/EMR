@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { 
   FlaskConical, 
@@ -14,10 +15,18 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  ClipboardList,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  Upload,
+  Trash2,
+  Image
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import Indents from './Indents';
 
 const mappingDict = {
     'wbc': ['WBC', 'WHITE', 'LEUCOCYTE', 'WBC COUNT'], 
@@ -108,7 +117,11 @@ const isRecordRelevantForGroup = (record, group) => {
 
 const Laboratory = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isExamineRoute = location.pathname === '/lab/examine';
   const [projectConfig, setProjectConfig] = useState(null);
+  const [activeSubTab, setActiveSubTab] = useState('queue');
   const [labRequests, setLabRequests] = useState([]);
   const [selectedRequestGroup, setSelectedRequestGroup] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -120,7 +133,9 @@ const Laboratory = () => {
     value: '', 
     values: {},
     reference_range: '', 
-    interpretation: '' 
+    interpretation: '',
+    attachment: null,
+    attachments: []
   });
   const [hardwareMatches, setHardwareMatches] = useState([]);
   const [isFetchingMatching, setIsFetchingMatching] = useState(false);
@@ -131,11 +146,29 @@ const Laboratory = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 100;
+  const itemsPerPage = 30;
+  const [sortConfig, setSortConfig] = useState({ key: 'oldest_created_at', direction: 'asc' });
 
   useEffect(() => {
     fetchLabRequests();
   }, []);
+
+  useEffect(() => {
+    // If path is /lab/examine but there is no selected group, redirect to /lab queue
+    if (isExamineRoute && !selectedRequestGroup) {
+      navigate('/lab', { replace: true });
+    }
+  }, [isExamineRoute, selectedRequestGroup, navigate]);
+
+  useEffect(() => {
+    // If user clicks sidebar or navigates back to /lab, reset selected group and request, and refresh list
+    if (location.pathname === '/lab') {
+      setSelectedRequest(null);
+      setSelectedRequestGroup(null);
+      setActiveSubTab('queue');
+      fetchLabRequests(searchTerm);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -202,7 +235,9 @@ const Laboratory = () => {
         value: '',
         values: initValues,
         reference_range: '',
-        interpretation: combinedInterpretation || ''
+        interpretation: combinedInterpretation || '',
+        attachment: null,
+        attachments: []
     });
   };
 
@@ -223,12 +258,27 @@ const Laboratory = () => {
             });
           }
           
-          return api.post(`laboratory/requests/${req.id}/record_result/`, {
-            value: resultData.value,
-            values: reqValues,
-            reference_range: resultData.reference_range,
-            interpretation: resultData.interpretation || 'Results verified.',
-            sample_type: sampleData.sample_type
+          const formData = new FormData();
+          formData.append('value', resultData.value || '');
+          formData.append('values', JSON.stringify(reqValues));
+          formData.append('reference_range', resultData.reference_range || '');
+          formData.append('interpretation', resultData.interpretation || 'Results verified.');
+          formData.append('sample_type', sampleData.sample_type || '');
+          
+          if (resultData.attachments && resultData.attachments.length > 0) {
+            resultData.attachments.forEach(file => {
+              formData.append('attachments', file);
+            });
+            formData.append('attachment', resultData.attachments[0]);
+          } else if (resultData.attachment) {
+            formData.append('attachment', resultData.attachment);
+            formData.append('attachments', resultData.attachment);
+          }
+          
+          return api.post(`laboratory/requests/${req.id}/record_result/`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
           });
         });
       
@@ -236,9 +286,8 @@ const Laboratory = () => {
       toast.success("All lab results updated! Notifying doctor.", { id: loadingToast });
       
       // Clear selection
-      setSelectedRequest(null);
-      setSelectedRequestGroup(null);
-      setResultData({ value: '', values: {}, reference_range: '', interpretation: '' });
+      navigate('/lab');
+      setResultData({ value: '', values: {}, reference_range: '', interpretation: '', attachment: null, attachments: [] });
       
       // Refresh list
       fetchLabRequests();
@@ -365,22 +414,91 @@ const Laboratory = () => {
   });
   groupedList.sort((a, b) => new Date(a.oldest_created_at) - new Date(b.oldest_created_at));
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedGroups = [...groupedList].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    let aVal = '';
+    let bVal = '';
+    
+    if (sortConfig.key === 'patient_name') {
+      aVal = (a.patient_name || '').toLowerCase();
+      bVal = (b.patient_name || '').toLowerCase();
+    } else if (sortConfig.key === 'test_names') {
+      aVal = a.requests.map(r => r.test_name).join(', ').toLowerCase();
+      bVal = b.requests.map(r => r.test_name).join(', ').toLowerCase();
+    } else if (sortConfig.key === 'oldest_created_at') {
+      aVal = new Date(a.oldest_created_at).getTime();
+      bVal = new Date(b.oldest_created_at).getTime();
+    }
+    
+    if (aVal < bVal) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (aVal > bVal) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentGroups = groupedList.slice(indexOfFirstItem, indexOfLastItem);
+  const currentGroups = sortedGroups.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(groupedList.length / itemsPerPage);
 
   const hasPending = selectedRequestGroup && selectedRequestGroup.requests.some(r => r.status !== 'COMPLETED');
+  const groupSupportsAttachments = selectedRequestGroup && selectedRequestGroup.requests.some(r => r.test_master_details?.supports_attachments);
 
   return (
     <div className="fade-in">
-      <header style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Laboratory Hub</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Process diagnostics and manage clinical laboratory results</p>
+      {!selectedRequestGroup && (
+      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Laboratory Hub</h1>
+          <p style={{ color: 'var(--text-muted)' }}>Process diagnostics and manage clinical laboratory results</p>
+        </div>
       </header>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedRequestGroup ? '1fr 1.25fr' : '1fr', gap: '2rem', alignItems: 'start' }}>
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      {!selectedRequestGroup && (
+        <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
+          <button 
+              onClick={() => setActiveSubTab('queue')}
+              style={{ 
+                  padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                  borderBottom: activeSubTab === 'queue' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                  fontWeight: 800, color: activeSubTab === 'queue' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                  cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
+              }}
+          >
+              Workload Queue ({groupedList.length})
+          </button>
+          {(user?.role === 'ADMIN' || user?.permissions?.includes('/indents/inventory')) && (
+            <button 
+                onClick={() => setActiveSubTab('stock')}
+                style={{ 
+                    padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                    borderBottom: activeSubTab === 'stock' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                    fontWeight: 800, color: activeSubTab === 'stock' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                    cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
+                }}
+            >
+                Room Stock
+            </button>
+          )}
+        </div>
+      )}
+
+      <div style={{ width: '100%', margin: '0 auto' }}>
+        {!selectedRequestGroup && activeSubTab === 'queue' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
              <div>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Workload Queue ({groupedList.length})</h3>
@@ -414,9 +532,11 @@ const Laboratory = () => {
                      style={{ 
                        padding: '0.5rem 1.25rem', borderRadius: '10px', border: 'none', 
                        background: activeTab === 'PENDING' ? 'var(--surface)' : 'transparent',
-                       color: activeTab === 'PENDING' ? 'var(--primary)' : 'var(--text-muted)',
+                       color: activeTab === 'PENDING' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
                        fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                       boxShadow: activeTab === 'PENDING' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                       boxShadow: activeTab === 'PENDING' 
+                         ? (projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}26` : '0 4px 12px var(--primary-shadow)') 
+                         : 'none',
                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                        display: 'flex',
                        alignItems: 'center',
@@ -432,7 +552,7 @@ const Laboratory = () => {
                        background: activeTab === 'COMPLETED' ? 'var(--surface)' : 'transparent',
                        color: activeTab === 'COMPLETED' ? '#10b981' : 'var(--text-muted)',
                        fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
-                       boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                       boxShadow: activeTab === 'COMPLETED' ? '0 4px 12px rgba(16, 185, 129, 0.15)' : 'none',
                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                        display: 'flex',
                        alignItems: 'center',
@@ -441,17 +561,47 @@ const Laboratory = () => {
                    >
                      <CheckCircle size={14} /> COMPLETED ({labRequests.filter(r => r.status === 'COMPLETED').length})
                    </button>
-                </div>
-             </div>
-          </div>
+                 </div>
+              </div>
+           </div>
           
           <div className="table-responsive">
             <table>
               <thead>
                 <tr>
-                  <th style={{ padding: '1rem 1.25rem' }}>Patient / DHID</th>
-                  <th>Test(s) Requested</th>
-                  <th>Workflow Status</th>
+                  <th 
+                    onClick={() => handleSort('patient_name')}
+                    style={{ padding: '1rem 1.25rem', cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Patient / DHID
+                      {sortConfig.key === 'patient_name' ? (
+                        sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('test_names')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Test(s) Requested
+                      {sortConfig.key === 'test_names' ? (
+                        sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('oldest_created_at')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Workflow Status
+                      {sortConfig.key === 'oldest_created_at' ? (
+                        sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                    </div>
+                  </th>
                   <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Action</th>
                 </tr>
               </thead>
@@ -483,6 +633,7 @@ const Laboratory = () => {
                     currentGroups.map(g => {
                        const isSelected = selectedRequestGroup?.id === g.id;
                        const testNames = g.requests.map(r => r.test_name).join(', ');
+                       const orderedBy = g.requests[0]?.ordered_by_name;
                        
                        let groupStatus = 'PENDING';
                        if (g.requests.every(r => r.status === 'COMPLETED')) {
@@ -507,7 +658,7 @@ const Laboratory = () => {
                                   </div>
                                   <div>
                                      <p style={{ fontWeight: 700, fontSize: '0.875rem' }}>{g.patient_name}</p>
-                                     <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {g.patient_id}{g.card_no ? ` | Card: ${g.card_no}` : ''}</p>
+                                     <p style={{ fontSize: '0.625rem', color: '#475569', fontWeight: 800 }}>ID: {g.patient_id}{g.card_no ? ` | Card: ${g.card_no}` : ''}{orderedBy ? ` | Ordered By: ${orderedBy}` : ''}</p>
                                   </div>
                                </div>
                             </td>
@@ -525,13 +676,56 @@ const Laboratory = () => {
                                </span>
                             </td>
                             <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                              <button className={`btn ${groupStatus === 'COMPLETED' ? 'btn-secondary' : 'btn-primary'}`} onClick={() => {
-                                setSelectedRequestGroup(g);
-                                setSelectedRequest(g.requests[0]);
-                                setupGroupResultForm(g);
-                                if (g.patient_id) fetchMatchingHardwareData(g.patient_id);
-                              }} style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}>
-                                 {groupStatus === 'COMPLETED' ? 'View Report' : 'Process'} <ArrowRight size={14} style={{ marginLeft: '4px' }} />
+                              <button 
+                                className={`btn ${groupStatus === 'COMPLETED' ? 'btn-secondary' : 'btn-primary'}`} 
+                                onClick={() => {
+                                  setSelectedRequestGroup(g);
+                                  setSelectedRequest(g.requests[0]);
+                                  setupGroupResultForm(g);
+                                  if (g.patient_id) fetchMatchingHardwareData(g.patient_id);
+                                  navigate('/lab/examine');
+                                }} 
+                                style={{ 
+                                  padding: '0.4rem 0.85rem', 
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  borderRadius: '10px',
+                                  border: 'none',
+                                  color: groupStatus === 'COMPLETED' ? 'var(--text-main)' : 'white',
+                                  background: groupStatus === 'COMPLETED' 
+                                    ? 'var(--surface)' 
+                                    : (projectConfig?.primary_color 
+                                       ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                       : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'),
+                                  boxShadow: groupStatus === 'COMPLETED' 
+                                    ? 'none' 
+                                    : (projectConfig?.primary_color 
+                                       ? `0 4px 10px ${projectConfig.primary_color}26` 
+                                       : '0 4px 10px var(--primary-shadow)'),
+                                  transition: 'all 0.2s ease',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  cursor: 'pointer'
+                                }}
+                                onMouseOver={e => {
+                                  if (groupStatus !== 'COMPLETED') {
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                    e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                      ? `0 6px 12px ${projectConfig.primary_color}4d` 
+                                      : '0 6px 12px var(--primary-shadow)';
+                                  }
+                                }}
+                                onMouseOut={e => {
+                                  if (groupStatus !== 'COMPLETED') {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                      ? `0 4px 10px ${projectConfig.primary_color}26` 
+                                      : '0 4px 10px var(--primary-shadow)';
+                                  }
+                                }}
+                              >
+                                  {groupStatus === 'COMPLETED' ? 'View Report' : 'Process'} <ArrowRight size={14} style={{ marginLeft: '4px' }} />
                               </button>
                             </td>
                           </tr>
@@ -647,23 +841,69 @@ const Laboratory = () => {
                      </button>
                  </div>
              </div>
-        </div>
+        </div>)}
+
+        {!selectedRequestGroup && activeSubTab === 'stock' && (
+          <div className="fade-in">
+             <Indents isEmbed={true} embedRoom="Lab Room" />
+          </div>
+        )}
 
         {selectedRequestGroup && (
-          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <div style={{ padding: '0.75rem', background: projectConfig?.primary_color || '#92400e', borderRadius: '14px', color: 'white' }}>
-                     <FlaskConical size={24} />
-                  </div>
+          <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', padding: '0.5rem' }}>
+               <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
                   <div>
-                     <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Clinical Diagnostic Entry</h2>
-                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Patient Case: <strong>{selectedRequestGroup.patient_name}</strong> (ID: {selectedRequestGroup.patient_id}{selectedRequestGroup.card_no ? ` | Card: ${selectedRequestGroup.card_no}` : ''})</p>
+                     <div style={{ width: 'fit-content' }}>
+                        <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em', margin: 0 }}>Clinical Diagnostic Entry</h2>
+                        <div style={{ 
+                          height: '3px', 
+                          width: '100%', 
+                          background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%)', 
+                          borderRadius: '4px', 
+                          marginTop: '6px',
+                          marginBottom: '8px'
+                        }}></div>
+                     </div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 800 }}> 
+                           Patient Case: <strong style={{ color: 'var(--text-main)' }}>{selectedRequestGroup.patient_name}</strong> | ID: {selectedRequestGroup.patient_id}{selectedRequestGroup.card_no ? ` | Card: ${selectedRequestGroup.card_no}` : ''}
+                        </p>
+                     </div>
                   </div>
                </div>
-               <button onClick={() => { setSelectedRequest(null); setSelectedRequestGroup(null); }} style={{ border: 'none', background: 'var(--background)', color: 'var(--text-main)', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <X size={16} />
-               </button>
+               <div style={{ display: 'flex', gap: '0.75rem', marginLeft: 'auto' }}>
+                  <button 
+                     onClick={() => navigate('/lab')} 
+                     style={{ 
+                       border: 'none',
+                       background: 'var(--primary)', 
+                       padding: '0.6rem 1.25rem', 
+                       borderRadius: '12px', 
+                       cursor: 'pointer', 
+                       transition: 'all 0.2s ease', 
+                       color: 'white',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '6px',
+                       fontWeight: 800,
+                       fontSize: '0.8125rem',
+                       boxShadow: '0 4px 12px var(--primary-shadow)'
+                     }}
+                     onMouseOver={e => {
+                       e.currentTarget.style.transform = 'translateY(-1px)';
+                       e.currentTarget.style.boxShadow = '0 6px 16px var(--primary-shadow)';
+                       e.currentTarget.style.background = 'var(--primary-dark)';
+                     }}
+                     onMouseOut={e => {
+                       e.currentTarget.style.transform = 'translateY(0)';
+                       e.currentTarget.style.boxShadow = '0 4px 12px var(--primary-shadow)';
+                       e.currentTarget.style.background = 'var(--primary)';
+                     }}
+                  >
+                     <ChevronLeft size={16} strokeWidth={2.5} /> Back to Queue
+                  </button>
+               </div>
             </div>
 
             <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
@@ -683,6 +923,27 @@ const Laboratory = () => {
                               ))}
                            </div>
                         )}
+                        {req.result?.attachment_url && (
+                           <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 850 }}>ATTACHMENT:</span>
+                              <a 
+                                href={req.result.attachment_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  fontSize: '0.6875rem', 
+                                  color: projectConfig?.primary_color || 'var(--primary)', 
+                                  fontWeight: 800,
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                <FileText size={12} /> View File
+                              </a>
+                           </div>
+                        )}
                      </div>
                   ))}
                 </div>
@@ -691,13 +952,9 @@ const Laboratory = () => {
             {hasPending && (
                <div style={{ marginBottom: '2rem', background: 'var(--surface)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #4f46e5 0%, #312e81 100%)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ShieldCheck size={20} color="white" />
-                        </div>
-                        <div>
-                            <p style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--text-main)' }}>Hardware Pulse HUB</p>
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '3px', height: '14px', borderRadius: '2px', background: 'var(--primary)' }}></span>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 950, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Data sync</p>
                     </div>
                     <button onClick={() => fetchMatchingHardwareData(selectedRequestGroup.patient_id)} className="btn btn-secondary" style={{ padding: '4px 8px' }}>
                         <RefreshCw size={14} className={isFetchingMatching ? 'spin' : ''} />
@@ -723,7 +980,39 @@ const Laboratory = () => {
                                               </div>
                                            </div>
                                        </div>
-                                       <button onClick={() => applyHardwareResult(m)} style={{ border: 'none', background: 'var(--primary)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }}>Apply Results</button>
+                                       <button 
+                                           onClick={() => applyHardwareResult(m)} 
+                                           style={{ 
+                                             border: 'none', 
+                                             background: projectConfig?.primary_color 
+                                               ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                               : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                                             color: 'white', 
+                                             padding: '6px 14px', 
+                                             borderRadius: '10px', 
+                                             fontSize: '0.75rem', 
+                                             fontWeight: 800, 
+                                             cursor: 'pointer', 
+                                             transition: 'all 0.2s ease', 
+                                             boxShadow: projectConfig?.primary_color 
+                                               ? `0 4px 10px ${projectConfig.primary_color}33` 
+                                               : '0 4px 10px var(--primary-shadow)' 
+                                           }}
+                                           onMouseOver={e => {
+                                             e.currentTarget.style.transform = 'translateY(-1px)';
+                                             e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                               ? `0 6px 12px ${projectConfig.primary_color}4d` 
+                                               : '0 6px 12px var(--primary-shadow)';
+                                           }}
+                                           onMouseOut={e => {
+                                             e.currentTarget.style.transform = 'translateY(0)';
+                                             e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                               ? `0 4px 10px ${projectConfig.primary_color}33` 
+                                               : '0 4px 10px var(--primary-shadow)';
+                                           }}
+                                        >
+                                           Apply Results
+                                        </button>
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                        {Object.entries(m).filter(([k, v]) => 
@@ -753,7 +1042,7 @@ const Laboratory = () => {
             <form onSubmit={handleSaveGroupResults} className="fade-in">
                <div style={{ background: 'var(--background)', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)' }}>
                   <div style={{ marginBottom: '2rem' }}>
-                      <p style={{ fontSize: '0.9375rem', fontWeight: 950, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem' }}>
+                      <p style={{ fontSize: '0.9375rem', fontWeight: 950, color: 'var(--text-main)', marginBottom: '1.5rem' }}>
                            Verification Desk
                       </p>
                       
@@ -764,9 +1053,12 @@ const Laboratory = () => {
 
                          return (
                             <div key={req.id} style={{ marginBottom: '1.75rem' }}>
-                               <div style={{ fontSize: '0.75rem', fontWeight: 900, color: 'var(--primary)', marginBottom: '0.6rem', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>{req.test_name}</span>
-                                  <span style={{ fontSize: '0.625rem', color: '#64748b' }}>Status: {req.status}</span>
+                               <div style={{ fontSize: '0.75rem', fontWeight: 950, color: 'var(--primary)', marginBottom: '0.6rem', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                     <span style={{ width: '3px', height: '12px', borderRadius: '2px', background: 'var(--primary)' }}></span>
+                                     {req.test_name}
+                                  </span>
+                                  <span style={{ fontSize: '0.625rem', color: '#64748b', fontWeight: 800 }}>Status: {req.status}</span>
                                 </div>
                                
                                <div className="table-responsive" style={{ borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
@@ -824,8 +1116,95 @@ const Laboratory = () => {
                          );
                       })}
 
+                      {groupSupportsAttachments && hasPending && (
+                        <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>
+                            File Attachment (X-Ray / Scan / PDF Report)
+                          </label>
+                          {/* Render existing attachments list */}
+                          {resultData.attachments && resultData.attachments.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                              {resultData.attachments.map((file, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    {file.type?.startsWith('image/') ? (
+                                      <div style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                        <img src={URL.createObjectURL(file)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      </div>
+                                    ) : (
+                                      <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
+                                        <FileText size={18} color="var(--primary)" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', margin: 0, wordBreak: 'break-all' }}>{file.name}</p>
+                                      <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0 }}>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
+                                  </div>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      const updated = resultData.attachments.filter((_, i) => i !== idx);
+                                      setResultData({ ...resultData, attachments: updated });
+                                    }}
+                                    style={{ border: 'none', background: '#fef2f2', color: '#ef4444', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Dropzone for adding files */}
+                          <div 
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                const newFiles = Array.from(e.dataTransfer.files);
+                                setResultData(prev => ({ ...prev, attachments: [...(prev.attachments || []), ...newFiles] }));
+                              }
+                            }}
+                            style={{ 
+                              border: '2px dashed var(--border)', 
+                              borderRadius: '16px', 
+                              padding: resultData.attachments?.length > 0 ? '1.25rem' : '2rem 1.5rem', 
+                              textAlign: 'center', 
+                              background: 'var(--background)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onClick={() => document.getElementById('lab-file-input').click()}
+                          >
+                            <input 
+                              type="file" 
+                              id="lab-file-input" 
+                              style={{ display: 'none' }} 
+                              multiple
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                  const newFiles = Array.from(e.target.files);
+                                  setResultData(prev => ({ ...prev, attachments: [...(prev.attachments || []), ...newFiles] }));
+                                }
+                              }}
+                              accept="image/*,application/pdf"
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <Upload size={24} color={projectConfig?.primary_color || 'var(--primary)'} />
+                              <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                                Drag & drop files here, or <span style={{ color: projectConfig?.primary_color || 'var(--primary)' }}>browse</span>
+                              </p>
+                              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', margin: 0 }}>
+                                Upload one or more files (images, X-Rays, scans, or PDFs)
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Clinical Interpretation</label>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: projectConfig?.primary_color || 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinical Interpretation</label>
                           <textarea 
                               rows="2" value={resultData.interpretation} 
                               onChange={e => setResultData({...resultData, interpretation: e.target.value})} 
@@ -834,9 +1213,43 @@ const Laboratory = () => {
                       </div>
 
                       {hasPending ? (
-                          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', background: projectConfig?.primary_color || 'var(--primary)', borderRadius: '20px', fontWeight: 900, marginTop: '1.5rem' }}>
-                              Finalize & Transmit <ArrowRight size={18} style={{ marginLeft: '8px' }} />
-                          </button>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                              <button 
+                                 type="submit" 
+                                 className="btn btn-primary" 
+                                 style={{ 
+                                   width: 'auto', 
+                                   padding: '0.75rem 2.5rem', 
+                                   border: 'none',
+                                   background: projectConfig?.primary_color 
+                                     ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                     : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                                   borderRadius: '16px', 
+                                   color: 'white',
+                                   fontWeight: 900,
+                                   fontSize: '0.9375rem',
+                                   cursor: 'pointer',
+                                   transition: 'all 0.3s ease',
+                                   boxShadow: projectConfig?.primary_color 
+                                     ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
+                                     : '0 10px 15px -3px var(--primary-shadow)'
+                                 }}
+                                 onMouseOver={e => {
+                                   e.currentTarget.style.transform = 'translateY(-1px)';
+                                   e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                     ? `0 12px 20px -3px ${projectConfig.primary_color}66` 
+                                     : '0 12px 20px -3px var(--primary-shadow)';
+                                 }}
+                                 onMouseOut={e => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                      ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
+                                      : '0 10px 15px -3px var(--primary-shadow)';
+                                 }}
+                              >
+                                  Finalize & Transmit
+                              </button>
+                          </div>
                       ) : (
                            <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '20px', color: '#10b981', fontSize: '0.8rem', fontWeight: 800, textAlign: 'center', marginTop: '1.5rem', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                               Results Transmitted to Doctor

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Stethoscope, 
   ClipboardList, 
@@ -17,13 +18,31 @@ import {
   Pencil,
   FileText,
   Calendar,
-  Plus
+  Plus,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  User,
+  Phone,
+  Hash,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  RotateCcw,
+  Sun,
+  RefreshCw,
+  Image
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import Indents from './Indents';
+
 
 const Clinical = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isExamineRoute = location.pathname === '/consultations/examine';
   const [projectConfig, setProjectConfig] = useState(null);
   const [visitsReady, setVisitsReady] = useState([]);
   const [selectedVisit, setSelectedVisit] = useState(null);
@@ -39,6 +58,7 @@ const Clinical = () => {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'visit_date', direction: 'asc' });
 
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
   const [pharmacyInventory, setPharmacyInventory] = useState([]);
@@ -63,11 +83,68 @@ const Clinical = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [detailedVisit, setDetailedVisit] = useState(null);
   const [isSavingConsult, setIsSavingConsult] = useState(false);
+  
+  // Lightbox Image Viewer state
+  const [lightboxImage, setLightboxImage] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [brightness, setBrightness] = useState(1);
+  const [flipH, setFlipH] = useState(false);
+  const [flipV, setFlipV] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const stateTab = location.state?.activeTab || location.state?.activeSubTab;
+    if (stateTab === 'approval') return 'approval';
+    return 'queue';
+  });
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  const fetchPendingApprovalsCount = async () => {
+    try {
+      const projectId = user?.project?.id || user?.project;
+      const projectQuery = projectId ? `?project=${projectId}` : '';
+      const res = await api.get(`pharmacy/indents/${projectQuery}`);
+      const indents = res.data.results || res.data || [];
+      const count = indents.filter(i => i.status === 'PENDING_APPROVAL').length;
+      setPendingApprovalsCount(count);
+    } catch (e) {
+      console.error("Failed to fetch pending approvals count:", e);
+    }
+  };
 
   useEffect(() => {
     fetchVisitsToSee();
     fetchRegistryTypes();
+    fetchPendingApprovalsCount();
   }, []);
+
+  useEffect(() => {
+    if (isExamineRoute && !selectedVisit) {
+      navigate('/consultations', { replace: true });
+    }
+  }, [isExamineRoute, selectedVisit, navigate]);
+
+  useEffect(() => {
+    if (location.pathname === '/consultations') {
+      setSelectedVisit(null);
+      fetchVisitsToSee(1, searchTerm);
+      fetchPendingApprovalsCount();
+    }
+  }, [location.pathname, user]);
+
+  useEffect(() => {
+    if (location.state?.activeTab || location.state?.activeSubTab) {
+      const stateTab = location.state.activeTab || location.state.activeSubTab;
+      if (stateTab === 'approval') {
+        setActiveSubTab('approval');
+      } else {
+        setActiveSubTab('queue');
+      }
+    }
+  }, [location.state]);
 
   const fetchRegistryTypes = async () => {
     try {
@@ -89,6 +166,7 @@ const Clinical = () => {
   useEffect(() => {
     if (user?.project) {
       fetchProjectConfig(user.project);
+      fetchPendingApprovalsCount();
     } else {
       setProjectConfig(null);
     }
@@ -154,11 +232,19 @@ const Clinical = () => {
     }
   };
 
-  const getDoseCount = (freq, dur, itemGroup = "") => {
+  const checkIsDayBased = (itemGroup) => {
+    const groupUpper = String(itemGroup || "").toUpperCase().trim();
+    if (groupUpper.includes('BOTTLE') || groupUpper.includes('BOT')) {
+      return false;
+    }
+    return groupUpper.includes('TAB') || groupUpper.includes('CAP');
+  };
+
+  const getDoseCount = (freq, dur, itemGroup = "", medName = "") => {
     if (!freq || !dur) return 0;
 
     // MNC Standard Logic: Only Tablets and Capsules follow frequency-based multiplication
-    const isDayBased = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(itemGroup?.toUpperCase()) || !itemGroup;
+    const isDayBased = checkIsDayBased(itemGroup, medName);
 
     if (!isDayBased) {
         // For Syrups, Ointments, Liquids, etc., the 'Duration' field is treated as 'Total Units/Bottles'
@@ -188,16 +274,17 @@ const Clinical = () => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && !selectedVisit) {
         fetchVisitsToSee(page, searchTerm, true);
+        fetchPendingApprovalsCount();
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [page, searchTerm, selectedVisit]);
+  }, [page, searchTerm, selectedVisit, user]);
 
   const fetchVisitsToSee = async (pageNum = 1, search = searchTerm, isBackground = false) => {
     if (!isBackground) setIsLoading(true);
     try {
       // Fetch only visits that need consultation
-      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=100&search=${encodeURIComponent(search)}`);
+      const res = await api.get(`clinical/visits/?status=PENDING_CONSULTATION,FINAL_CONSULTATION&page=${pageNum}&page_size=30&search=${encodeURIComponent(search)}`);
       if (res.data.results) {
           setVisitsReady(res.data.results);
           setTotalCount(res.data.count);
@@ -239,8 +326,8 @@ const Clinical = () => {
             toast.error("Please specify the number of Days for the medication being prescribed.");
             return;
         }
-        const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
-          ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
+        const finalUnits = checkIsDayBased(newMed.item_group, newMed.name) 
+          ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group, newMed.name)
           : (parseInt(newMed.total_units) || 1);
         finalConsultData.medications = [...consultData.medications, { ...newMed, total_units: finalUnits }];
     }
@@ -263,7 +350,13 @@ const Clinical = () => {
                 toast.error(`Please specify the number of Days for "${med.name}".`);
                 return;
             }
-            const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === med.name.toLowerCase());
+            const drugObj = pharmacyInventory.find(d => {
+                const dCode = d.ucode || d.item_code;
+                if (med.item_code && dCode) {
+                    return dCode === med.item_code;
+                }
+                return d.name.toLowerCase() === med.name.toLowerCase();
+            });
             if (!drugObj) {
                 toast.error(`"${med.name}" is not registered in the project's pharmacy registry.`);
                 return;
@@ -276,10 +369,15 @@ const Clinical = () => {
             }
 
             // Sum up total units requested for this specific drug in the prescription
-            const sameMeds = finalConsultData.medications.filter(m => m.name.toLowerCase() === med.name.toLowerCase());
+            const sameMeds = finalConsultData.medications.filter(m => {
+                if (med.item_code && m.item_code) {
+                    return m.item_code === med.item_code;
+                }
+                return m.name.toLowerCase() === med.name.toLowerCase();
+            });
             const totalRequired = sameMeds.reduce((sum, m) => {
-                const units = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(m.item_group?.toUpperCase()) 
-                    ? getDoseCount(m.frequency, m.duration, m.item_group)
+                const units = checkIsDayBased(m.item_group, m.name) 
+                    ? getDoseCount(m.frequency, m.duration, m.item_group, m.name)
                     : (parseInt(m.total_units) || 1);
                 return sum + units;
             }, 0);
@@ -296,7 +394,7 @@ const Clinical = () => {
     try {
       await api.post(`clinical/visits/${selectedVisit.id}/record_consultation/`, finalConsultData);
       toast.success(`Patient moved to ${finalConsultData.next_step.replace('PENDING_', '')}`, { id: loadingToast });
-      setSelectedVisit(null);
+      navigate('/consultations');
       setConsultData({
         chief_complaint: '', 
         diagnosis: '', 
@@ -336,7 +434,13 @@ const Clinical = () => {
   };
 
   const handleRepeatMedication = (histMed) => {
-    const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === histMed.medication_name.toLowerCase());
+    const drugObj = pharmacyInventory.find(d => {
+      const dCode = d.ucode || d.item_code;
+      if (histMed.item_code && dCode) {
+        return dCode === histMed.item_code;
+      }
+      return d.name.toLowerCase() === histMed.medication_name.toLowerCase();
+    });
     if (!drugObj) {
       toast.error(`"${histMed.medication_name}" is not registered in the project's pharmacy registry.`);
       return;
@@ -353,8 +457,8 @@ const Clinical = () => {
       return;
     }
 
-    const totalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(drugObj.item_group?.toUpperCase())
-      ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group)
+    const totalUnits = checkIsDayBased(drugObj.item_group, drugObj.name)
+      ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group, drugObj.name)
       : (parseInt(histMed.total_units) || 1);
 
     const newPrescription = {
@@ -386,7 +490,13 @@ const Clinical = () => {
     let updatedMedications = [...consultData.medications];
 
     detailedVisit.prescriptions.forEach(histMed => {
-      const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === histMed.medication_name.toLowerCase());
+      const drugObj = pharmacyInventory.find(d => {
+        const dCode = d.ucode || d.item_code;
+        if (histMed.item_code && dCode) {
+          return dCode === histMed.item_code;
+        }
+        return d.name.toLowerCase() === histMed.medication_name.toLowerCase();
+      });
       if (!drugObj) {
         skippedOut.push(histMed.medication_name);
         return;
@@ -403,8 +513,8 @@ const Clinical = () => {
         return;
       }
 
-      const totalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(drugObj.item_group?.toUpperCase())
-        ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group)
+      const totalUnits = checkIsDayBased(drugObj.item_group, drugObj.name)
+        ? getDoseCount(histMed.frequency, histMed.duration, drugObj.item_group, drugObj.name)
         : (parseInt(histMed.total_units) || 1);
 
       updatedMedications.push({
@@ -458,16 +568,85 @@ const Clinical = () => {
     return patientName.includes(searchLow) || patientId.includes(searchLow) || cardNo.includes(searchLow) || phone.includes(searchLow) || employeeId.includes(searchLow);
   });
 
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedVisits = [...filteredVisits].sort((a, b) => {
+    const { key, direction } = sortConfig;
+    let aVal, bVal;
+    if (key === 'patient_name') {
+      aVal = `${a.patient_details?.first_name || ''} ${a.patient_details?.last_name || ''}`.toLowerCase();
+      bVal = `${b.patient_details?.first_name || ''} ${b.patient_details?.last_name || ''}`.toLowerCase();
+    } else if (key === 'reason') {
+      aVal = (a.reason || '').toLowerCase();
+      bVal = (b.reason || '').toLowerCase();
+    } else if (key === 'visit_date') {
+      aVal = new Date(a.visit_date || 0).getTime();
+      bVal = new Date(b.visit_date || 0).getTime();
+    } else {
+      aVal = a[key]; bVal = b[key];
+    }
+    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   return (
+    <>
     <div className="fade-in">
-      <header style={{ marginBottom: '2.5rem' }}>
+      {!selectedVisit && (
+      <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Consult Desk</h1>
         <p style={{ color: 'var(--text-muted)' }}>Professional clinical assessment and treatment planning</p>
+        </div>
       </header>
+      )}
+
+      {!selectedVisit && (
+        <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
+          <button 
+              onClick={() => setActiveSubTab('queue')}
+              style={{ 
+                  padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                  borderBottom: activeSubTab === 'queue' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                  fontWeight: 800, color: activeSubTab === 'queue' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                  cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
+              }}
+          >
+              Consultation Queue ({totalCount})
+          </button>
+          {(user?.role === 'ADMIN' || user?.permissions?.includes('/indents/approval')) && (
+            <button 
+                onClick={() => setActiveSubTab('approval')}
+                style={{ 
+                    padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
+                    borderBottom: activeSubTab === 'approval' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
+                    fontWeight: 800, color: activeSubTab === 'approval' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
+                    cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+            >
+                Room Stock Approval Desk
+                {pendingApprovalsCount > 0 && (
+                  <span style={{ 
+                    background: 'var(--primary)', color: 'white', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '10px', fontWeight: 900,
+                    animation: 'pulse 2s infinite'
+                  }}>
+                    {pendingApprovalsCount}
+                  </span>
+                )}
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting Patients - Only show if NO patient is selected */}
-        {!selectedVisit && (
+        {!selectedVisit && activeSubTab === 'queue' && (
           <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
@@ -504,9 +683,39 @@ const Clinical = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Patient Name</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</th>
-                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vitals Status</th>
+                     <th 
+                       onClick={() => handleSort('patient_name')}
+                       style={{ padding: '1rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Patient Name
+                         {sortConfig.key === 'patient_name' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
+                     <th 
+                       onClick={() => handleSort('reason')}
+                       style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Reason
+                         {sortConfig.key === 'reason' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
+                     <th 
+                       onClick={() => handleSort('visit_date')}
+                       style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', userSelect: 'none' }}
+                     >
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         Registration Time
+                         {sortConfig.key === 'visit_date' ? (
+                           sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                         ) : <ArrowUpDown size={12} style={{ color: '#94a3b8' }} />}
+                       </div>
+                     </th>
                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
                   </tr>
                 </thead>
@@ -527,7 +736,7 @@ const Clinical = () => {
                          `}</style>
                        </td>
                      </tr>
-                   ) : filteredVisits.length === 0 ? (
+                   ) : sortedVisits.length === 0 ? (
                      <tr>
                        <td colSpan="4" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: '#64748b' }}>
                           <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>No patients found</p>
@@ -535,7 +744,7 @@ const Clinical = () => {
                        </td>
                      </tr>
                    ) : (
-                      filteredVisits.map(v => (
+                      sortedVisits.map(v => (
                     <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', transition: 'all 0.2s ease' }}>
                       <td style={{ padding: '1.25rem 1.5rem' }}>
                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -588,7 +797,7 @@ const Clinical = () => {
                                    </span>
                                  )}
                                </p>
-                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}{v.vitals?.recorded_by_username ? ` | Vitals: ${v.vitals.recorded_by_username}` : ''}</p>
                             </div>
                          </div>
                       </td>
@@ -612,13 +821,16 @@ const Clinical = () => {
                                     frequency: p.frequency,
                                     duration: p.duration,
                                     total_units: p.total_units || 1,
-                                    timing: p.timing || 'After Food'
+                                    timing: p.timing || 'After Food',
+                                    item_code: p.item_code || '',
+                                    item_group: p.item_group || ''
                                 })) || []
                               });
                               // Background Pre-fetch (Performance)
                               fetchHistory(v.patient);
                               // Keep dashboard hidden initially
                               setShowHistoryDashboard(false);
+                              navigate('/consultations/examine');
                             }} 
                             style={{ 
                               background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
@@ -648,7 +860,7 @@ const Clinical = () => {
                   {/* Pagination Controls */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--background)' }}>
                       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                          Showing <span style={{ color: 'var(--primary)' }}>{filteredVisits.length}</span> of {totalCount} entries
+                          Showing <span style={{ color: 'var(--primary)' }}>{sortedVisits.length}</span> of {totalCount} entries
                       </p>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button 
@@ -661,7 +873,7 @@ const Clinical = () => {
                           </button>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                               {(() => {
-                                  const totalPages = Math.ceil(totalCount / 100);
+                                  const totalPages = Math.ceil(totalCount / 30);
                                   if (totalPages <= 1) return null;
 
                                   const buttons = [];
@@ -743,9 +955,9 @@ const Clinical = () => {
                           </div>
                           <button 
                               className="btn btn-secondary" 
-                              disabled={page >= Math.ceil(totalCount / 100)}
+                              disabled={page >= Math.ceil(totalCount / 30)}
                               onClick={() => fetchVisitsToSee(page + 1, searchTerm)}
-                              style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 100) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                      style={{ padding: '0.4rem', borderRadius: '8px', opacity: page >= Math.ceil(totalCount / 30) ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                               <ChevronRight size={18} />
                           </button>
@@ -754,9 +966,16 @@ const Clinical = () => {
           </div>
         )}
 
+        {!selectedVisit && activeSubTab === 'approval' && (
+          <div className="fade-in">
+             <Indents isEmbed={true} embedTab="approval" />
+          </div>
+        )}
+
+
         {/* Examination & Plan - Only show if a patient is selected */}
         {selectedVisit && (
-        <div className="workspace-split" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <div className="workspace-split" style={{ width: '100%', margin: '0 auto' }}>
           {/* TOP: HISTORICAL REFERENCE PANEL (Unified MNC View) */}
           {showHistoryDashboard && (detailedVisit || isLoadingHistory) && (
             <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed var(--border)' : `1.5px solid ${projectConfig?.primary_color || 'var(--primary)'}`, marginBottom: '2rem' }}>
@@ -923,6 +1142,59 @@ const Clinical = () => {
                                                 {!lr.test_master_details?.sub_tests?.length && lr.result?.value && (
                                                     <p style={{ fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', color: 'var(--text-main)' }}>{lr.result.value}</p>
                                                 )}
+                                                {((lr.result?.attachments && lr.result.attachments.length > 0) || lr.result?.attachment_url) && (
+                                                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                                                        {lr.result.attachments && lr.result.attachments.length > 0 ? (
+                                                            lr.result.attachments.map((att, attIdx) => {
+                                                                const isPdf = att.file_url?.toLowerCase().endsWith('.pdf') || att.file?.toLowerCase().endsWith('.pdf');
+                                                                return isPdf ? (
+                                                                    <a key={att.id || attIdx} href={att.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                        <FileText size={10} /> View PDF ({attIdx + 1})
+                                                                    </a>
+                                                                ) : (
+                                                                    <button 
+                                                                        key={att.id || attIdx}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setLightboxImage(att.file_url);
+                                                                            setZoom(1);
+                                                                            setRotation(0);
+                                                                            setBrightness(1);
+                                                                            setFlipH(false);
+                                                                            setFlipV(false);
+                                                                            setPan({ x: 0, y: 0 });
+                                                                        }}
+                                                                        style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                                                    >
+                                                                        <Image size={10} /> View Scan ({attIdx + 1})
+                                                                    </button>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            lr.result.attachment_url.toLowerCase().endsWith('.pdf') ? (
+                                                                <a href={lr.result.attachment_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                                    <FileText size={10} /> View PDF
+                                                                </a>
+                                                            ) : (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setLightboxImage(lr.result.attachment_url);
+                                                                        setZoom(1);
+                                                                        setRotation(0);
+                                                                        setBrightness(1);
+                                                                        setFlipH(false);
+                                                                        setFlipV(false);
+                                                                        setPan({ x: 0, y: 0 });
+                                                                    }}
+                                                                    style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                                                >
+                                                                    <Image size={10} /> View Scan
+                                                                </button>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )) : <p className="empty-text">No laboratory tests requested</p>}
@@ -934,73 +1206,58 @@ const Clinical = () => {
             </div>
           )}
 
-          <div className="active-consult-panel card fade-in" style={{ border: `1px solid ${projectConfig?.primary_color || 'var(--primary)'}`, borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.05)' }}>
+          <div className="active-consult-panel card fade-in" style={{ border: '1px solid var(--border)', borderRadius: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', padding: '2rem 1.5rem', background: 'var(--surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '0.5rem' }}>
                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                    <div style={{ padding: '0.875rem', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: '16px', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.2)' }}>
-                       <Stethoscope size={24} color="white" />
-                    </div>
                     <div>
-                      <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>Clinical Assessment</h2>
-                      <p style={{ fontSize: '0.8125rem', color: '#475569', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}> 
+                      <div style={{ width: 'fit-content' }}>
+                        <h2 style={{ fontSize: '1.375rem', fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em', margin: 0 }}>Clinical Assessment</h2>
+                        <div style={{ height: '3px', width: '100%', background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%)', borderRadius: '4px', marginTop: '6px', marginBottom: '8px' }}></div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 800 }}> 
                         ID: {selectedVisit.patient_details?.patient_id} | {selectedVisit.patient_details?.first_name} {selectedVisit.patient_details?.last_name}
+                        </p>
                         {selectedVisit.is_late_entry && (
-                          <span 
-                            style={{ 
-                              fontSize: '0.625rem', 
-                              background: 'rgba(245, 158, 11, 0.1)', 
-                              color: '#d97706', 
-                              padding: '0.15rem 0.4rem', 
-                              borderRadius: '6px', 
-                              fontWeight: 800,
-                              border: '1px solid rgba(245, 158, 11, 0.2)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.02em',
-                              display: 'inline-block'
-                            }}
+                          <span style={{ fontSize: '0.625rem', background: 'rgba(245, 158, 11, 0.1)', color: '#d97706', padding: '0.15rem 0.4rem', borderRadius: '6px', fontWeight: 800, border: '1px solid rgba(245, 158, 11, 0.2)', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'inline-block' }}
                             title={`Justification: ${selectedVisit.late_entry_justification || 'N/A'}`}
                           >
                             Late Entry
                           </span>
                         )}
-                      </p>
+                      </div>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedVisit(null)} style={{ border: 'none', background: 'var(--background)', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#64748b' }}>
-                    <X size={20} />
+                 <button onClick={() => navigate('/consultations')} style={{ border: 'none', background: 'var(--primary)', padding: '0.6rem 1.25rem', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.8125rem', boxShadow: '0 4px 12px var(--primary-shadow)' }}
+                  onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = 'var(--primary-dark)'; }}
+                  onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'var(--primary)'; }}>
+                    <ChevronLeft size={16} strokeWidth={2.5} /> Back to Queue
                  </button>
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--background)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border)', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender / Age</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
+              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <User size={18} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Number</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <Phone size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registry / Reason</p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <ClipboardList size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
                  </div>
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <p style={{ fontSize: '0.625rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                       {selectedVisit.patient_details?.card_no ? 'Card Number' : 'Aadhaar Number'}
-                    </p>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                 <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                     <Hash size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
                        {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
-                    </p>
+                     </p>
                  </div>
-                  <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
+                   <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'flex-end' }}>
                      {selectedVisit?.patient_details?.total_visits > 1 && (
-                        <button 
-                           type="button"
-                           onClick={() => setShowHistoryDashboard(true)}
-                           className="view-history-btn"
-                           style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                        >
+                        <button type="button" onClick={() => setShowHistoryDashboard(true)} className="view-history-btn" style={{ padding: '0.4rem 0.8rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                            <History size={13} /> VIEW HISTORY
                         </button>
                      )}
@@ -1167,6 +1424,128 @@ const Clinical = () => {
                                             <p style={{ fontSize: '0.75rem', color: 'var(--text-main)', lineHeight: 1.4, fontWeight: 500 }}>{lr.result.interpretation}</p>
                                         </div>
                                     )}
+
+                                    {((lr.result?.attachments && lr.result.attachments.length > 0) || lr.result?.attachment_url) && (
+                                        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed var(--border)' }}>
+                                            <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px', fontWeight: 800 }}>Attached Diagnostics / Scans</p>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                                {lr.result.attachments && lr.result.attachments.length > 0 ? (
+                                                    lr.result.attachments.map((att, attIdx) => {
+                                                        const isPdf = att.file_url?.toLowerCase().endsWith('.pdf') || att.file?.toLowerCase().endsWith('.pdf');
+                                                        return isPdf ? (
+                                                            <a 
+                                                                key={att.id || attIdx}
+                                                                href={att.file_url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                style={{ 
+                                                                    display: 'inline-flex', 
+                                                                    alignItems: 'center', 
+                                                                    gap: '6px', 
+                                                                    padding: '8px 12px', 
+                                                                    background: 'var(--background)', 
+                                                                    border: '1px solid var(--border)', 
+                                                                    borderRadius: '10px', 
+                                                                    fontSize: '0.7rem', 
+                                                                    color: 'var(--primary)', 
+                                                                    fontWeight: 800, 
+                                                                    textDecoration: 'none' 
+                                                                }}
+                                                            >
+                                                                <FileText size={12} /> View PDF ({attIdx + 1})
+                                                            </a>
+                                                        ) : (
+                                                            <div 
+                                                                key={att.id || attIdx}
+                                                                style={{ 
+                                                                    position: 'relative', 
+                                                                    width: '100px', 
+                                                                    height: '75px', 
+                                                                    borderRadius: '8px', 
+                                                                    overflow: 'hidden', 
+                                                                    border: '1px solid var(--border)', 
+                                                                    cursor: 'pointer',
+                                                                    background: '#000'
+                                                                }}
+                                                                onClick={() => {
+                                                                    setLightboxImage(att.file_url);
+                                                                    setZoom(1);
+                                                                    setRotation(0);
+                                                                    setBrightness(1);
+                                                                    setFlipH(false);
+                                                                    setFlipV(false);
+                                                                    setPan({ x: 0, y: 0 });
+                                                                }}
+                                                            >
+                                                                <img 
+                                                                    src={att.file_url} 
+                                                                    alt={`Scan ${attIdx + 1}`} 
+                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} 
+                                                                />
+                                                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>
+                                                                    VIEW SCAN {attIdx + 1}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    lr.result.attachment_url.toLowerCase().endsWith('.pdf') ? (
+                                                        <a 
+                                                            href={lr.result.attachment_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            style={{ 
+                                                                display: 'inline-flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '6px', 
+                                                                padding: '8px 16px', 
+                                                                background: 'var(--background)', 
+                                                                border: '1px solid var(--border)', 
+                                                                borderRadius: '10px', 
+                                                                fontSize: '0.75rem', 
+                                                                color: 'var(--primary)', 
+                                                                fontWeight: 800, 
+                                                                textDecoration: 'none' 
+                                                            }}
+                                                        >
+                                                            <FileText size={14} /> View PDF Document
+                                                        </a>
+                                                    ) : (
+                                                        <div 
+                                                            style={{ 
+                                                                position: 'relative', 
+                                                                width: '120px', 
+                                                                height: '90px', 
+                                                                borderRadius: '10px', 
+                                                                overflow: 'hidden', 
+                                                                border: '1px solid var(--border)', 
+                                                                cursor: 'pointer',
+                                                                background: '#000'
+                                                            }}
+                                                            onClick={() => {
+                                                                setLightboxImage(lr.result.attachment_url);
+                                                                setZoom(1);
+                                                                setRotation(0);
+                                                                setBrightness(1);
+                                                                setFlipH(false);
+                                                                setFlipV(false);
+                                                                setPan({ x: 0, y: 0 });
+                                                            }}
+                                                        >
+                                                            <img 
+                                                                src={lr.result.attachment_url} 
+                                                                alt="Diagnostic Scan" 
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} 
+                                                            />
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '0.625rem', fontWeight: 900 }}>
+                                                                VIEW SCAN
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -1286,7 +1665,8 @@ const Clinical = () => {
                                     .map(d => (
                                         <div 
                                             key={d.id} 
-                                            onMouseDown={() => {
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
                                                 const group = getDrugGroup(d);
                                                 setSelectedGroup(group.toUpperCase());
                                                 setNewMed({
@@ -1317,11 +1697,27 @@ const Clinical = () => {
                         
                         {/* Dynamic Stock Indicator */}
                         {newMed.name && (() => {
-                            const drug = pharmacyInventory.find(d => d.name === newMed.name);
+                            const drug = pharmacyInventory.find(d => {
+                                const dCode = d.ucode || d.item_code;
+                                if (newMed.item_code && dCode) {
+                                    return dCode === newMed.item_code;
+                                }
+                                return d.name === newMed.name;
+                            });
                             if (!drug) return null;
                             const alreadyAdded = consultData.medications
-                                .filter(m => m.name === newMed.name)
-                                .reduce((sum, m) => sum + getDoseCount(m.frequency, m.duration, m.item_group), 0);
+                                .filter(m => {
+                                    if (newMed.item_code && m.item_code) {
+                                        return m.item_code === newMed.item_code;
+                                    }
+                                    return m.name === newMed.name;
+                                })
+                                .reduce((sum, m) => {
+                                    const units = checkIsDayBased(m.item_group, m.name)
+                                        ? getDoseCount(m.frequency, m.duration, m.item_group, m.name)
+                                        : (parseInt(m.total_units) || 1);
+                                    return sum + units;
+                                }, 0);
                             const remaining = (drug.quantity || drug.balance_qty || 0) - alreadyAdded;
                             const stockState = remaining > 10 ? 'high' : remaining > 0 ? 'low' : 'empty';
                             return (
@@ -1385,7 +1781,7 @@ const Clinical = () => {
                        />
 
                        {/* Extra Units Field for Non-Tablets */}
-                       {(!['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) && newMed.item_group) && (
+                       {(!checkIsDayBased(newMed.item_group, newMed.name) && newMed.item_group) && (
                            <input 
                                placeholder="Units" 
                                type="number" 
@@ -1407,18 +1803,21 @@ const Clinical = () => {
                           }
                           
                           // For Tablets, total_units is calculated. For others, it's explicitly provided.
-                           const finalUnits = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(newMed.item_group?.toUpperCase()) 
-                             ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group)
+                           const finalUnits = checkIsDayBased(newMed.item_group, newMed.name) 
+                             ? getDoseCount(newMed.frequency, newMed.duration, newMed.item_group, newMed.name)
                              : (parseInt(newMed.total_units) || 1);
 
                            // Stock validation: Check if medication is in stock and we have enough available balance!
-                           const drugObj = pharmacyInventory.find(d => d.name.toLowerCase() === newMed.name.toLowerCase());
+                           const drugObj = pharmacyInventory.find(d => 
+                               (newMed.item_code && (d.ucode || d.item_code) ? (d.ucode || d.item_code) === newMed.item_code :
+                               d.name.toLowerCase() === newMed.name.toLowerCase())
+                           );
                           if (drugObj) {
                               const alreadyAdded = consultData.medications
-                                  .filter(m => m.name.toLowerCase() === newMed.name.toLowerCase())
+                                  .filter(m => (newMed.item_code && m.item_code ? m.item_code === newMed.item_code : m.name.toLowerCase() === newMed.name.toLowerCase()))
                                   .reduce((sum, m) => {
-                                      const units = ['TABLETS', 'CAPSULES', 'GENERAL'].includes(m.item_group?.toUpperCase()) 
-                                          ? getDoseCount(m.frequency, m.duration, m.item_group)
+                                      const units = checkIsDayBased(m.item_group, m.name) 
+                                          ? getDoseCount(m.frequency, m.duration, m.item_group, m.name)
                                           : (parseInt(m.total_units) || 1);
                                       return sum + units;
                                   }, 0);
@@ -1441,7 +1840,7 @@ const Clinical = () => {
                               ...consultData, 
                               medications: [...consultData.medications, { ...newMed, total_units: finalUnits }]
                           });
-                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' });
+                          setNewMed({ name: '', dosage: '', frequency: '1-0-1', duration: '', total_units: 1, timing: 'After Food', item_code: '', item_group: '' }); setSelectedGroup("");
                           setDrugSearch("");
                        }} className="btn btn-primary" style={{ height: '36px', width: '36px', padding: 0 }}>+</button>
                     </div>
@@ -1467,7 +1866,10 @@ const Clinical = () => {
                                                 </span>
 
                                                 {(() => {
-                                                    const drug = pharmacyInventory.find(d => d.name.toLowerCase() === m.name.toLowerCase());
+                                                    const drug = pharmacyInventory.find(d => 
+                                                        (m.item_code && (d.ucode || d.item_code) ? (d.ucode || d.item_code) === m.item_code :
+                                                        d.name.toLowerCase() === m.name.toLowerCase())
+                                                    );
                                                     if (drug) {
                                                         const initialQty = parseInt(drug.additional_fields?.initial_quantity) || 100;
                                                         const threshold = Math.max(5, Math.round(initialQty * 0.2));
@@ -1496,7 +1898,7 @@ const Clinical = () => {
                                             type="button" 
                                             title="Edit Medication"
                                             onClick={() => {
-                                                setNewMed({ ...m });
+                                                setNewMed({ ...m }); setSelectedGroup(m.item_group ? m.item_group.toUpperCase() : "");
                                                 const updated = consultData.medications.filter((_, i) => i !== idx);
                                                 setConsultData({...consultData, medications: updated});
                                             }}
@@ -2160,6 +2562,249 @@ const Clinical = () => {
       `}</style>
 
     </div>
+
+      {lightboxImage && (
+          <div 
+              style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 99999,
+                  background: 'rgba(15, 23, 42, 0.95)',
+                  backdropFilter: 'blur(12px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  userSelect: 'none'
+              }}
+              onKeyDown={(e) => {
+                  if (e.key === 'Escape') setLightboxImage(null);
+              }}
+              tabIndex={0}
+          >
+              {/* Top Control Bar */}
+              <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1rem 2rem',
+                  background: 'rgba(30, 41, 59, 0.5)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: 'white'
+              }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Image size={18} color={projectConfig?.primary_color || 'var(--primary)'} />
+                      <span style={{ fontSize: '0.875rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Interactive Imaging Viewer</span>
+                  </div>
+                  
+                  {/* Toolbar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                              type="button"
+                              onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))}
+                              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Zoom Out"
+                          >
+                              <ZoomOut size={16} />
+                          </button>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, width: '45px', textAlign: 'center' }}>
+                              {Math.round(zoom * 100)}%
+                          </span>
+                          <button 
+                              type="button"
+                              onClick={() => setZoom(prev => Math.min(prev + 0.25, 5))}
+                              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Zoom In"
+                          >
+                              <ZoomIn size={16} />
+                          </button>
+                      </div>
+
+                      <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+
+                      {/* Rotate Controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                              type="button"
+                              onClick={() => setRotation(prev => (prev - 90) % 360)}
+                              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Rotate Counter-Clockwise"
+                          >
+                              <RotateCcw size={16} />
+                          </button>
+                          
+                          {/* Fine Rotation Slider */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 4px' }}>
+                              <input 
+                                  type="range" 
+                                  min="-180" 
+                                  max="180" 
+                                  step="1" 
+                                  value={rotation} 
+                                  onChange={(e) => setRotation(parseInt(e.target.value))}
+                                  style={{ width: '80px', cursor: 'pointer' }}
+                                  title="Rotate Angle"
+                              />
+                              <span style={{ fontSize: '0.725rem', fontWeight: 800, minWidth: '35px', textAlign: 'right' }}>{rotation}°</span>
+                          </div>
+
+                          <button 
+                              type="button"
+                              onClick={() => setRotation(prev => (prev + 90) % 360)}
+                              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Rotate Clockwise"
+                          >
+                              <RotateCw size={16} />
+                          </button>
+                      </div>
+
+                      <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+
+                      {/* Flip Controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                              type="button"
+                              onClick={() => setFlipH(prev => !prev)}
+                              style={{ 
+                                  background: flipH ? 'var(--primary)' : 'rgba(255,255,255,0.1)', 
+                                  border: 'none', 
+                                  color: 'white', 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '8px', 
+                                  cursor: 'pointer', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  transition: 'background 0.2s'
+                              }}
+                              title="Flip Horizontally"
+                          >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M13 3l9 9-9 9" />
+                                  <path d="M11 3L2 12l9 9" />
+                                  <path d="M12 2v20" strokeDasharray="3" />
+                              </svg>
+                          </button>
+                          <button 
+                              type="button"
+                              onClick={() => setFlipV(prev => !prev)}
+                              style={{ 
+                                  background: flipV ? 'var(--primary)' : 'rgba(255,255,255,0.1)', 
+                                  border: 'none', 
+                                  color: 'white', 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '8px', 
+                                  cursor: 'pointer', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  transition: 'background 0.2s'
+                              }}
+                              title="Flip Vertically"
+                          >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(90deg)' }}>
+                                  <path d="M13 3l9 9-9 9" />
+                                  <path d="M11 3L2 12l9 9" />
+                                  <path d="M12 2v20" strokeDasharray="3" />
+                              </svg>
+                          </button>
+                      </div>
+
+                      <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Sun size={16} title="Brightness" />
+                          <input 
+                              type="range" 
+                              min="0.5" 
+                              max="2" 
+                              step="0.1" 
+                              value={brightness} 
+                              onChange={(e) => setBrightness(parseFloat(e.target.value))}
+                              style={{ width: '80px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{Math.round(brightness * 100)}%</span>
+                      </div>
+
+                      <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+
+                      <button 
+                          type="button"
+                          onClick={() => {
+                              setZoom(1);
+                              setRotation(0);
+                              setBrightness(1);
+                              setFlipH(false);
+                              setFlipV(false);
+                              setPan({ x: 0, y: 0 });
+                          }}
+                          style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Reset Layout"
+                      >
+                          <RefreshCw size={16} />
+                      </button>
+                  </div>
+
+                  <button 
+                      type="button"
+                      onClick={() => setLightboxImage(null)}
+                      style={{ background: '#ef4444', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                      <X size={18} />
+                  </button>
+              </div>
+
+              {/* View Stage */}
+              <div 
+                  style={{
+                      flex: 1,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: isDragging ? 'grabbing' : 'grab'
+                  }}
+                  onMouseDown={(e) => {
+                      if (e.target.tagName === 'IMG') {
+                          e.preventDefault();
+                          setIsDragging(true);
+                          setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+                      }
+                  }}
+                  onMouseMove={(e) => {
+                      if (!isDragging) return;
+                      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+                  }}
+                  onMouseUp={() => setIsDragging(false)}
+                  onMouseLeave={() => setIsDragging(false)}
+                  onWheel={(e) => {
+                      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+                      setZoom(prev => Math.min(Math.max(prev * zoomFactor, 0.5), 5));
+                  }}
+              >
+                  <img 
+                      src={lightboxImage} 
+                      alt="Diagnostic imaging details" 
+                      style={{
+                          maxWidth: '90%',
+                          maxHeight: '90%',
+                          objectFit: 'contain',
+                          transform: `translate(${pan.x}px, ${pan.y}px) rotate(${rotation}deg) scale(${zoom}) scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`,
+                          filter: `brightness(${brightness})`,
+                          transition: isDragging ? 'none' : 'transform 0.15s ease-out, filter 0.15s ease-out',
+                          pointerEvents: 'auto',
+                          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                      }}
+                  />
+                  <div style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', background: 'rgba(15, 23, 42, 0.7)', padding: '6px 16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: '0.6875rem', pointerEvents: 'none', fontWeight: 800 }}>
+                      Use mouse wheel to zoom. Drag to pan/move scan.
+                  </div>
+              </div>
+          </div>
+      )}
+    </>
   );
 };
 

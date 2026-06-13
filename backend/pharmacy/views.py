@@ -5,8 +5,8 @@ from django.db.models import Sum, F, Q, Count, DecimalField, ExpressionWrapper
 from django.utils import timezone
 from datetime import timedelta, datetime
 from patients.models import RegistryData, RegistryType, EmployeeMaster
-from .models import Prescription, DispensingRecord
-from .serializers import PrescriptionSerializer, DispensingRecordSerializer
+from .models import Prescription, DispensingRecord, Indent, IndentItem, RoomStock, RoomStockTransfer, RoomStockDispensation
+from .serializers import PrescriptionSerializer, DispensingRecordSerializer, IndentSerializer, IndentItemSerializer, RoomStockSerializer, RoomStockDispensationSerializer
 from accounts.models import Notification
 from accounts.utils import log_action
 from .reports import generate_consumption_pdf_report, generate_consumption_xlsx_report
@@ -26,7 +26,7 @@ def notify_team(project, roles, title, message):
 from rest_framework.pagination import PageNumberPagination
 
 class LargeResultsPagination(PageNumberPagination):
-    page_size = 100
+    page_size = 30
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
@@ -129,6 +129,14 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     def dispense(self, request, pk=None):
         prescription = self.get_object()
         visit = prescription.visit
+        
+        # Check if associated employee is active
+        if visit.patient.employee_master and not visit.patient.employee_master.is_active:
+            return Response(
+                {"error": "Cannot dispense medication. The associated employee card is deactivated (e.g. transferred)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         serializer = DispensingRecordSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(prescription=prescription, dispensed_by=request.user)
@@ -157,13 +165,27 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                     ).first()
 
                     if pharmacy_registry:
-                        # 3. Find the drug by Name OR Alias (Case-Insensitive)
-                        search_name = prescription.medication_name.strip()
-                        drug_item = RegistryData.objects.filter(
-                            registry_type=pharmacy_registry
-                        ).filter(
-                            Q(name__iexact=search_name) | Q(aliases__icontains=search_name)
-                        ).first()
+                        # 3. Find the drug by Code, Name OR Alias (Case-Insensitive)
+                        drug_item = None
+                        if prescription.item_code:
+                            # Match ONLY by ucode first to avoid incorrect name matching
+                            drug_item = RegistryData.objects.filter(
+                                registry_type=pharmacy_registry,
+                                ucode__iexact=prescription.item_code
+                            ).first()
+                            if not drug_item:
+                                drug_item = RegistryData.objects.filter(
+                                    registry_type=pharmacy_registry,
+                                    name__iexact=prescription.item_code
+                                ).first()
+                        
+                        if not drug_item:
+                            search_name = prescription.medication_name.strip()
+                            drug_item = RegistryData.objects.filter(
+                                registry_type=pharmacy_registry
+                            ).filter(
+                                Q(name__iexact=search_name) | Q(aliases__icontains=search_name)
+                            ).first()
 
                         if drug_item:
                             # 4. FEFO Batch-Level Deduction & Split-Batch Transaction Generator
@@ -692,6 +714,76 @@ class ConsumptionReportView(views.APIView):
             })
             med_groups[group_key]["total_visit_units"] += units
 
+        # Add RoomStockDispensation records to med_groups
+        room_qs = RoomStockDispensation.objects.select_related(
+            'room_stock__registry_item', 
+            'patient',
+            'dispensed_by'
+        ).all()
+        if clean_project:
+            room_qs = room_qs.filter(project_id=clean_project)
+        
+        # Temporal filters
+        if range_type == 'week':
+            room_qs = room_qs.filter(dispensed_at__gte=now - timedelta(days=7))
+        elif range_type == 'month':
+            room_qs = room_qs.filter(dispensed_at__gte=now - timedelta(days=30))
+        elif range_type == 'year':
+            room_qs = room_qs.filter(dispensed_at__gte=now - timedelta(days=365))
+        elif range_type == 'custom':
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            if start_date and end_date:
+                try:
+                    s_dt = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+                    e_dt = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d')) + timedelta(days=1)
+                    room_qs = room_qs.filter(dispensed_at__range=(s_dt, e_dt))
+                except Exception:
+                    pass
+        
+        if employee_id:
+            room_qs = room_qs.filter(
+                Q(patient__card_no=employee_id) | 
+                Q(outside_patient_aadhaar=employee_id)
+            )
+
+        for disp in room_qs:
+            group_key = f"room_disp_{disp.id}"
+            
+            p_name = "N/A"
+            card_no = "N/A"
+            patient_id = "N/A"
+            if disp.recipient_type == 'PATIENT' and disp.patient:
+                p_name = disp.patient.__str__()
+                card_no = disp.patient.card_no or "N/A"
+                patient_id = disp.patient.patient_id or "N/A"
+            else:
+                p_name = f"Outside: {disp.outside_patient_name or 'Unknown'} (Phone: {disp.outside_patient_phone or 'N/A'})"
+                card_no = f"Aadhaar: {disp.outside_patient_aadhaar or 'N/A'}"
+                patient_id = "OUTSIDE"
+
+            # Fetch unit cost from room stock registry item
+            cost = float(disp.room_stock.registry_item.cost or 0.0)
+            total_cost = float(disp.quantity) * cost
+
+            med_groups[group_key] = {
+                "visit_id": f"R-{disp.id}",
+                "visit_date": disp.dispensed_at.strftime('%Y-%m-%d') if disp.dispensed_at else 'N/A',
+                "patient_id": patient_id,
+                "card_no": card_no,
+                "patient_name": p_name,
+                "is_late_entry": False,
+                "late_entry_justification": f"Dispensed from {disp.room_stock.location} by {disp.dispensed_by.username}",
+                "items": [{
+                    "name": disp.room_stock.registry_item.name,
+                    "clean_name": disp.room_stock.registry_item.name.strip().upper(),
+                    "units": disp.quantity,
+                    "unit_cost": cost,
+                    "total_cost": total_cost
+                }],
+                "total_visit_units": disp.quantity
+            }
+
         final_items = []
         grand_total_cost = 0
         grand_total_units = 0
@@ -701,8 +793,8 @@ class ConsumptionReportView(views.APIView):
             processed_items = []
             total_visit_cost = 0
             for item in data['items']:
-                unit_price = item.get('unit_cost', 0)
-                total_price = item.get('total_cost', 0)
+                unit_price = float(item.get('unit_cost') or 0.0)
+                total_price = float(item.get('total_cost') or 0.0)
                 
                 processed_items.append({
                     "name": item['name'],
@@ -727,7 +819,7 @@ class ConsumptionReportView(views.APIView):
                 "total_visit_cost": round(total_visit_cost, 2)
             })
 
-        final_items.sort(key=lambda x: (x['visit_date'], x['visit_id']), reverse=True)
+        final_items.sort(key=lambda x: (x['visit_date'], str(x['visit_id'])), reverse=True)
 
         # 6. Response Router (JSON or PDF)
         report_data = {
@@ -760,3 +852,438 @@ class ConsumptionReportView(views.APIView):
             return response
 
         return Response(report_data)
+
+
+class IndentViewSet(viewsets.ModelViewSet):
+    serializer_class = IndentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_param = self.request.query_params.get('project')
+        
+        queryset = Indent.objects.all().prefetch_related('items')
+        
+        if user.is_superuser or user.role == 'ADMIN':
+            if project_param:
+                queryset = queryset.filter(project_id=project_param)
+        elif user.project:
+            queryset = queryset.filter(project=user.project)
+        else:
+            queryset = queryset.none()
+            
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+            
+        location_param = self.request.query_params.get('location')
+        if location_param:
+            queryset = queryset.filter(requesting_location=location_param)
+            
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        project = user.project
+        if not project:
+            return Response({'error': 'Your user profile is not linked to any project. Cannot raise indent.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        requesting_location = request.data.get('requesting_location')
+        if not requesting_location:
+            return Response({'error': 'Requesting location/room is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items_data = request.data.get('items', [])
+        if not items_data:
+            return Response({'error': 'At least one medicine item is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Resolve pharmacy registry
+        pharmacy_registry = RegistryType.objects.filter(project=project, slug__icontains='pharmacy').first()
+        if not pharmacy_registry:
+            return Response({'error': f'No Pharmacy Registry found for project {project.name}'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate stock levels
+        items_to_create = []
+        for it in items_data:
+            name = it.get('medication_name', '').strip()
+            qty = int(it.get('requested_quantity', 0))
+            if qty <= 0:
+                return Response({'error': f'Requested quantity for {name} must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Find drug by Code first, then Name/Alias
+            item_code = it.get('item_code') or it.get('ucode')
+            drug_item = None
+            if item_code:
+                # Match ONLY by ucode first to avoid incorrect name matching
+                drug_item = RegistryData.objects.filter(
+                    registry_type=pharmacy_registry,
+                    ucode__iexact=item_code
+                ).first()
+                if not drug_item:
+                    drug_item = RegistryData.objects.filter(
+                        registry_type=pharmacy_registry,
+                        name__iexact=item_code
+                    ).first()
+            
+            if not drug_item:
+                drug_item = RegistryData.objects.filter(
+                    registry_type=pharmacy_registry
+                ).filter(
+                    Q(name__iexact=name) | Q(aliases__icontains=name)
+                ).first()
+            
+            if not drug_item:
+                return Response({'error': f"Medicine '{name}' not found in project pharmacy registry."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate within stock
+            if qty > drug_item.quantity:
+                return Response({'error': f"Requested quantity for {name} ({qty}) exceeds available pharmacy stock ({drug_item.quantity})."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            items_to_create.append({
+                'medication_name': name,
+                'requested_quantity': qty,
+                'registry_item': drug_item
+            })
+            
+        # Create Indent
+        indent = Indent.objects.create(
+            project=project,
+            raised_by=user,
+            raised_by_role=user.role or 'NURSE',
+            requesting_location=requesting_location,
+            status='PENDING_APPROVAL'
+        )
+        
+        # Create items
+        for it in items_to_create:
+            IndentItem.objects.create(
+                indent=indent,
+                medication_name=it['medication_name'],
+                requested_quantity=it['requested_quantity'],
+                registry_item=it['registry_item']
+            )
+            
+        # Notify doctors
+        notify_team(project, ['DOCTOR', 'ADMIN'], "New Indent Request", f"New replenishment request for {requesting_location} raised by {user.username}.")
+        
+        serializer = self.get_serializer(indent)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        indent = self.get_object()
+        if indent.status != 'PENDING_APPROVAL':
+            return Response({'error': 'Only pending indents can be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        indent.status = 'CANCELLED'
+        indent.save()
+        return Response({'status': 'cancelled'})
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        indent = self.get_object()
+        if indent.status != 'PENDING_APPROVAL':
+            return Response({'error': 'Only pending indents can be approved'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items_data = request.data.get('items', [])
+        approved_map = {}
+        for it in items_data:
+            approved_map[int(it['id'])] = int(it['approved_quantity'])
+            
+        # Validate approved quantities
+        for item in indent.items.all():
+            app_qty = approved_map.get(item.id, item.requested_quantity)
+            if app_qty < 0:
+                return Response({'error': f'Approved quantity for {item.medication_name} cannot be negative.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check stock
+            drug_item = item.registry_item
+            if drug_item and app_qty > drug_item.quantity:
+                return Response({'error': f"Approved quantity for {item.medication_name} ({app_qty}) exceeds available pharmacy stock ({drug_item.quantity})."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            item.approved_quantity = app_qty
+            item.save()
+            
+        indent.status = 'APPROVED'
+        indent.doctor = request.user
+        indent.doctor_remarks = request.data.get('doctor_remarks', '')
+        indent.save()
+        
+        # Notify pharmacy
+        notify_team(indent.project, ['PHARMACIST', 'PHARMACY', 'ADMIN'], "Indent Approved", f"Replenishment request for {indent.requesting_location} has been approved by Doctor {request.user.username}.")
+        
+        return Response({'status': 'approved'})
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        indent = self.get_object()
+        if indent.status != 'PENDING_APPROVAL':
+            return Response({'error': 'Only pending indents can be rejected'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        indent.status = 'REJECTED'
+        indent.doctor = request.user
+        indent.doctor_remarks = request.data.get('doctor_remarks', '')
+        indent.save()
+        
+        # Notify creator
+        Notification.objects.create(
+            recipient=indent.raised_by,
+            project=indent.project,
+            title="Indent Rejected",
+            message=f"Your replenishment request for {indent.requesting_location} was rejected by Doctor."
+        )
+        
+        return Response({'status': 'rejected'})
+
+    @action(detail=True, methods=['post'])
+    def dispense(self, request, pk=None):
+        indent = self.get_object()
+        if indent.status != 'APPROVED':
+            return Response({'error': 'Only approved indents can be dispensed'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                for item in indent.items.all():
+                    drug_item = item.registry_item
+                    if not drug_item:
+                        pharmacy_registry = RegistryType.objects.filter(
+                            project=indent.project, 
+                            slug__icontains='pharmacy'
+                        ).first()
+                        if pharmacy_registry:
+                            drug_item = RegistryData.objects.filter(
+                                registry_type=pharmacy_registry
+                            ).filter(
+                                Q(name__iexact=item.medication_name) | Q(aliases__icontains=item.medication_name)
+                            ).first()
+                    
+                    if not drug_item:
+                        raise Exception(f"Medication '{item.medication_name}' not found in registry")
+                    
+                    qty_to_deduct = item.approved_quantity
+                    if qty_to_deduct <= 0:
+                        continue
+                    
+                    if drug_item.quantity < qty_to_deduct:
+                        raise Exception(f"Insufficient stock for {item.medication_name}. Approved: {qty_to_deduct}, Available: {drug_item.quantity}")
+                    
+                    # Deduct from batches using FEFO
+                    from .models import DrugBatch
+                    active_batches = DrugBatch.objects.filter(registry_item=drug_item, quantity__gt=0).order_by('expiry_date')
+                    remaining = qty_to_deduct
+                    
+                    if active_batches.exists():
+                        for b in active_batches:
+                            batch_cost = b.unit_cost or drug_item.cost or 0
+                            if b.quantity >= remaining:
+                                RoomStockTransfer.objects.create(
+                                    indent_item=item,
+                                    batch=b,
+                                    dispensed_by=request.user,
+                                    quantity=remaining,
+                                    unit_cost=batch_cost,
+                                    total_cost=float(remaining) * float(batch_cost)
+                                )
+                                b.quantity -= remaining
+                                b.save()
+                                remaining = 0
+                                break
+                            else:
+                                if b.quantity > 0:
+                                    RoomStockTransfer.objects.create(
+                                        indent_item=item,
+                                        batch=b,
+                                        dispensed_by=request.user,
+                                        quantity=b.quantity,
+                                        unit_cost=batch_cost,
+                                        total_cost=float(b.quantity) * float(batch_cost)
+                                    )
+                                    remaining -= b.quantity
+                                    b.quantity = 0
+                                    b.save()
+                    
+                    if remaining > 0:
+                        RoomStockTransfer.objects.create(
+                            indent_item=item,
+                            batch=None,
+                            dispensed_by=request.user,
+                            quantity=remaining,
+                            unit_cost=drug_item.cost or 0,
+                            total_cost=float(remaining) * float(drug_item.cost or 0)
+                        )
+                    
+                    total_batch_stock = DrugBatch.objects.filter(registry_item=drug_item).aggregate(total=Sum('quantity'))['total'] or 0
+                    drug_item.quantity = total_batch_stock
+                    drug_item.save(update_fields=['quantity'])
+                    
+                    # Update Room Stock
+                    room_stock, created = RoomStock.objects.get_or_create(
+                        project=indent.project,
+                        location=indent.requesting_location,
+                        registry_item=drug_item
+                    )
+                    room_stock.quantity += item.approved_quantity
+                    room_stock.save()
+                    
+                    item.dispensed_quantity = item.approved_quantity
+                    item.save()
+                
+                indent.status = 'DISPENSED'
+                indent.save()
+                
+                log_action(
+                    request.user,
+                    'Pharmacy',
+                    'Indent Replenished',
+                    f"[REPLENISHMENT] Dispensed Indent ID: {indent.id} to location: {indent.requesting_location}"
+                )
+                
+                Notification.objects.create(
+                    recipient=indent.raised_by,
+                    project=indent.project,
+                    title="Indent Dispensed",
+                    message=f"Your replenishment request for {indent.requesting_location} has been dispensed by Pharmacy."
+                )
+                
+                return Response({'status': 'dispensed to room stock'})
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RoomStockViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RoomStockSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_param = self.request.query_params.get('project')
+        
+        queryset = RoomStock.objects.all().select_related('registry_item')
+        if user.is_superuser or user.role == 'ADMIN':
+            if project_param:
+                queryset = queryset.filter(project_id=project_param)
+        elif user.project:
+            queryset = queryset.filter(project=user.project)
+        else:
+            queryset = queryset.none()
+            
+        location = self.request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(location=location)
+            
+        return queryset
+
+
+class RoomStockDispensationViewSet(viewsets.ModelViewSet):
+    serializer_class = RoomStockDispensationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_param = self.request.query_params.get('project')
+        
+        queryset = RoomStockDispensation.objects.all().select_related('room_stock__registry_item', 'patient')
+        if user.is_superuser or user.role == 'ADMIN':
+            if project_param:
+                queryset = queryset.filter(project_id=project_param)
+        elif user.project:
+            queryset = queryset.filter(project=user.project)
+        else:
+            queryset = queryset.none()
+            
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        project = user.project
+        if not project:
+            return Response({'error': 'Your user profile is not linked to any project.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        recipient_type = request.data.get('recipient_type', 'PATIENT')
+        patient_id = request.data.get('patient_id')
+        outside_name = request.data.get('outside_patient_name')
+        outside_aadhaar = request.data.get('outside_patient_aadhaar')
+        outside_phone = request.data.get('outside_patient_phone')
+        outside_details = request.data.get('outside_patient_details')
+        
+        patient = None
+        if recipient_type == 'PATIENT':
+            if not patient_id:
+                return Response({'error': 'Patient is required for registered patient dispensing'}, status=status.HTTP_400_BAD_REQUEST)
+            from patients.models import Patient
+            try:
+                patient = Patient.objects.get(id=patient_id)
+            except Patient.DoesNotExist:
+                return Response({'error': 'Patient not found'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Check if associated employee is active
+            if patient.employee_master and not patient.employee_master.is_active:
+                return Response({'error': 'Cannot dispense medication. The associated employee card is deactivated (e.g. transferred).'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            if not outside_name or not outside_aadhaar or not outside_phone:
+                return Response({'error': 'Name, Aadhaar Number, and Phone Number are required for outside patients'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Handle multi-item list or fallback to single item
+        items_data = request.data.get('items')
+        is_bulk = True
+        if not items_data:
+            is_bulk = False
+            room_stock_id = request.data.get('room_stock_id')
+            qty = int(request.data.get('quantity', 0))
+            items_data = [{'room_stock_id': room_stock_id, 'quantity': qty}]
+
+        if not items_data or len(items_data) == 0:
+            return Response({'error': 'No items selected for dispensation'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db import transaction
+        try:
+            with transaction.atomic():
+                dispensation_records = []
+                for item in items_data:
+                    rs_id = item.get('room_stock_id')
+                    q = int(item.get('quantity', 0))
+                    if q <= 0:
+                        raise Exception('Quantity must be greater than zero')
+                        
+                    try:
+                        room_stock = RoomStock.objects.get(id=rs_id, project=project)
+                    except RoomStock.DoesNotExist:
+                        raise Exception('Room stock item not found')
+                        
+                    if room_stock.quantity < q:
+                        raise Exception(f'Insufficient room stock for {room_stock.registry_item.name}. Available: {room_stock.quantity}')
+                        
+                    # Deduct stock and save
+                    room_stock.quantity -= q
+                    room_stock.save()
+                    
+                    disp = RoomStockDispensation.objects.create(
+                        project=project,
+                        room_stock=room_stock,
+                        dispensed_by=user,
+                        recipient_type=recipient_type,
+                        patient=patient,
+                        outside_patient_name=outside_name,
+                        outside_patient_aadhaar=outside_aadhaar,
+                        outside_patient_phone=outside_phone,
+                        outside_patient_details=outside_details,
+                        quantity=q
+                    )
+                    dispensation_records.append(disp)
+                    
+                    log_action(
+                        user,
+                        'Pharmacy',
+                        'Room Dispensation',
+                        f"[ROOM_DISPENSE] Dispensed {q} of {room_stock.registry_item.name} from {room_stock.location} to {outside_name or patient}"
+                    )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if is_bulk:
+            serializer = self.get_serializer(dispensation_records, many=True)
+        else:
+            serializer = self.get_serializer(dispensation_records[0])
+            
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

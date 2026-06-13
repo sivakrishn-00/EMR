@@ -120,7 +120,7 @@ const Reports = () => {
 
   useEffect(() => {
     if (user?.project && selectedProject === 'all') {
-      const defaultProj = String(user.project);
+      const defaultProj = String(user.project.id || user.project);
       setSelectedProject(defaultProj);
       sessionStorage.setItem('reports_selected_project', defaultProj);
     }
@@ -372,7 +372,7 @@ const Reports = () => {
     document.body.removeChild(link);
   };
 
-  const currentProjectName = projects.find(p => p.id === parseInt(selectedProject))?.name || 'Global Enterprise';
+  const currentProjectName = projects.find(p => String(p.id) === String(selectedProject))?.name || 'Global Enterprise';
 
   if (loading && !reportData) {
     return (
@@ -433,7 +433,7 @@ const Reports = () => {
           </p>
         </div>
 
-        {activeTab === 'GENERAL' && (
+        {true && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {/* 🌟 CUSTOM PROFESSIONAL DROPDOWN */}
             <div style={{ position: 'relative' }} ref={projDropdownRef}>
@@ -1047,7 +1047,9 @@ const Reports = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--border)', paddingLeft: '1.5rem' }}>
                                 <User size={14} style={{ color: '#6366f1' }} />
                                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-main)' }}>{visit.patient_name}</span>
-                                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface)', padding: '2px 6px', borderRadius: '4px' }}>{visit.patient_id}</span>
+                                 <span style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--text-muted)', background: 'var(--surface)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                                   {visit.card_no && visit.card_no !== 'N/A' ? visit.card_no : `UHID: ${visit.patient_id}`}
+                                 </span>
                                 {visit.is_late_entry && (
                                   <span 
                                     style={{ 

@@ -69,6 +69,7 @@ class EmployeeMaster(models.Model):
     designation = models.CharField(max_length=100, blank=True, null=True)
     additional_fields = models.JSONField(default=dict, blank=True)
     proof_image = models.ImageField(upload_to='employee_proofs/', blank=True, null=True)
+    is_active = models.BooleanField(default=True, help_text="Designates whether this employee is active.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -338,6 +339,7 @@ def sync_employee_to_registry(sender, instance, **kwargs):
                     'name': instance.name,
                     'category': instance.designation or 'STAFF',
                     'description': instance.address or '',
+                    'status': 'ACTIVE' if instance.is_active else 'INACTIVE',
                     'additional_fields': {
                         'dob': str(instance.dob) if instance.dob else '',
                         'gender': instance.gender,
@@ -402,6 +404,7 @@ def sync_family_to_registry(sender, instance, **kwargs):
                     'name': instance.name,
                     'category': instance.relationship or 'DEPENDENT',
                     'description': f"Linked to {instance.employee.card_no}",
+                    'status': 'ACTIVE' if instance.employee.is_active else 'INACTIVE',
                     'additional_fields': {
                         'parent_card_no': instance.employee.card_no,
                         'dob': str(instance.dob) if instance.dob else '',
@@ -481,3 +484,22 @@ class RegistryUploadSession(models.Model):
 
     def __str__(self):
         return f"{self.filename} ({self.mode}) by {self.user} at {self.timestamp}"
+
+
+@receiver(post_save, sender=Project)
+def clone_global_roles_to_project(sender, instance, created, **kwargs):
+    if created:
+        from accounts.models import UserRole
+        # Get all global template roles (where project is null)
+        global_roles = UserRole.objects.filter(project__isnull=True)
+        for role in global_roles:
+            UserRole.objects.get_or_create(
+                name=role.name,
+                project=instance,
+                defaults={
+                    'description': role.description,
+                    'data_isolation': role.data_isolation,
+                    'permissions': role.permissions
+                }
+            )
+        print(f"Cloned {global_roles.count()} global roles for project: {instance.name}")

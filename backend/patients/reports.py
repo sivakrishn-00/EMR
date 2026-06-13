@@ -229,8 +229,26 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
         lab_data = [[Paragraph("INVESTIGATION PARAMETER", theme['label_left']), Paragraph("RESULT VALUE", theme['label_center']), Paragraph("REFERENCE RANGE", theme['label_center'])]]
         for lr in v.get('lab_requests', []):
             res = lr.get('result', {}) or {}; tn = lr.get('test_name') or lr.get('test_master_details', {}).get('name', 'Unknown')
+            
+            # Extract names of uploaded files/scans
+            attach_names = []
+            if res:
+                if res.get('attachments'):
+                    for att in res.get('attachments'):
+                        url = att.get('file_url') or att.get('file')
+                        if url:
+                            from urllib.parse import unquote
+                            attach_names.append(unquote(url.split('/')[-1]))
+                elif res.get('attachment_url'):
+                    from urllib.parse import unquote
+                    attach_names.append(unquote(res.get('attachment_url').split('/')[-1]))
+            
+            attach_str = ""
+            if attach_names:
+                attach_str = f"<br/><font size=6.5 color='#475569'><b>FILES:</b> {', '.join(attach_names)}</font>"
+
             if res and res.get('values'):
-                lab_data.append([Paragraph(f"<b>{tn.upper()}</b>", ParagraphStyle('P', parent=theme['value'], textColor=NAVY)), Paragraph("", theme['badge_green']), Paragraph("", theme['value'])])
+                lab_data.append([Paragraph(f"<b>{tn.upper()}</b>{attach_str}", ParagraphStyle('P', parent=theme['value'], textColor=NAVY)), Paragraph("", theme['badge_green']), Paragraph("", theme['value'])])
                 for sn, sv in res['values'].items():
                     ref = "--"
                     is_alert = False
@@ -247,7 +265,7 @@ def generate_patient_pdf_report(patient_id, visit_date_str=None, limit=None):
                             pass
                     lab_data.append([Paragraph(f"{sn}", theme['value']), Paragraph(to_str(sv), theme['alert_red'] if is_alert else theme['badge_green']), Paragraph(ref, ParagraphStyle('R', parent=theme['value'], alignment=1))])
             else:
-                lab_data.append([Paragraph(tn, theme['value']), Paragraph(to_str(res.get('value', 'Pending')), theme['badge_green']), Paragraph("--", ParagraphStyle('R', parent=theme['value'], alignment=1))])
+                lab_data.append([Paragraph(f"<b>{tn}</b>{attach_str}" if attach_str else tn, theme['value']), Paragraph(to_str(res.get('value', 'Pending')), theme['badge_green']), Paragraph("--", ParagraphStyle('R', parent=theme['value'], alignment=1))])
         labt = Table(lab_data, colWidths=[3.2*inch, 1.4*inch, 2.0*inch])
         labt.setStyle(std_grid)
         elements.append(labt)

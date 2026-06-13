@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -26,7 +26,11 @@ import api from '../services/api';
 const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [projectConfig, setProjectConfig] = useState(null);
+
+  const adminRoutes = ['/users', '/audit', '/admin-masters', '/projects', '/bridge-hub', '/roles'];
+  const isAdminRoute = adminRoutes.some(route => location.pathname.startsWith(route));
 
   useEffect(() => {
     if (user?.project) {
@@ -75,6 +79,13 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
              userPerms.includes('/admin-masters/stats') ||
              userPerms.includes('/admin-masters/upload_history');
     }
+    if (path === '/indents') {
+      return user?.role === 'ADMIN' || 
+             userPerms.includes('ADMIN_ALL') || 
+             userPerms.includes('/indents') ||
+             userPerms.includes('/indents/inventory') ||
+             userPerms.includes('/indents/approval');
+    }
     return user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(path);
   };
 
@@ -96,7 +107,7 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
                     letterSpacing: '0.05em',
                     textTransform: 'uppercase',
                     lineHeight: 1,
-                    color: projectConfig?.primary_color || 'var(--primary)'
+                    color: 'var(--primary)'
                   }}>
                     {user?.project_name || 'EMR'}
                   </span>
@@ -289,9 +300,9 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .collapse-btn:hover {
-          background: ${projectConfig?.primary_color || 'var(--primary)'} !important;
+          background: ${projectConfig?.primary_color ? projectConfig.primary_color : 'var(--primary)'} !important;
           color: white !important;
-          border-color: ${projectConfig?.primary_color || 'var(--primary)'} !important;
+          border-color: ${projectConfig?.primary_color ? projectConfig.primary_color : 'var(--primary)'} !important;
         }
         .collapsed .collapse-btn {
           transform: rotate(180deg);

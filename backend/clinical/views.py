@@ -33,7 +33,7 @@ def notify_team(project, roles, title, message):
 from rest_framework.pagination import PageNumberPagination
 
 class LargeResultsPagination(PageNumberPagination):
-    page_size = 100
+    page_size = 30
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
@@ -200,10 +200,12 @@ class VisitViewSet(viewsets.ModelViewSet):
                         freq = med.get('frequency', '1-0-1')
                         duration = med.get('duration', '5 days')
                         tot_units = int(med.get('total_units', 1))
+                        item_code = med.get('item_code', '')
                         
                         presc = Prescription.objects.create(
                             visit=visit,
                             medication_name=med_name,
+                            item_code=item_code,
                             dosage=dosage,
                             frequency=freq,
                             duration=duration,

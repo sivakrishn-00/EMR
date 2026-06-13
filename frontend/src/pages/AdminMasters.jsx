@@ -263,6 +263,7 @@ const AdminMasters = () => {
     test_type: "",
     department: "",
     description: "",
+    supports_attachments: false,
     is_active: true
   });
   const [deptForm, setDeptForm] = useState({
@@ -308,7 +309,7 @@ const AdminMasters = () => {
   };
 
    const resetLabForm = () => {
-     setLabTestForm({ name: "", code: "", test_type: "", department: "", description: "", is_active: true });
+     setLabTestForm({ name: "", code: "", test_type: "", department: "", description: "", supports_attachments: false, is_active: true });
      setIsEditingLabTest(false);
      setCurrentLabTest(null);
    };
@@ -379,6 +380,7 @@ const AdminMasters = () => {
     address: "",
     designation: "",
     proof_image: null,
+    is_active: true,
     additional_fields: { employee_id: "" },
   });
 
@@ -441,11 +443,24 @@ const AdminMasters = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--primary', '#6366f1');
-    root.style.setProperty('--primary-dark', '#4f46e5');
-    root.style.setProperty('--secondary', '#10b981');
-    root.style.setProperty('--accent', '#f59e0b');
-  }, []);
+    const isGlobalAdmin = user?.role === 'ADMIN' || user?.is_superuser;
+    const projId = !isGlobalAdmin ? (selectedProject || user?.project) : null;
+    
+    if (projId && projects.length > 0) {
+      const proj = projects.find(p => String(p.id) === String(projId));
+      if (proj) {
+        root.style.setProperty('--primary', proj.primary_color || '#6366f1');
+        root.style.setProperty('--primary-dark', proj.primary_color || '#4f46e5');
+        root.style.setProperty('--secondary', proj.secondary_color || '#10b981');
+        root.style.setProperty('--accent', proj.accent_color || '#f59e0b');
+      }
+    } else {
+      root.style.setProperty('--primary', '#6366f1');
+      root.style.setProperty('--primary-dark', '#4f46e5');
+      root.style.setProperty('--secondary', '#10b981');
+      root.style.setProperty('--accent', '#f59e0b');
+    }
+  }, [selectedProject, projects, user]);
 
   useEffect(() => {
     if (showMasterModal && !isEditingMaster) {
@@ -887,6 +902,8 @@ const AdminMasters = () => {
       if (val !== null && val !== undefined && val !== "") {
         if (key === "additional_fields") {
           data.append(key, JSON.stringify(val));
+        } else if (key === "is_active") {
+          data.append(key, val ? "true" : "false");
         } else {
           data.append(key, val);
         }
@@ -921,6 +938,7 @@ const AdminMasters = () => {
         address: "",
         designation: "",
         proof_image: null,
+        is_active: true,
         additional_fields: { employee_id: "" },
       });
       fetchEmployeeMasters();
@@ -1664,11 +1682,11 @@ const AdminMasters = () => {
                 <button
                   className="btn"
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                    background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
                     color: "white",
                     border: "none",
                     fontWeight: 800,
-                    boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                     height: "40px",
                     borderRadius: "14px",
@@ -1680,11 +1698,11 @@ const AdminMasters = () => {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 6px 15px rgba(124, 58, 237, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 6px 15px rgba(0, 0, 0, 0.12)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(124, 58, 237, 0.2)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
                   }}
                   onClick={() => {
                     setViewMode("PROJECTS");
@@ -1701,19 +1719,19 @@ const AdminMasters = () => {
                       padding: "0 1.25rem",
                       height: "40px",
                       borderRadius: "14px",
-                      background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                      background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
                       border: "none",
                       fontWeight: 800,
-                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 6px 15px rgba(99, 102, 241, 0.3)";
+                      e.currentTarget.style.boxShadow = "0 6px 15px rgba(0, 0, 0, 0.12)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.2)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.08)";
                     }}
                     onClick={() => {
                       setIsEditingProtocol(false);
@@ -1792,9 +1810,9 @@ const AdminMasters = () => {
                     <button
                       className="btn btn-primary"
                       style={{
-                        background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                        background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)",
                         border: "none",
-                        boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                         fontSize: "0.75rem",
                         height: "40px",
                         borderRadius: "10px",
@@ -1816,6 +1834,7 @@ const AdminMasters = () => {
                           address: "",
                           designation: "",
                           proof_image: null,
+                          is_active: true,
                           additional_fields: { employee_id: "" },
                         });
                         fetchNextCardNo(selectedProject || user?.project);
@@ -4034,6 +4053,7 @@ const AdminMasters = () => {
                                                           test_type: test.test_type,
                                                           department: test.department,
                                                           description: test.description,
+                                                          supports_attachments: !!test.supports_attachments,
                                                           is_active: test.is_active
                                                        });
                                                        setIsEditingLabTest(true);
@@ -4483,6 +4503,17 @@ const AdminMasters = () => {
                               >
                                 RELATIONSHIP
                               </th>
+                              <th
+                                style={{
+                                  fontSize: "0.75rem",
+                                  fontWeight: 900,
+                                  color: "#475569",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                STATUS
+                              </th>
                               {activeProjectFields.map((field) => (
                                 <th
                                   key={field.id}
@@ -4707,6 +4738,26 @@ const AdminMasters = () => {
                                       >
                                         -
                                       </td>
+                                      <td
+                                        style={{
+                                          fontSize: "0.8125rem",
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            padding: "2px 8px",
+                                            borderRadius: "6px",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 800,
+                                            background: m.is_active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                            color: m.is_active ? "#10b981" : "#ef4444",
+                                            border: m.is_active ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
+                                          }}
+                                        >
+                                          {m.is_active ? "ACTIVE" : "INACTIVE"}
+                                        </span>
+                                      </td>
                                     </>
                                   ) : (
                                       <>
@@ -4887,6 +4938,49 @@ const AdminMasters = () => {
                                             />
                                           </button>
                                         )}
+                                      {!isRegistry && (
+                                        <button
+                                          className="btn btn-secondary"
+                                          style={{
+                                            padding: "0.5rem",
+                                            border: "none",
+                                            background: m.is_active ? "#fee2e2" : "#d1fae5",
+                                            borderRadius: "10px",
+                                          }}
+                                          title={m.is_active ? "Deactivate Employee" : "Activate Employee"}
+                                          onClick={() => {
+                                            setConfirmModal({
+                                              isOpen: true,
+                                              title: m.is_active ? "Deactivate Employee" : "Activate Employee",
+                                              message: `Are you sure you want to ${m.is_active ? "deactivate" : "activate"} employee "${m.name}"? This will affect medicine dispensing privileges.`,
+                                              onConfirm: async () => {
+                                                setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                                                const targetActive = !m.is_active;
+                                                
+                                                // Optimistic update for instant speed!
+                                                setEmployeeMasters(prev => prev.map(emp => emp.id === m.id ? { ...emp, is_active: targetActive } : emp));
+                                                
+                                                const loadId = toast.loading(targetActive ? "Deactivating employee..." : "Activating employee...");
+                                                try {
+                                                  await api.patch(`patients/employee-masters/${m.id}/`, {
+                                                    is_active: targetActive
+                                                  });
+                                                  toast.success(`Employee ${targetActive ? "deactivated" : "activated"} successfully!`, { id: loadId });
+                                                } catch (err) {
+                                                  // Rollback on error
+                                                  setEmployeeMasters(prev => prev.map(emp => emp.id === m.id ? { ...emp, is_active: !targetActive } : emp));
+                                                  toast.error("Failed to update active status", { id: loadId });
+                                                }
+                                              }
+                                            });
+                                          }}
+                                        >
+                                          <Power
+                                            size={18}
+                                            color={m.is_active ? "#ef4444" : "#10b981"}
+                                          />
+                                        </button>
+                                      )}
                                       <button
                                         className="btn btn-secondary"
                                         style={{
@@ -4908,6 +5002,7 @@ const AdminMasters = () => {
                                               address: m.address,
                                               designation:
                                                 m.designation || "",
+                                              is_active: m.is_active ?? true,
                                               additional_fields: {
                                                 employee_id: "",
                                                 ...(m.additional_fields || {})
@@ -5021,6 +5116,37 @@ const AdminMasters = () => {
                                         >
                                           {f.relationship}
                                         </td>
+                                        <td
+                                          style={{
+                                            fontSize: "0.8125rem",
+                                            fontWeight: 800,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              padding: "2px 8px",
+                                              borderRadius: "6px",
+                                              fontSize: "0.75rem",
+                                              fontWeight: 800,
+                                              background: m.is_active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                              color: m.is_active ? "#10b981" : "#ef4444",
+                                              border: m.is_active ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
+                                            }}
+                                          >
+                                            {m.is_active ? "ACTIVE" : "INACTIVE"}
+                                          </span>
+                                        </td>
+                                        {activeProjectFields.map((field) => (
+                                          <td
+                                            key={field.id}
+                                            style={{
+                                              fontSize: "0.8125rem",
+                                              color: "var(--text-muted)",
+                                            }}
+                                          >
+                                            --
+                                          </td>
+                                        ))}
                                         <td
                                           style={{
                                             textAlign: "right",
@@ -5633,6 +5759,29 @@ const AdminMasters = () => {
                       className="form-control"
                       placeholder="Village/City, District, State"
                     ></textarea>
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: "span 2", display: "flex", alignItems: "center", gap: "10px", marginTop: "0.5rem" }}>
+                    <input
+                      type="checkbox"
+                      id="is_active_checkbox"
+                      checked={masterFormData.is_active}
+                      onChange={(e) =>
+                        setMasterFormData({
+                          ...masterFormData,
+                          is_active: e.target.checked,
+                        })
+                      }
+                      style={{
+                        width: "20px",
+                        height: "20px",
+                        accentColor: "var(--primary)",
+                        cursor: "pointer",
+                      }}
+                    />
+                    <label htmlFor="is_active_checkbox" style={{ margin: 0, fontWeight: 800, cursor: "pointer", color: "var(--text-main)" }}>
+                      Active Status (Allow medicine dispensing and registration)
+                    </label>
                   </div>
 
                   {activeProjectFields.length > 0 && (
@@ -8135,7 +8284,15 @@ const AdminMasters = () => {
                 </div>
 
                 <div 
-                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s' }} 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s', marginTop: '1rem' }} 
+                   onClick={() => setLabTestForm({ ...labTestForm, supports_attachments: !labTestForm.supports_attachments })}
+                >
+                   <input type="checkbox" id="lab-supports-attachments" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={labTestForm.supports_attachments} readOnly />
+                   <label style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', pointerEvents: 'none' }}>Supports Image/PDF Upload (X-Ray, Scan)</label>
+                </div>
+
+                <div 
+                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--background)', borderRadius: '12px', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s', marginTop: '0.75rem' }} 
                    onClick={() => setLabTestForm({ ...labTestForm, is_active: !labTestForm.is_active })}
                 >
                    <input type="checkbox" id="lab-active" style={{ width: '1.25rem', height: '1.25rem', margin: 0, cursor: 'pointer', pointerEvents: 'none' }} checked={labTestForm.is_active} readOnly />

@@ -9,20 +9,42 @@ from .models import User, AuditLog, Notification, UserRole
 from clinical.serializers import VisitSerializer
 
 class UserRoleViewSet(viewsets.ModelViewSet):
-    queryset = UserRole.objects.all()
     serializer_class = UserRoleSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = UserRole.objects.all()
+        
+        if user.project:
+            queryset = queryset.filter(project=user.project)
+        else:
+            project_param = self.request.query_params.get('project')
+            if project_param is not None:
+                if project_param in ['null', 'None', 'global', '']:
+                    queryset = queryset.filter(project__isnull=True)
+                else:
+                    queryset = queryset.filter(project_id=project_param)
+        return queryset.order_by('id')
+
+    def perform_create(self, serializer):
+        if self.request.user.project:
+            serializer.save(project=self.request.user.project)
+        else:
+            serializer.save()
 
 class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # 🚀 AUTO-REPAIR: Ensure all patients have the 'PATIENT' role linked
         from .models import UserRole
-        patient_role = UserRole.objects.filter(name='PATIENT').first()
-        if patient_role:
-            # Fix patients who were created without the dynamic role link
-            users_needing_repair = User.objects.filter(role='PATIENT', user_roles=None)
-            for u in users_needing_repair:
-                u.user_roles.add(patient_role)
+        users_needing_repair = User.objects.filter(role='PATIENT', user_roles=None)
+        for u in users_needing_repair:
+            p_role = UserRole.objects.filter(name='PATIENT', project=u.project).first()
+            if not p_role:
+                p_role = UserRole.objects.filter(name='PATIENT', project__isnull=True).first()
+            if p_role:
+                u.user_roles.add(p_role)
         
         return User.objects.all().order_by('-date_joined')
     serializer_class = UserSerializer
@@ -30,7 +52,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def roles(self, request):
-        db_roles = list(UserRole.objects.values_list('name', flat=True))
+        user = request.user
+        qs = UserRole.objects.all()
+        if user.project:
+            qs = qs.filter(project=user.project)
+        db_roles = list(qs.values_list('name', flat=True).distinct())
         default_roles = ['ADMIN', 'DOCTOR', 'NURSE', 'DEO', 'LAB_TECH', 'PHARMACIST', 'PATIENT']
         for r in default_roles:
             if r not in db_roles:

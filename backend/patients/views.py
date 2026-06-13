@@ -397,7 +397,7 @@ class RegistryFieldViewSet(viewsets.ModelViewSet):
 from rest_framework.pagination import PageNumberPagination
 
 class LargeResultsPagination(PageNumberPagination):
-    page_size = 100
+    page_size = 30
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
@@ -2190,6 +2190,7 @@ class PatientViewSet(viewsets.ModelViewSet):
             last_name=patient.last_name,
             phone=patient.phone,
             role='PATIENT',
+            project=patient.project,
             is_active=False,      # Must be activated via OTP setup
             is_password_set=False # Force password setup
         )
@@ -2198,6 +2199,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         from accounts.models import UserRole
         patient_role, created = UserRole.objects.get_or_create(
             name='PATIENT',
+            project=patient.project,
             defaults={'description': 'Default role for MNC Portal patients'}
         )
         user.user_roles.add(patient_role)
@@ -2210,16 +2212,11 @@ class PatientViewSet(viewsets.ModelViewSet):
         })
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def bulk_enable_portal(self, request):
+        from accounts.models import User, UserRole
         patient_ids = request.data.get('patient_ids', [])
         if not patient_ids:
             return Response({"error": "No patients selected"}, status=400)
             
-        from accounts.models import User, UserRole
-        patient_role, _ = UserRole.objects.get_or_create(
-            name='PATIENT',
-            defaults={'description': 'Default role for MNC Portal patients'}
-        )
-        
         success_count = 0
         patients = Patient.objects.filter(id__in=patient_ids)
         
@@ -2231,10 +2228,16 @@ class PatientViewSet(viewsets.ModelViewSet):
                     last_name=patient.last_name,
                     phone=patient.phone,
                     role='PATIENT',
+                    project=patient.project,
                     is_active=False,
                     is_password_set=False
                 )
-                user.user_roles.add(patient_role)
+                patient_role_proj, _ = UserRole.objects.get_or_create(
+                    name='PATIENT',
+                    project=patient.project,
+                    defaults={'description': 'Default role for MNC Portal patients'}
+                )
+                user.user_roles.add(patient_role_proj)
                 success_count += 1
                 
         return Response({

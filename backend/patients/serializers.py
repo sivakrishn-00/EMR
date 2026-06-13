@@ -153,6 +153,7 @@ class PatientSerializer(serializers.ModelSerializer):
     family_details = serializers.SerializerMethodField()
     project_name = serializers.CharField(source='project.name', read_only=True)
     portal_status = serializers.SerializerMethodField()
+    registered_by_username = serializers.CharField(source='registered_by.username', read_only=True)
 
     class Meta:
         model = Patient

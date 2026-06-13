@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import time
-from .models import LabRequest, LabResult, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachine, LabMachineData, LabSyncAudit, LabProjectBridge
+from .models import LabRequest, LabResult, LabResultAttachment, LabTestMaster, LabSubTest, LabDepartment, LabTestType, LabMachine, LabMachineData, LabSyncAudit, LabProjectBridge
 from .serializers import (
     LabRequestSerializer, LabResultSerializer, LabTestMasterSerializer, 
     LabSubTestSerializer, LabDepartmentSerializer, LabTestTypeSerializer, 
@@ -34,7 +34,7 @@ from .permissions import HasMachineSyncKey
 from rest_framework.pagination import PageNumberPagination
 
 class LargeResultsPagination(PageNumberPagination):
-    page_size = 100
+    page_size = 30
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
@@ -107,12 +107,36 @@ class LabRequestViewSet(viewsets.ModelViewSet):
         lab_request = self.get_object()
         result_instance = getattr(lab_request, 'result', None)
         
-        serializer = LabResultSerializer(result_instance, data=request.data, partial=True)
+        # Support multipart form-data uploads
+        if hasattr(request.data, 'dict'):
+            data = request.data.dict()
+        else:
+            data = dict(request.data)
+        
+        if 'values' in data and isinstance(data['values'], str):
+            try:
+                data['values'] = json.loads(data['values'])
+            except Exception:
+                pass
+        
+        if request.FILES and 'attachment' in request.FILES:
+            data['attachment'] = request.FILES['attachment']
+        
+        # Remove fields that belong to LabRequest, not LabResult
+        sample_type = data.pop('sample_type', None)
+        if isinstance(sample_type, list):
+            sample_type = sample_type[0] if sample_type else None
+            
+        serializer = LabResultSerializer(result_instance, data=data, partial=True, context={'request': request})
         if serializer.is_valid():
-            serializer.save(lab_request=lab_request, recorded_by=request.user)
+            result_obj = serializer.save(lab_request=lab_request, recorded_by=request.user)
+            
+            # Save multiple attachments
+            attachments = request.FILES.getlist('attachments')
+            for f in attachments:
+                LabResultAttachment.objects.create(result=result_obj, file=f)
             
             # One-step workflow supports saving sample_type here
-            sample_type = request.data.get('sample_type')
             if sample_type:
                 lab_request.sample_type = sample_type
                 if not lab_request.sample_collected_at:
@@ -161,6 +185,7 @@ class LabRequestViewSet(viewsets.ModelViewSet):
             notify_team(visit.patient.project, ['ADMIN', 'LAB_TECH'], "Lab Job Completed", f"Results finalized for {visit.patient}")
                 
             return Response(serializer.data, status=status.HTTP_201_CREATED if not result_instance else status.HTTP_200_OK)
+        print(f"[LAB RESULT ERROR] {serializer.errors} | Data keys: {list(data.keys())}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
