@@ -636,21 +636,15 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
       return;
     }
     const filtered = registryDrugs.filter(d => 
-      (d.quantity || 0) > 0 && (
-        d.name.toLowerCase().includes(val.toLowerCase()) || 
-        (d.code && d.code.toLowerCase().includes(val.toLowerCase())) ||
-        (d.ucode && d.ucode.toLowerCase().includes(val.toLowerCase())) ||
-        (d.item_code && d.item_code.toLowerCase().includes(val.toLowerCase()))
-      )
+      d.name.toLowerCase().includes(val.toLowerCase()) || 
+      (d.code && d.code.toLowerCase().includes(val.toLowerCase())) ||
+      (d.ucode && d.ucode.toLowerCase().includes(val.toLowerCase())) ||
+      (d.item_code && d.item_code.toLowerCase().includes(val.toLowerCase()))
     ).slice(0, 8);
     setDrugResults(filtered);
   };
 
   const addDrugToIndent = (drug) => {
-    if (selectedDrugQty > (drug.quantity || 0)) {
-      toast.error(`Requested quantity for ${drug.name} cannot exceed available pharmacy stock (${drug.quantity || 0})!`);
-      return;
-    }
     if (indentForm.items.some(i => i.medication_name.toLowerCase() === drug.name.toLowerCase())) {
       toast.error('Medication is already added to request list');
       return;

@@ -971,9 +971,7 @@ class IndentViewSet(viewsets.ModelViewSet):
             if not drug_item:
                 return Response({'error': f"Medicine '{name}' not found in project pharmacy registry."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Validate within stock
-            if qty > drug_item.quantity:
-                return Response({'error': f"Requested quantity for {name} ({qty}) exceeds available pharmacy stock ({drug_item.quantity})."}, status=status.HTTP_400_BAD_REQUEST)
+            # Allow requesting any quantity (even if exceeds current stock, e.g. for replenishment/procurement)
             
             items_to_create.append({
                 'medication_name': name,
@@ -1032,10 +1030,8 @@ class IndentViewSet(viewsets.ModelViewSet):
             if app_qty < 0:
                 return Response({'error': f'Approved quantity for {item.medication_name} cannot be negative.'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Check stock
+            # Allow approving any quantity (doctor approved demand)
             drug_item = item.registry_item
-            if drug_item and app_qty > drug_item.quantity:
-                return Response({'error': f"Approved quantity for {item.medication_name} ({app_qty}) exceeds available pharmacy stock ({drug_item.quantity})."}, status=status.HTTP_400_BAD_REQUEST)
                 
             item.approved_quantity = app_qty
             item.save()
@@ -1138,20 +1134,33 @@ class IndentViewSet(viewsets.ModelViewSet):
                                     remaining -= b.quantity
                                     b.quantity = 0
                                     b.save()
-                    
-                    if remaining > 0:
+                                    
+                        if remaining > 0:
+                            RoomStockTransfer.objects.create(
+                                indent_item=item,
+                                batch=None,
+                                dispensed_by=request.user,
+                                quantity=remaining,
+                                unit_cost=drug_item.cost or 0,
+                                total_cost=float(remaining) * float(drug_item.cost or 0)
+                            )
+                        
+                        total_batch_stock = DrugBatch.objects.filter(registry_item=drug_item).aggregate(total=Sum('quantity'))['total'] or 0
+                        drug_item.quantity = total_batch_stock
+                        drug_item.save(update_fields=['quantity'])
+                    else:
+                        # Fallback: direct deduction from parent stock if no active batches exist
                         RoomStockTransfer.objects.create(
                             indent_item=item,
                             batch=None,
                             dispensed_by=request.user,
-                            quantity=remaining,
+                            quantity=qty_to_deduct,
                             unit_cost=drug_item.cost or 0,
-                            total_cost=float(remaining) * float(drug_item.cost or 0)
+                            total_cost=float(qty_to_deduct) * float(drug_item.cost or 0)
                         )
-                    
-                    total_batch_stock = DrugBatch.objects.filter(registry_item=drug_item).aggregate(total=Sum('quantity'))['total'] or 0
-                    drug_item.quantity = total_batch_stock
-                    drug_item.save(update_fields=['quantity'])
+                        drug_item.refresh_from_db()
+                        drug_item.quantity = max(0, drug_item.quantity - qty_to_deduct)
+                        drug_item.save(update_fields=['quantity'])
                     
                     # Update Room Stock
                     room_stock, created = RoomStock.objects.get_or_create(
