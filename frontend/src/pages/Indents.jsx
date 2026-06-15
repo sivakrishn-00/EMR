@@ -707,7 +707,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {activeTab !== 'approval' ? (
             <>
-              {!(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
+              {isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
                 <select 
                   value={selectedRoom}
                   onChange={(e) => setSelectedRoom(e.target.value)}
@@ -832,7 +832,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              {isEmbed && !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') && (
+              {isEmbed && (isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY')) && (
                 <div ref={dropdownRef} style={{ position: 'relative', minWidth: '190px' }}>
                   <button
                     type="button"
@@ -1094,7 +1094,9 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                     <th style={{ padding: '0.875rem 1rem', fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Category</th>
                     <th style={{ padding: '0.875rem 1rem', fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Quantity</th>
                     <th style={{ padding: '0.875rem 1rem', fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last Updated</th>
-                    <th style={{ textAlign: 'right', padding: '0.875rem 1.5rem 0.875rem 1rem', fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Action</th>
+                    {!isPharmacyUser && (
+                      <th style={{ textAlign: 'right', padding: '0.875rem 1.5rem 0.875rem 1rem', fontSize: '0.72rem', fontWeight: 900, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Action</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -1107,7 +1109,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                     if (filtered.length === 0) {
                       return (
                         <tr>
-                          <td colSpan="6" style={{ textAlign: 'center', padding: '4rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                          <td colSpan={isPharmacyUser ? 5 : 6} style={{ textAlign: 'center', padding: '4rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                             <Package size={36} style={{ marginBottom: '1rem', opacity: 0.5 }} />
                             <p style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--text-main)' }}>No Room Stock Items Found</p>
                             <p style={{ fontSize: '0.75rem', marginTop: '4px' }}>Raise a replenishment indent to receive medicines from Pharmacy.</p>
@@ -1147,38 +1149,40 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                           )}
                         </td>
                         <td style={{ padding: '1rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{new Date(item.updated_at).toLocaleString()}</td>
-                        <td style={{ padding: '1rem 1.5rem 1rem 1rem', textAlign: 'right', verticalAlign: 'middle' }}>
-                          <button 
-                            className="btn"
-                            onClick={() => {
-                              setSelectedStockItem(item);
-                              setDispenseItems([{
-                                room_stock_id: item.id,
-                                name: item.registry_item_name,
-                                quantity: 1,
-                                max_quantity: item.quantity
-                              }]);
-                              setDispenseForm(f => ({ ...f, quantity: 1 }));
-                              setShowDispenseModal(true);
-                            }}
-                            style={{ 
-                              padding: '0.45rem 1rem', 
-                              fontSize: '0.75rem', 
-                              borderRadius: '10px', 
-                              fontWeight: 800,
-                              background: 'rgba(99, 102, 241, 0.04)',
-                              border: `1px solid rgba(99, 102, 241, 0.15)`,
-                              color: projectConfig?.primary_color || 'var(--primary)',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Send size={12} /> Dispense directly
-                          </button>
-                        </td>
+                        {!isPharmacyUser && (
+                          <td style={{ padding: '1rem 1.5rem 1rem 1rem', textAlign: 'right', verticalAlign: 'middle' }}>
+                            <button 
+                              className="btn"
+                              onClick={() => {
+                                setSelectedStockItem(item);
+                                setDispenseItems([{
+                                  room_stock_id: item.id,
+                                  name: item.registry_item_name,
+                                  quantity: 1,
+                                  max_quantity: item.quantity
+                                }]);
+                                setDispenseForm(f => ({ ...f, quantity: 1 }));
+                                setShowDispenseModal(true);
+                              }}
+                              style={{ 
+                                padding: '0.45rem 1rem', 
+                                fontSize: '0.75rem', 
+                                borderRadius: '10px', 
+                                fontWeight: 800,
+                                background: 'rgba(99, 102, 241, 0.04)',
+                                border: `1px solid rgba(99, 102, 241, 0.15)`,
+                                color: projectConfig?.primary_color || 'var(--primary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <Send size={12} /> Dispense directly
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ));
                   })()}
@@ -1906,7 +1910,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
             <form onSubmit={handleRaiseIndent}>
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                 <label style={{ fontWeight: 800 }}>Requesting Room / Sub-Store Location</label>
-                {!(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
+                {isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
                   <select 
                     value={indentForm.requesting_location}
                     onChange={(e) => setIndentForm(f => ({ ...f, requesting_location: e.target.value }))}
