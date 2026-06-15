@@ -350,7 +350,7 @@ const Reports = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success("Professional Audit Report (XLSX) generated successfully");
+        toast.success("Audit Report (XLSX) generated successfully");
       } catch (err) {
         toast.error("Excel generation failed. Please try again.");
         console.error(err);

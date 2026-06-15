@@ -747,7 +747,40 @@ class ConsumptionReportView(views.APIView):
                 Q(outside_patient_aadhaar=employee_id)
             )
 
-        for disp in room_qs:
+        # Group room stock dispensations that occurred at the same time to the same recipient
+        room_records = list(room_qs)
+        grouped_room = []
+        visited_room = set()
+        for i, rec in enumerate(room_records):
+            if rec.id in visited_room:
+                continue
+            group = [rec]
+            visited_room.add(rec.id)
+            for j in range(i + 1, len(room_records)):
+                other = room_records[j]
+                if other.id in visited_room:
+                    continue
+                if rec.recipient_type != other.recipient_type:
+                    continue
+                if rec.recipient_type == 'PATIENT':
+                    if rec.patient_id != other.patient_id:
+                        continue
+                else:
+                    if rec.outside_patient_name != other.outside_patient_name:
+                        continue
+                if rec.dispensed_by_id != other.dispensed_by_id:
+                    continue
+                if rec.room_stock.location != other.room_stock.location:
+                    continue
+                time_diff = abs((rec.dispensed_at - other.dispensed_at).total_seconds())
+                if time_diff > 5:
+                    continue
+                group.append(other)
+                visited_room.add(other.id)
+            grouped_room.append(group)
+
+        for group in grouped_room:
+            disp = group[0]
             group_key = f"room_disp_{disp.id}"
             
             p_name = "N/A"
@@ -762,9 +795,19 @@ class ConsumptionReportView(views.APIView):
                 card_no = f"Aadhaar: {disp.outside_patient_aadhaar or 'N/A'}"
                 patient_id = "OUTSIDE"
 
-            # Fetch unit cost from room stock registry item
-            cost = float(disp.room_stock.registry_item.cost or 0.0)
-            total_cost = float(disp.quantity) * cost
+            items_list = []
+            total_units = 0
+            for item in group:
+                cost = float(item.room_stock.registry_item.cost or 0.0)
+                total_cost = float(item.quantity) * cost
+                items_list.append({
+                    "name": item.room_stock.registry_item.name,
+                    "clean_name": item.room_stock.registry_item.name.strip().upper(),
+                    "units": item.quantity,
+                    "unit_cost": cost,
+                    "total_cost": total_cost
+                })
+                total_units += item.quantity
 
             med_groups[group_key] = {
                 "visit_id": f"R-{disp.id}",
@@ -774,14 +817,8 @@ class ConsumptionReportView(views.APIView):
                 "patient_name": p_name,
                 "is_late_entry": False,
                 "late_entry_justification": f"Dispensed from {disp.room_stock.location} by {disp.dispensed_by.username}",
-                "items": [{
-                    "name": disp.room_stock.registry_item.name,
-                    "clean_name": disp.room_stock.registry_item.name.strip().upper(),
-                    "units": disp.quantity,
-                    "unit_cost": cost,
-                    "total_cost": total_cost
-                }],
-                "total_visit_units": disp.quantity
+                "items": items_list,
+                "total_visit_units": total_units
             }
 
         final_items = []
@@ -1194,6 +1231,68 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Sort queryset by dispensed_at desc to group chronologically
+        records = list(queryset.order_by('-dispensed_at'))
+        
+        grouped_records = []
+        visited = set()
+        for i, rec in enumerate(records):
+            if rec.id in visited:
+                continue
+                
+            group = [rec]
+            visited.add(rec.id)
+            
+            # Find matching items dispensed at the same time (within 5 seconds)
+            for j in range(i + 1, len(records)):
+                other = records[j]
+                if other.id in visited:
+                    continue
+                if rec.recipient_type != other.recipient_type:
+                    continue
+                if rec.recipient_type == 'PATIENT':
+                    if rec.patient_id != other.patient_id:
+                        continue
+                else:
+                    if rec.outside_patient_name != other.outside_patient_name:
+                        continue
+                if rec.dispensed_by_id != other.dispensed_by_id:
+                    continue
+                if rec.room_stock.location != other.room_stock.location:
+                    continue
+                time_diff = abs((rec.dispensed_at - other.dispensed_at).total_seconds())
+                if time_diff > 5:
+                    continue
+                
+                group.append(other)
+                visited.add(other.id)
+            
+            grouped_records.append(group)
+            
+        # Serialize grouped records
+        serialized_list = []
+        for group in grouped_records:
+            base_rec = group[0]
+            serializer = self.get_serializer(base_rec)
+            data = serializer.data
+            
+            # Format medication_name and quantity to show all grouped items
+            med_details = [f"{item.room_stock.registry_item.name} ({item.quantity})" for item in group]
+            data['medication_name'] = ", ".join(med_details)
+            data['quantity'] = sum(item.quantity for item in group)
+            
+            serialized_list.append(data)
+            
+        # Paginate grouped data
+        page = self.paginate_queryset(serialized_list)
+        if page is not None:
+            return self.get_paginated_response(page)
+            
+        return Response(serialized_list)
+
     def create(self, request, *args, **kwargs):
         user = request.user
         project = user.project
@@ -1221,8 +1320,8 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
             if patient.employee_master and not patient.employee_master.is_active:
                 return Response({'error': 'Cannot dispense medication. The associated employee card is deactivated (e.g. transferred).'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            if not outside_name or not outside_aadhaar or not outside_phone:
-                return Response({'error': 'Name, Aadhaar Number, and Phone Number are required for outside patients'}, status=status.HTTP_400_BAD_REQUEST)
+            if not outside_name:
+                return Response({'error': 'Walk-In Patient Name is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Handle multi-item list or fallback to single item
         items_data = request.data.get('items')
@@ -1237,6 +1336,9 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
             return Response({'error': 'No items selected for dispensation'}, status=status.HTTP_400_BAD_REQUEST)
 
         from django.db import transaction
+        from django.utils import timezone
+        dispense_time = timezone.now()
+        
         try:
             with transaction.atomic():
                 dispensation_records = []
@@ -1268,7 +1370,8 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
                         outside_patient_aadhaar=outside_aadhaar,
                         outside_patient_phone=outside_phone,
                         outside_patient_details=outside_details,
-                        quantity=q
+                        quantity=q,
+                        dispensed_at=dispense_time
                     )
                     dispensation_records.append(disp)
                     

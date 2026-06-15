@@ -139,6 +139,7 @@ const Laboratory = () => {
   });
   const [hardwareMatches, setHardwareMatches] = useState([]);
   const [isFetchingMatching, setIsFetchingMatching] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [sampleData, setSampleData] = useState({
     sample_type: 'Blood',
@@ -243,6 +244,8 @@ const Laboratory = () => {
 
   const handleSaveGroupResults = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const loadingToast = toast.loading('Publishing all lab results...');
     try {
       // Submit results for all pending/collected requests in the group
@@ -293,6 +296,8 @@ const Laboratory = () => {
       fetchLabRequests();
     } catch (err) {
       toast.error("Error saving some results. Check if fields are valid.", { id: loadingToast });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1217,37 +1222,47 @@ const Laboratory = () => {
                               <button 
                                  type="submit" 
                                  className="btn btn-primary" 
+                                 disabled={isSubmitting}
                                  style={{ 
                                    width: 'auto', 
                                    padding: '0.75rem 2.5rem', 
                                    border: 'none',
-                                   background: projectConfig?.primary_color 
-                                     ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
-                                     : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                                   background: isSubmitting 
+                                     ? 'var(--text-muted)' 
+                                     : (projectConfig?.primary_color 
+                                        ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                        : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'), 
                                    borderRadius: '16px', 
                                    color: 'white',
                                    fontWeight: 900,
                                    fontSize: '0.9375rem',
-                                   cursor: 'pointer',
+                                   cursor: isSubmitting ? 'not-allowed' : 'pointer',
                                    transition: 'all 0.3s ease',
-                                   boxShadow: projectConfig?.primary_color 
-                                     ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
-                                     : '0 10px 15px -3px var(--primary-shadow)'
+                                   boxShadow: isSubmitting 
+                                     ? 'none' 
+                                     : (projectConfig?.primary_color 
+                                        ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
+                                        : '0 10px 15px -3px var(--primary-shadow)'),
+                                   opacity: isSubmitting ? 0.7 : 1
                                  }}
                                  onMouseOver={e => {
-                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                   e.currentTarget.style.boxShadow = projectConfig?.primary_color 
-                                     ? `0 12px 20px -3px ${projectConfig.primary_color}66` 
-                                     : '0 12px 20px -3px var(--primary-shadow)';
+                                   if (!isSubmitting) {
+                                     e.currentTarget.style.transform = 'translateY(-1px)';
+                                     e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                       ? `0 12px 20px -3px ${projectConfig.primary_color}66` 
+                                       : '0 12px 20px -3px var(--primary-shadow)';
+                                   }
                                  }}
                                  onMouseOut={e => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = projectConfig?.primary_color 
-                                      ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
-                                      : '0 10px 15px -3px var(--primary-shadow)';
+                                   if (!isSubmitting) {
+                                     e.currentTarget.style.transform = 'translateY(0)';
+                                     e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                       ? `0 10px 15px -3px ${projectConfig.primary_color}4d` 
+                                       : '0 10px 15px -3px var(--primary-shadow)';
+                                   }
                                  }}
                               >
-                                  Finalize & Transmit
+                                  {isSubmitting ? 'Transmitting...' : 'Finalize & Transmit'}
                               </button>
                           </div>
                       ) : (
