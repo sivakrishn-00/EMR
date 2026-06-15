@@ -37,6 +37,13 @@ class VisitSerializer(serializers.ModelSerializer):
         if not patient:
             raise serializers.ValidationError("Patient is required.")
             
+        # Check active status of linked employee
+        if patient.is_employee_linked:
+            if patient.employee_master and not patient.employee_master.is_active:
+                raise serializers.ValidationError("Cannot start visit. The associated employee card is deactivated (inactive).")
+            if patient.family_member and patient.family_member.employee and not patient.family_member.employee.is_active:
+                raise serializers.ValidationError("Cannot start visit. The associated employee card is deactivated (inactive).")
+            
         # 2. Get Project and Config
         project = patient.project
         if not project and patient.employee_master:
@@ -142,6 +149,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'patient': {'required': False}
         }
+
+    def validate(self, attrs):
+        patient = attrs.get('patient')
+        if patient and patient.is_employee_linked:
+            if patient.employee_master and not patient.employee_master.is_active:
+                raise serializers.ValidationError("Cannot schedule appointment. The associated employee card is deactivated (inactive).")
+            if patient.family_member and patient.family_member.employee and not patient.family_member.employee.is_active:
+                raise serializers.ValidationError("Cannot schedule appointment. The associated employee card is deactivated (inactive).")
+        return attrs
 
     def get_patient_name(self, obj):
         return f"{obj.patient.first_name} {obj.patient.last_name}"

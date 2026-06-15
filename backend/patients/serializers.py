@@ -154,10 +154,19 @@ class PatientSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)
     portal_status = serializers.SerializerMethodField()
     registered_by_username = serializers.CharField(source='registered_by.username', read_only=True)
+    is_active = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = '__all__'
+
+    def get_is_active(self, obj):
+        if obj.is_employee_linked:
+            if obj.employee_master:
+                return obj.employee_master.is_active
+            if obj.family_member and obj.family_member.employee:
+                return obj.family_member.employee.is_active
+        return True
 
     def get_portal_status(self, obj):
         from accounts.models import User

@@ -1084,6 +1084,20 @@ const Patients = () => {
                                 {p.relationship === 'PRIMARY CARD HOLDER' ? 'PRIMARY' : 'DEPENDENT'}
                             </span>
                           )}
+                          {p.is_active === false && (
+                            <span style={{ 
+                                marginLeft: '8px', 
+                                fontSize: '0.625rem', 
+                                background: '#fee2e2', 
+                                color: '#991b1b', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                fontWeight: 800,
+                                textTransform: 'uppercase'
+                            }}>
+                                DEACTIVATED
+                            </span>
+                          )}
                           </p>
                           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             ID: <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{p.patient_id}</span> {p.is_employee_linked && ` | Card: ${p.card_no}`}
@@ -1223,8 +1237,15 @@ const Patients = () => {
                             ) : (
                                 <button 
                                     className="btn btn-primary" 
-                                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', borderRadius: '10px', opacity: isCheckingIn === p.id ? 0.5 : 1 }}
-                                    disabled={isCheckingIn === p.id}
+                                    style={{ 
+                                        padding: '0.4rem 0.75rem', 
+                                        fontSize: '0.75rem', 
+                                        background: p.is_active === false ? '#94a3b8' : 'var(--primary)', 
+                                        borderColor: p.is_active === false ? '#94a3b8' : 'var(--primary)',
+                                        borderRadius: '10px', 
+                                        opacity: (isCheckingIn === p.id || p.is_active === false) ? 0.5 : 1 
+                                    }}
+                                    disabled={isCheckingIn === p.id || p.is_active === false}
                                     onClick={async () => {
                                         const loading = toast.loading('Initiating Arrived Status...');
                                         setIsCheckingIn(p.id);
@@ -1237,19 +1258,27 @@ const Patients = () => {
                                             toast.success("Patient Arrived & Registered!", { id: loading });
                                             fetchPatients();
                                         } catch (e) { 
-                                            toast.error("Check-in sync failed", { id: loading }); 
+                                            toast.error(e.response?.data?.error || "Check-in sync failed", { id: loading }); 
                                         } finally {
                                             setIsCheckingIn(null);
                                         }
                                     }}
                                 >
-                                    <Check size={12} /> {isCheckingIn === p.id ? 'Starting...' : 'Start Visit'}
+                                    <Check size={12} /> {isCheckingIn === p.id ? 'Starting...' : p.is_active === false ? 'Deactivated' : 'Start Visit'}
                                 </button>
                             )
                         ) : (
                             <button 
                                 className="btn btn-primary" 
-                                style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem', background: '#f59e0b', borderColor: '#f59e0b', borderRadius: '10px' }}
+                                style={{ 
+                                    padding: '0.4rem 0.75rem', 
+                                    fontSize: '0.75rem', 
+                                    background: p.is_active === false ? '#94a3b8' : '#f59e0b', 
+                                    borderColor: p.is_active === false ? '#94a3b8' : '#f59e0b', 
+                                    borderRadius: '10px',
+                                    opacity: p.is_active === false ? 0.5 : 1
+                                }}
+                                disabled={p.is_active === false}
                                 onClick={() => {
                                     setTriagePatient(p);
                                     setTriageReason('Routine Checkup');
@@ -1259,7 +1288,7 @@ const Patients = () => {
                                     setShowTriageModal(true);
                                 }}
                             >
-                                <Activity size={12} /> Intake
+                                <Activity size={12} /> {p.is_active === false ? 'Deactivated' : 'Intake'}
                             </button>
                         )}
                         {(viewMode === 'ALL' || viewMode === 'COMPLETED') && (
@@ -1573,14 +1602,18 @@ const Patients = () => {
                                                         <Loader2 size={16} className="spin" /> Searching Registry...
                                                     </div>
                                                 ) : employeeMasters.filter(emp => 
-                                                    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
-                                                    emp.card_no.includes(employeeSearchTerm)
+                                                    emp.is_active && (
+                                                        emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
+                                                        emp.card_no.includes(employeeSearchTerm)
+                                                    )
                                                 ).length === 0 ? (
                                                     <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No matching employees found</div>
                                                 ) : (
                                                     employeeMasters.filter(emp => 
-                                                        emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
-                                                        emp.card_no.includes(employeeSearchTerm)
+                                                        emp.is_active && (
+                                                            emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || 
+                                                            emp.card_no.includes(employeeSearchTerm)
+                                                        )
                                                     ).map(emp => (
                                                         <div 
                                                             key={emp.id}

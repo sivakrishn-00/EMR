@@ -126,6 +126,12 @@ class VisitViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def record_vitals(self, request, pk=None):
         visit = self.get_object()
+        patient = visit.patient
+        if patient.is_employee_linked:
+            if patient.employee_master and not patient.employee_master.is_active:
+                return Response({"error": "Cannot record vitals. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
+            if patient.family_member and patient.family_member.employee and not patient.family_member.employee.is_active:
+                return Response({"error": "Cannot record vitals. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
         vitals_instance = getattr(visit, 'vitals', None)
         serializer = VitalsSerializer(vitals_instance, data=request.data, partial=True)
         if serializer.is_valid():
@@ -149,6 +155,11 @@ class VisitViewSet(viewsets.ModelViewSet):
     def record_consultation(self, request, pk=None):
         visit = self.get_object()
         patient = visit.patient
+        if patient.is_employee_linked:
+            if patient.employee_master and not patient.employee_master.is_active:
+                return Response({"error": "Cannot record consultation. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
+            if patient.family_member and patient.family_member.employee and not patient.family_member.employee.is_active:
+                return Response({"error": "Cannot record consultation. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
         project_obj = patient.project or (patient.employee_master.project if patient.is_employee_linked and patient.employee_master else None)
         
         # Check if consultation already exists
@@ -424,6 +435,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if appt.status == 'CHECKED_IN':
             return Response({"error": "Already checked in"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check active status of linked employee
+        patient = appt.patient
+        if patient.is_employee_linked:
+            if patient.employee_master and not patient.employee_master.is_active:
+                return Response({"error": "Cannot check in. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
+            if patient.family_member and patient.family_member.employee and not patient.family_member.employee.is_active:
+                return Response({"error": "Cannot check in. The associated employee card is deactivated (inactive)."}, status=status.HTTP_400_BAD_REQUEST)
+
         # 1. Update Appointment
         appt.status = 'CHECKED_IN'
         appt.save()

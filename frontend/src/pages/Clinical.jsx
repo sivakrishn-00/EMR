@@ -797,7 +797,28 @@ const Clinical = () => {
                                    </span>
                                  )}
                                </p>
-                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}{v.vitals?.recorded_by_username ? ` | Vitals: ${v.vitals.recorded_by_username}` : ''}</p>
+                               <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                                  ID: {v.patient_details?.patient_id}{v.patient_details?.card_no ? ` | Card: ${v.patient_details.card_no}` : ''}{v.vitals?.recorded_by_username ? ` | Vitals: ${v.vitals.recorded_by_username}` : ''}
+                                  {v.patient_details?.is_active === false && (
+                                    <span 
+                                      style={{ 
+                                        marginLeft: '0.5rem', 
+                                        fontSize: '0.625rem', 
+                                        background: '#fee2e2', 
+                                        color: '#991b1b', 
+                                        padding: '2px 6px', 
+                                        borderRadius: '4px', 
+                                        fontWeight: 800,
+                                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.02em',
+                                        display: 'inline-block'
+                                      }}
+                                    >
+                                      Deactivated
+                                    </span>
+                                  )}
+                                </p>
                             </div>
                          </div>
                       </td>
@@ -807,6 +828,7 @@ const Clinical = () => {
                       </td>
                       <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                           <button 
+                            disabled={v.patient_details?.is_active === false}
                             onClick={() => {
                               setSelectedVisit(v);
                               setConsultData({
@@ -833,22 +855,23 @@ const Clinical = () => {
                               navigate('/consultations/examine');
                             }} 
                             style={{ 
-                              background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                              background: v.patient_details?.is_active === false ? '#94a3b8' : (projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'),
                               color: 'white',
                               border: 'none',
                               padding: '0.625rem 1.5rem',
                               borderRadius: '12px',
                               fontSize: '0.8125rem',
                               fontWeight: 800,
-                              cursor: 'pointer',
+                              cursor: v.patient_details?.is_active === false ? 'not-allowed' : 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.5rem',
-                              boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.25)',
-                              transition: 'all 0.2s ease'
+                              boxShadow: v.patient_details?.is_active === false ? 'none' : (projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(79, 70, 229, 0.25)'),
+                              transition: 'all 0.2s ease',
+                              opacity: v.patient_details?.is_active === false ? 0.6 : 1
                             }}
                           >
-                             Examine <Stethoscope size={16} />
+                             {v.patient_details?.is_active === false ? 'Deactivated' : 'Examine'} <Stethoscope size={16} />
                           </button>
                       </td>
                     </tr>
