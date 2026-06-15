@@ -556,7 +556,10 @@ class RegistryDataViewSet(viewsets.ModelViewSet):
             names_param = self.request.query_params.get('names')
             if names_param:
                 from django.db.models.functions import Lower
-                name_list = [n.strip().lower() for n in names_param.split(',') if n.strip()]
+                if '|' in names_param:
+                    name_list = [n.strip().lower() for n in names_param.split('|') if n.strip()]
+                else:
+                    name_list = [n.strip().lower() for n in names_param.split(',') if n.strip()]
                 queryset = queryset.annotate(name_lower=Lower('name')).filter(name_lower__in=name_list)
 
             # Workspace Search: Filter by primary identifiers (ucode/name)

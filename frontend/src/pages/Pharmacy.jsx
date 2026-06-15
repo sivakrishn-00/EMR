@@ -280,7 +280,7 @@ const Pharmacy = () => {
 
     }
 
-    const names = presc.items.map(i => i.medication_name).join(',');
+    const names = presc.items.map(i => i.medication_name).join('|');
 
     const projectId = user?.project?.id || user?.project;
 
