@@ -37,6 +37,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
   const canViewInventory = userPerms.includes('/indents/inventory') || user?.role === 'ADMIN';
   const canViewApproval = userPerms.includes('/indents/approval') || user?.role === 'ADMIN';
   const canViewIndents = userPerms.includes('/indents') || user?.role === 'ADMIN';
+  const isPharmacyUser = isPharmacy || user?.role === 'PHARMACIST' || user?.role === 'PHARMACY' || userPerms.includes('/pharmacy');
 
   const [activeTab, setActiveTab] = useState(() => {
     if (isEmbed && embedTab) return embedTab;
@@ -337,7 +338,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
     if (user?.project) {
       fetchProjectConfig(user.project.id || user.project);
     }
-  }, [user, activeTab, selectedRoom]);
+  }, [user, activeTab, activeSubTab, selectedRoom, user?.project]);
 
   // Background Polling
   useEffect(() => {
@@ -347,7 +348,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [activeTab, selectedRoom]);
+  }, [activeTab, activeSubTab, selectedRoom, user, user?.project]);
 
   const fetchProjectConfig = async (projectId) => {
     try {
@@ -765,7 +766,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
           ) : (
             <button 
               onClick={() => {
-                const target = location.state?.from || (user?.role === 'PHARMACIST' ? '/pharmacy' : '/consultations');
+                const target = location.state?.from || (isPharmacyUser ? '/pharmacy' : '/consultations');
                 navigate(target);
               }}
               style={{
@@ -793,10 +794,10 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
               }}
             >
               <ArrowLeft size={16} style={{ color: 'var(--primary)' }} />
-              {(location.state?.from === '/pharmacy' || user?.role === 'PHARMACIST') ? 'Back to Pharmacy' : 'Back to Consult Desk'}
+              {(location.state?.from === '/pharmacy' || isPharmacyUser) ? 'Back to Pharmacy' : 'Back to Consult Desk'}
             </button>
           )}
-          {activeTab !== 'approval' && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
+          {activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
             <button 
               className="btn btn-primary"
               onClick={() => setShowRequestModal(true)}
@@ -986,7 +987,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                   </button>
                 )}
               </div>
-              {isEmbed && activeTab !== 'approval' && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
+              {isEmbed && activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
                 <button 
                   className="btn btn-primary"
                   onClick={() => setShowRequestModal(true)}
@@ -1247,7 +1248,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                               Cancel
                             </button>
                           )}
-                          {ind.status === 'APPROVED' && (user?.role === 'PHARMACIST' || user?.role === 'PHARMACY' || user?.role === 'ADMIN') && (
+                          {ind.status === 'APPROVED' && isPharmacyUser && (
                             <button 
                               className="btn btn-primary"
                               onClick={() => handleDispenseIndent(ind.id)}
@@ -1270,7 +1271,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                               <CheckCircle2 size={12} /> Fulfill & Dispense
                             </button>
                           )}
-                          {ind.status !== 'PENDING_APPROVAL' && !(ind.status === 'APPROVED' && (user?.role === 'PHARMACIST' || user?.role === 'PHARMACY' || user?.role === 'ADMIN')) && (
+                          {ind.status !== 'PENDING_APPROVAL' && !(ind.status === 'APPROVED' && isPharmacyUser) && (
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Completed</span>
                           )}
                         </td>
