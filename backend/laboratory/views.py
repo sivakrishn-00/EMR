@@ -126,15 +126,20 @@ class LabRequestViewSet(viewsets.ModelViewSet):
         sample_type = data.pop('sample_type', None)
         if isinstance(sample_type, list):
             sample_type = sample_type[0] if sample_type else None
+
+        # Remove attachment if test master doesn't support attachments
+        if lab_request.test_master and not lab_request.test_master.supports_attachments:
+            data.pop('attachment', None)
             
         serializer = LabResultSerializer(result_instance, data=data, partial=True, context={'request': request})
         if serializer.is_valid():
             result_obj = serializer.save(lab_request=lab_request, recorded_by=request.user)
             
-            # Save multiple attachments
-            attachments = request.FILES.getlist('attachments')
-            for f in attachments:
-                LabResultAttachment.objects.create(result=result_obj, file=f)
+            # Save multiple attachments only if supported
+            if not lab_request.test_master or lab_request.test_master.supports_attachments:
+                attachments = request.FILES.getlist('attachments')
+                for f in attachments:
+                    LabResultAttachment.objects.create(result=result_obj, file=f)
             
             # One-step workflow supports saving sample_type here
             if sample_type:

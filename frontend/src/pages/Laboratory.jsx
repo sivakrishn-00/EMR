@@ -268,14 +268,16 @@ const Laboratory = () => {
           formData.append('interpretation', resultData.interpretation || 'Results verified.');
           formData.append('sample_type', sampleData.sample_type || '');
           
-          if (resultData.attachments && resultData.attachments.length > 0) {
-            resultData.attachments.forEach(file => {
-              formData.append('attachments', file);
-            });
-            formData.append('attachment', resultData.attachments[0]);
-          } else if (resultData.attachment) {
-            formData.append('attachment', resultData.attachment);
-            formData.append('attachments', resultData.attachment);
+          if (req.test_master_details?.supports_attachments) {
+            if (resultData.attachments && resultData.attachments.length > 0) {
+              resultData.attachments.forEach(file => {
+                formData.append('attachments', file);
+              });
+              formData.append('attachment', resultData.attachments[0]);
+            } else if (resultData.attachment) {
+              formData.append('attachment', resultData.attachment);
+              formData.append('attachments', resultData.attachment);
+            }
           }
           
           return api.post(`laboratory/requests/${req.id}/record_result/`, formData, {
