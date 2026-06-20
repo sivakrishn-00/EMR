@@ -36,38 +36,8 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
-// Animated CountUp Component
-const CountUp = ({ to, duration = 1.0 }) => {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const end = parseFloat(String(to).replace(/[^\d.-]/g, '')) || 0;
-    if (start === end) {
-      setCount(end);
-      return;
-    }
-
-    const totalMiliseconds = duration * 1000;
-    const incrementTime = 25; 
-    const totalSteps = Math.round(totalMiliseconds / incrementTime);
-    let step = 0;
-
-    const timer = setInterval(() => {
-      step++;
-      const current = end * (step / totalSteps);
-      if (step >= totalSteps) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(current);
-      }
-    }, incrementTime);
-
-    return () => clearInterval(timer);
-  }, [to, duration]);
-
-  // Format the output
+// Static Formatter Component (Previously animated CountUp)
+const CountUp = ({ to }) => {
   const str = String(to);
   const match = str.match(/^([^0-9.-]*)([0-9.,-]+)([^0-9.-]*)$/);
   if (match) {
@@ -79,7 +49,10 @@ const CountUp = ({ to, duration = 1.0 }) => {
     const hasDecimal = numPart.includes('.');
     const decimalPlaces = hasDecimal ? numPart.split('.')[1].length : 0;
     
-    const formattedNum = count.toLocaleString(undefined, {
+    // Parse the numeric part to get correct value
+    const numVal = parseFloat(numPart.replace(/,/g, '')) || 0;
+    
+    const formattedNum = numVal.toLocaleString(undefined, {
       minimumFractionDigits: decimalPlaces,
       maximumFractionDigits: decimalPlaces
     });
@@ -87,7 +60,8 @@ const CountUp = ({ to, duration = 1.0 }) => {
     return <>{prefix}{formattedNum}{suffix}</>;
   }
 
-  return <>{Math.round(count).toLocaleString()}</>;
+  const numVal = parseFloat(str.replace(/,/g, '')) || 0;
+  return <>{Math.round(numVal).toLocaleString()}</>;
 };
 
 const Reports = () => {
@@ -336,6 +310,16 @@ const Reports = () => {
 
   const exportToXLSX = async () => {
     if (activeTab === 'PERSONNEL') {
+      if (timeRange === 'custom') {
+        if (!startDate || !endDate) {
+          toast.error("Please select both Start and End dates before exporting");
+          return;
+        }
+        if (new Date(startDate) > new Date(endDate)) {
+          toast.error("Start date cannot be after End date");
+          return;
+        }
+      }
       try {
         let url = `pharmacy/audit-export/?project=${selectedProject}&employee=${selectedEmployee}&range=${timeRange}&export_format=xlsx`;
         if (timeRange === 'custom') {

@@ -607,7 +607,9 @@ class ConsumptionReportView(views.APIView):
                     e_dt = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d')) + timedelta(days=1)
                     queryset = queryset.filter(dispensed_at__range=(s_dt, e_dt))
                 except Exception:
-                    pass
+                    queryset = queryset.filter(dispensed_at__gte=now - timedelta(days=30))
+            else:
+                queryset = queryset.filter(dispensed_at__gte=now - timedelta(days=30))
 
         # 5. Aggregation Engine (MNC Standard: Clinical Dose Calculation Strategy)
         # We fetch records and calculate units based on prescription logic to ensure 100% accuracy
@@ -739,7 +741,9 @@ class ConsumptionReportView(views.APIView):
                     e_dt = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d')) + timedelta(days=1)
                     room_qs = room_qs.filter(dispensed_at__range=(s_dt, e_dt))
                 except Exception:
-                    pass
+                    room_qs = room_qs.filter(dispensed_at__gte=now - timedelta(days=30))
+            else:
+                room_qs = room_qs.filter(dispensed_at__gte=now - timedelta(days=30))
         
         if employee_id:
             room_qs = room_qs.filter(
@@ -747,37 +751,52 @@ class ConsumptionReportView(views.APIView):
                 Q(outside_patient_aadhaar=employee_id)
             )
 
-        # Group room stock dispensations that occurred at the same time to the same recipient
+        # Group room stock dispensations that occurred at the same time to the same recipient (Optimized to O(N log N))
         room_records = list(room_qs)
+        
+        def get_sort_key(rec):
+            recipient_val = rec.patient_id if rec.recipient_type == 'PATIENT' else rec.outside_patient_name
+            recipient_val = str(recipient_val or '')
+            location = rec.room_stock.location if (rec.room_stock and rec.room_stock.location) else ''
+            dispensed_at_ts = rec.dispensed_at.timestamp() if rec.dispensed_at else 0.0
+            return (
+                rec.recipient_type or '',
+                recipient_val,
+                rec.dispensed_by_id or 0,
+                location,
+                dispensed_at_ts
+            )
+
+        sorted_records = sorted(room_records, key=get_sort_key)
+        
         grouped_room = []
-        visited_room = set()
-        for i, rec in enumerate(room_records):
-            if rec.id in visited_room:
-                continue
-            group = [rec]
-            visited_room.add(rec.id)
-            for j in range(i + 1, len(room_records)):
-                other = room_records[j]
-                if other.id in visited_room:
-                    continue
-                if rec.recipient_type != other.recipient_type:
-                    continue
-                if rec.recipient_type == 'PATIENT':
-                    if rec.patient_id != other.patient_id:
-                        continue
+        if sorted_records:
+            current_group = [sorted_records[0]]
+            for rec in sorted_records[1:]:
+                prev = current_group[0]
+                
+                rec_recipient = rec.patient_id if rec.recipient_type == 'PATIENT' else rec.outside_patient_name
+                prev_recipient = prev.patient_id if prev.recipient_type == 'PATIENT' else prev.outside_patient_name
+                
+                rec_loc = rec.room_stock.location if (rec.room_stock and rec.room_stock.location) else ''
+                prev_loc = prev.room_stock.location if (prev.room_stock and prev.room_stock.location) else ''
+                
+                same_keys = (
+                    rec.recipient_type == prev.recipient_type and
+                    rec_recipient == prev_recipient and
+                    rec.dispensed_by_id == prev.dispensed_by_id and
+                    rec_loc == prev_loc
+                )
+                
+                time_diff = abs((rec.dispensed_at - prev.dispensed_at).total_seconds()) if (rec.dispensed_at and prev.dispensed_at) else 999999
+                
+                if same_keys and time_diff <= 5:
+                    current_group.append(rec)
                 else:
-                    if rec.outside_patient_name != other.outside_patient_name:
-                        continue
-                if rec.dispensed_by_id != other.dispensed_by_id:
-                    continue
-                if rec.room_stock.location != other.room_stock.location:
-                    continue
-                time_diff = abs((rec.dispensed_at - other.dispensed_at).total_seconds())
-                if time_diff > 5:
-                    continue
-                group.append(other)
-                visited_room.add(other.id)
-            grouped_room.append(group)
+                    grouped_room.append(current_group)
+                    current_group = [rec]
+            if current_group:
+                grouped_room.append(current_group)
 
         for group in grouped_room:
             disp = group[0]
