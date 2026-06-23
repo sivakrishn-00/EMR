@@ -116,6 +116,8 @@ const PatientDashboard = () => {
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [nextPageUrl, setNextPageUrl] = useState(null);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     
     // Sync tab with URL
     const currentTab = location.pathname.includes('records') ? 'Records' : 
@@ -137,10 +139,36 @@ const PatientDashboard = () => {
     const fetchNotifications = async () => {
         try {
             const res = await api.get('accounts/notifications/');
-            setNotifications(Array.isArray(res.data) ? res.data : []);
-            setUnreadCount(Array.isArray(res.data) ? res.data.filter(n => !n.is_read).length : 0);
+            if (res.data && res.data.results) {
+                setNotifications(res.data.results);
+                setUnreadCount(res.data.unread_count || 0);
+                setNextPageUrl(res.data.next);
+            } else {
+                const list = Array.isArray(res.data) ? res.data : [];
+                setNotifications(list);
+                setUnreadCount(list.filter(n => !n.is_read).length);
+                setNextPageUrl(null);
+            }
         } catch (err) {
             console.error("Notification pulse failed");
+        }
+    };
+
+    const loadMoreNotifications = async () => {
+        if (!nextPageUrl || isLoadingMore) return;
+        setIsLoadingMore(true);
+        try {
+            const relativePath = nextPageUrl.split('/api/')[1];
+            const res = await api.get(relativePath);
+            if (res.data && res.data.results) {
+                setNotifications(prev => [...prev, ...res.data.results]);
+                setNextPageUrl(res.data.next);
+                setUnreadCount(res.data.unread_count || 0);
+            }
+        } catch (err) {
+            console.error("Load more notify fail");
+        } finally {
+            setIsLoadingMore(false);
         }
     };
 
@@ -791,35 +819,62 @@ const PatientDashboard = () => {
                     )}
                 </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    {notifications.length > 0 ? notifications.map((n, i) => (
-                        <div 
-                            key={i} 
-                            style={{ 
-                                padding: '1rem', 
-                                borderBottom: i === notifications.length - 1 ? 'none' : '1px solid #f9fafb',
-                                background: n.is_read ? 'white' : '#f5f7ff',
-                                transition: '0.2s'
-                            }}
-                        >
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                <div style={{ 
-                                    width: '8px', 
-                                    height: '8px', 
-                                    borderRadius: '50%', 
-                                    background: n.is_read ? 'transparent' : 'var(--admin-blue)', 
-                                    marginTop: '4px',
-                                    flexShrink: 0 
-                                }}></div>
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>{n.title}</div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: 500, color: '#6b7280', lineHeight: 1.4 }}>{n.message}</div>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#9ca3af', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Clock size={10} /> {formatDate(n.created_at, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+                    {notifications.length > 0 ? (
+                        <>
+                            {notifications.map((n, i) => (
+                                <div 
+                                    key={i} 
+                                    style={{ 
+                                        padding: '1rem', 
+                                        borderBottom: i === notifications.length - 1 && !nextPageUrl ? 'none' : '1px solid #f9fafb',
+                                        background: n.is_read ? 'white' : '#f5f7ff',
+                                        transition: '0.2s'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        <div style={{ 
+                                            width: '8px', 
+                                            height: '8px', 
+                                            borderRadius: '50%', 
+                                            background: n.is_read ? 'transparent' : 'var(--admin-blue)', 
+                                            marginTop: '4px',
+                                            flexShrink: 0 
+                                        }}></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#111827', marginBottom: '2px' }}>{n.title}</div>
+                                            <div style={{ fontSize: '0.7rem', fontWeight: 500, color: '#6b7280', lineHeight: 1.4 }}>{n.message}</div>
+                                            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#9ca3af', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Clock size={10} /> {formatDate(n.created_at, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    )) : (
+                            ))}
+                            {nextPageUrl && (
+                                <button
+                                    onClick={loadMoreNotifications}
+                                    disabled={isLoadingMore}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        background: '#f9fafb',
+                                        border: 'none',
+                                        borderTop: '1px solid #e5e7eb',
+                                        color: 'var(--admin-blue)',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        textAlign: 'center',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                                >
+                                    {isLoadingMore ? 'Loading...' : 'Load More'}
+                                </button>
+                            )}
+                        </>
+                    ) : (
                         <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#9ca3af' }}>
                             <Bell size={24} style={{ opacity: 0.2, marginBottom: '0.5rem' }} />
                             <div style={{ fontSize: '0.75rem', fontWeight: 600 }}>No new notifications</div>

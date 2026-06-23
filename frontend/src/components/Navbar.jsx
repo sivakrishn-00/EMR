@@ -23,6 +23,28 @@ import { useAuth } from '../context/AuthContext';
 import api, { MEDIA_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  
+  if (isNaN(diffMs)) return '';
+
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
+
 const Navbar = ({ onToggleSidebar, isCollapsed }) => {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -30,6 +52,9 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [nextPageUrl, setNextPageUrl] = useState(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [masters, setMasters] = useState([]);
@@ -140,9 +165,36 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
       }
       const url = activeProject ? `accounts/notifications/?project=${activeProject}` : 'accounts/notifications/';
       const res = await api.get(url);
-      setNotifications(Array.isArray(res.data) ? res.data : (res.data.results || []));
+      if (res.data && res.data.results) {
+        setNotifications(res.data.results);
+        setUnreadCount(res.data.unread_count || 0);
+        setNextPageUrl(res.data.next);
+      } else {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setNotifications(list);
+        setUnreadCount(list.filter(n => !n.is_read).length);
+        setNextPageUrl(null);
+      }
     } catch (err) {
       console.error("Notify fail");
+    }
+  };
+
+  const loadMoreNotifications = async () => {
+    if (!nextPageUrl || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const relativePath = nextPageUrl.split('/api/')[1];
+      const res = await api.get(relativePath);
+      if (res.data && res.data.results) {
+        setNotifications(prev => [...prev, ...res.data.results]);
+        setNextPageUrl(res.data.next);
+        setUnreadCount(res.data.unread_count || 0);
+      }
+    } catch (err) {
+      console.error("Load more notify fail");
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -182,8 +234,6 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
       console.error("Mark read fail");
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const handleLogout = () => {
     logout();
@@ -620,31 +670,55 @@ const Navbar = ({ onToggleSidebar, isCollapsed }) => {
 
                   <div style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
                     {notifications.length > 0 ? (
-                      notifications.map((n, i) => (
-                        <div key={i} style={{ 
-                          padding: '0.875rem', 
-                          borderRadius: '12px', 
-                          background: n.is_read ? 'transparent' : 'rgba(99, 102, 241, 0.03)', 
-                          marginBottom: '0.5rem',
-                          border: '1px solid',
-                          borderColor: n.is_read ? 'var(--border)' : 'rgba(99, 102, 241, 0.1)',
-                          position: 'relative',
-                          transition: 'all 0.2s'
-                        }}>
-                          {!n.is_read && <div style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary)' }}></div>}
-                          <div style={{ display: 'flex', gap: '0.75rem' }}>
-                            <div style={{ paddingTop: '2px' }}>
-                              <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: n.type === 'ALERT' ? '#fef2f2' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Bell size={14} color={n.type === 'ALERT' ? '#ef4444' : 'var(--primary)'} />
+                      <>
+                        {notifications.map((n, i) => (
+                          <div key={i} style={{ 
+                            padding: '0.875rem', 
+                            borderRadius: '12px', 
+                            background: n.is_read ? 'transparent' : 'rgba(99, 102, 241, 0.03)', 
+                            marginBottom: '0.5rem',
+                            border: '1px solid',
+                            borderColor: n.is_read ? 'var(--border)' : 'rgba(99, 102, 241, 0.1)',
+                            position: 'relative',
+                            transition: 'all 0.2s'
+                          }}>
+                            {!n.is_read && <div style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary)' }}></div>}
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                              <div style={{ paddingTop: '2px' }}>
+                                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: n.type === 'ALERT' ? '#fef2f2' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Bell size={14} color={n.type === 'ALERT' ? '#ef4444' : 'var(--primary)'} />
+                                </div>
+                              </div>
+                              <div>
+                                  <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.message}</p>
+                                  <p style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: '0.375rem' }}>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {formatRelativeTime(n.created_at)}</p>
                               </div>
                             </div>
-                            <div>
-                                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.message}</p>
-                                <p style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: '0.375rem' }}>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Just now</p>
-                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                        {nextPageUrl && (
+                          <button
+                            onClick={loadMoreNotifications}
+                            disabled={isLoadingMore}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 1rem',
+                              marginTop: '0.5rem',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border)',
+                              background: 'var(--surface)',
+                              color: 'var(--primary)',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {isLoadingMore ? 'LOADING...' : 'LOAD MORE'}
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
                         <div style={{ background: 'var(--background)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>

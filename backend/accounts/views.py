@@ -154,10 +154,38 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             
         return response
 
+from rest_framework.pagination import PageNumberPagination
+
+class NotificationPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        from django.db.models import Q
+        from .models import Notification
+        user = self.request.user
+        
+        unread_qs = Notification.objects.filter(recipient=user, is_read=False)
+        if user.project:
+            unread_qs = unread_qs.filter(Q(project=user.project) | Q(project__isnull=True))
+        else:
+            project_id = self.request.query_params.get('project')
+            if project_id:
+                unread_qs = unread_qs.filter(Q(project_id=project_id) | Q(project__isnull=True))
+                
+        return Response({
+            'count': self.page.paginator.count,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'unread_count': unread_qs.count(),
+            'results': data
+        })
+
 class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = None # Return full list for dropdown
+    pagination_class = NotificationPagination
 
     def get_queryset(self):
         from django.db.models import Q
