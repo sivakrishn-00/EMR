@@ -199,12 +199,12 @@ const ThemedApp = ({ children }) => {
     } else {
       // System defaults (Admin portal theme / One unique color)
       const root = document.documentElement;
-      root.style.setProperty('--primary', '#6366f1');
+      root.style.setProperty('--primary', '#4f46e5');
       root.style.setProperty('--secondary', '#10b981');
       root.style.setProperty('--accent', '#f59e0b');
-      root.style.setProperty('--primary-dark', '#4f46e5');
+      root.style.setProperty('--primary-dark', '#4338ca');
       root.style.setProperty('--primary-light', '#818cf8');
-      root.style.setProperty('--primary-shadow', 'rgba(99, 102, 241, 0.25)');
+      root.style.setProperty('--primary-shadow', 'rgba(79, 70, 229, 0.25)');
     }
   }, [user, location.pathname]);
 

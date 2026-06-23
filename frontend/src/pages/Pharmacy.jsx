@@ -1035,7 +1035,7 @@ const Pharmacy = () => {
 
                           background: projectConfig?.primary_color 
 
-                            ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                            ? projectConfig.primary_color 
 
                             : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
 
@@ -1949,7 +1949,7 @@ const Pharmacy = () => {
 
                                  background: projectConfig?.primary_color 
 
-                                   ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                   ? projectConfig.primary_color 
 
                                    : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
 

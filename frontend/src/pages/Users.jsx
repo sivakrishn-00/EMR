@@ -1,8 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../services/api';
-import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check, ShieldCheck, Clock } from 'lucide-react';
+import { UserPlus, Search, UserCheck, Shield, Trash2, Edit, X, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Check, ShieldCheck, Clock, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: '52px',
+          borderRadius: '16px',
+          background: 'var(--background)',
+          border: '1px solid var(--border)',
+          padding: '0 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          color: 'var(--text-main)',
+          textAlign: 'left'
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={18} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '8px'
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value && <Check size={16} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Users = () => {
     const [users, setUsers] = useState([]);
@@ -93,6 +199,10 @@ const Users = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!formData.project) {
+            toast.error("Please select an Assigned Project Facility");
+            return;
+        }
         const loadingToast = toast.loading(editingUser ? 'Updating user...' : 'Creating staff member...');
         try {
             const dataToSubmit = { ...formData };
@@ -604,16 +714,15 @@ const Users = () => {
 
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                     <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Assigned Project Facility</label>
-                                    <select 
-                                        required 
-                                        className="form-control"
-                                        style={{ height: '52px', borderRadius: '16px' }}
-                                        value={formData.project} 
-                                        onChange={e => setFormData({...formData, project: e.target.value})}
-                                    >
-                                        <option value="">-- Select Project Facility --</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
+                                    <CustomSelect
+                                        options={[
+                                            { value: "", label: "-- Select Project Facility --" },
+                                            ...projects.map(p => ({ value: String(p.id), label: p.name }))
+                                        ]}
+                                        value={String(formData.project || "")}
+                                        onChange={val => setFormData({...formData, project: val})}
+                                        placeholder="-- Select Project Facility --"
+                                    />
                                 </div>
 
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>

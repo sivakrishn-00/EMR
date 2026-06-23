@@ -449,14 +449,14 @@ const AdminMasters = () => {
     if (projId && projects.length > 0) {
       const proj = projects.find(p => String(p.id) === String(projId));
       if (proj) {
-        root.style.setProperty('--primary', proj.primary_color || '#6366f1');
-        root.style.setProperty('--primary-dark', proj.primary_color || '#4f46e5');
+        root.style.setProperty('--primary', proj.primary_color || '#4f46e5');
+        root.style.setProperty('--primary-dark', proj.primary_color || '#4338ca');
         root.style.setProperty('--secondary', proj.secondary_color || '#10b981');
         root.style.setProperty('--accent', proj.accent_color || '#f59e0b');
       }
     } else {
-      root.style.setProperty('--primary', '#6366f1');
-      root.style.setProperty('--primary-dark', '#4f46e5');
+      root.style.setProperty('--primary', '#4f46e5');
+      root.style.setProperty('--primary-dark', '#4338ca');
       root.style.setProperty('--secondary', '#10b981');
       root.style.setProperty('--accent', '#f59e0b');
     }

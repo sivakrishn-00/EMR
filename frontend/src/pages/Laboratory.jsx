@@ -702,7 +702,7 @@ const Laboratory = () => {
                                   background: groupStatus === 'COMPLETED' 
                                     ? 'var(--surface)' 
                                     : (projectConfig?.primary_color 
-                                       ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                       ? projectConfig.primary_color 
                                        : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'),
                                   boxShadow: groupStatus === 'COMPLETED' 
                                     ? 'none' 
@@ -990,33 +990,33 @@ const Laboratory = () => {
                                        <button 
                                            onClick={() => applyHardwareResult(m)} 
                                            style={{ 
-                                             border: 'none', 
-                                             background: projectConfig?.primary_color 
-                                               ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
-                                               : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
-                                             color: 'white', 
-                                             padding: '6px 14px', 
-                                             borderRadius: '10px', 
-                                             fontSize: '0.75rem', 
-                                             fontWeight: 800, 
-                                             cursor: 'pointer', 
-                                             transition: 'all 0.2s ease', 
-                                             boxShadow: projectConfig?.primary_color 
-                                               ? `0 4px 10px ${projectConfig.primary_color}33` 
-                                               : '0 4px 10px var(--primary-shadow)' 
-                                           }}
-                                           onMouseOver={e => {
-                                             e.currentTarget.style.transform = 'translateY(-1px)';
-                                             e.currentTarget.style.boxShadow = projectConfig?.primary_color 
-                                               ? `0 6px 12px ${projectConfig.primary_color}4d` 
-                                               : '0 6px 12px var(--primary-shadow)';
-                                           }}
-                                           onMouseOut={e => {
-                                             e.currentTarget.style.transform = 'translateY(0)';
-                                             e.currentTarget.style.boxShadow = projectConfig?.primary_color 
-                                               ? `0 4px 10px ${projectConfig.primary_color}33` 
-                                               : '0 4px 10px var(--primary-shadow)';
-                                           }}
+                                              border: 'none', 
+                                              background: projectConfig?.primary_color 
+                                                ? projectConfig.primary_color 
+                                                : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                                              color: 'white', 
+                                              padding: '6px 14px', 
+                                              borderRadius: '10px', 
+                                              fontSize: '0.75rem', 
+                                              fontWeight: 800, 
+                                              cursor: 'pointer', 
+                                              transition: 'all 0.2s ease', 
+                                              boxShadow: projectConfig?.primary_color 
+                                                ? `0 4px 10px ${projectConfig.primary_color}33` 
+                                                : '0 4px 10px var(--primary-shadow)' 
+                                            }}
+                                            onMouseOver={e => {
+                                              e.currentTarget.style.transform = 'translateY(-1px)';
+                                              e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                                ? `0 6px 12px ${projectConfig.primary_color}4d` 
+                                                : '0 6px 12px var(--primary-shadow)';
+                                            }}
+                                            onMouseOut={e => {
+                                              e.currentTarget.style.transform = 'translateY(0)';
+                                              e.currentTarget.style.boxShadow = projectConfig?.primary_color 
+                                                ? `0 4px 10px ${projectConfig.primary_color}33` 
+                                                : '0 4px 10px var(--primary-shadow)';
+                                            }}
                                         >
                                            Apply Results
                                         </button>
@@ -1232,7 +1232,7 @@ const Laboratory = () => {
                                    background: isSubmitting 
                                      ? 'var(--text-muted)' 
                                      : (projectConfig?.primary_color 
-                                        ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` 
+                                        ? projectConfig.primary_color 
                                         : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'), 
                                    borderRadius: '16px', 
                                    color: 'white',

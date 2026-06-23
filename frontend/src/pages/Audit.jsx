@@ -1,8 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { ClipboardList, Search, Calendar, Filter, User, ChevronLeft, ChevronRight, X, Download } from 'lucide-react';
+import { ClipboardList, Search, Calendar, Filter, User, ChevronLeft, ChevronRight, X, Download, ChevronDown, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor, height = '52px' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: height,
+          borderRadius: '12px',
+          background: 'var(--background)',
+          border: '1.5px solid var(--border)',
+          padding: '0 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          color: 'var(--text-main)',
+          textAlign: 'left',
+          fontWeight: 600
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={18} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '8px'
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.625rem 1rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value && <Check size={16} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Audit = () => {
     const { user } = useAuth();
@@ -109,32 +216,17 @@ const Audit = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                     {!user?.project && (
-                        <select
-                            value={selectedProject}
-                            onChange={(e) => setSelectedProject(e.target.value)}
-                            style={{
-                                padding: '0 2.25rem 0 1rem',
-                                borderRadius: '12px',
-                                border: '1.5px solid var(--border)',
-                                background: 'var(--surface) url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") no-repeat right 0.75rem center',
-                                backgroundSize: '16px',
-                                color: 'var(--text-main)',
-                                fontWeight: 700,
-                                fontSize: '0.875rem',
-                                cursor: 'pointer',
-                                height: '44px',
-                                outline: 'none',
-                                appearance: 'none',
-                                WebkitAppearance: 'none',
-                                MozAppearance: 'none',
-                                minWidth: '160px'
-                            }}
-                        >
-                            <option value="">All Projects</option>
-                            {projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                        <CustomSelect
+                            options={[
+                                { value: "", label: "All Projects" },
+                                ...projects.map(p => ({ value: String(p.id), label: p.name }))
+                            ]}
+                            value={String(selectedProject || "")}
+                            onChange={val => setSelectedProject(val)}
+                            placeholder="All Projects"
+                            height="44px"
+                            style={{ minWidth: '160px' }}
+                        />
                     )}
                     {(startDate || endDate || searchQuery) && (
                         <button 

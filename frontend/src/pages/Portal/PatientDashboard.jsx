@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -105,7 +105,7 @@ const PatientDashboard = () => {
             console.error("PDF Generation Error:", err);
             toast.error("Failed to generate Secure PDF. Registry sync required.", { id: loadId });
         }
-    };
+    }; 
 
     const [reportView, setReportView] = useState(null); // High-fidelity Dossier Modal
     const [showBookingModal, setShowBookingModal] = useState(false);

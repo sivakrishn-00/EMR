@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../services/api';
 import { 
@@ -25,10 +25,117 @@ import {
   Loader2,
   Users,
   Database,
-  ArrowRight
+  ArrowRight,
+  ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: '52px',
+          borderRadius: '16px',
+          background: 'var(--background)',
+          border: '1px solid var(--border)',
+          padding: '0 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          color: 'var(--text-main)',
+          textAlign: 'left'
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={18} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '8px'
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value && <Check size={16} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Patients = () => {
   const { user } = useAuth();
@@ -880,7 +987,7 @@ const Patients = () => {
                 <button 
                   onClick={() => downloadMasterReport(selectedPatientForDownload, downloadVisitCount)}
                   className="btn btn-primary" 
-                  style={{ flex: 1, padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, border: 'none', boxShadow: `0 10px 15px -3px ${primaryColor}4d`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8125rem' }}
+                  style={{ flex: 1, padding: '0.875rem', borderRadius: '14px', fontWeight: 900, background: primaryColor, border: 'none', boxShadow: `0 10px 15px -3px ${primaryColor}4d`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8125rem' }}
                 >
                   <Download size={16} /> DOWNLOAD
                 </button>
@@ -934,7 +1041,7 @@ const Patients = () => {
             setIsLateEntry(false);
             setLateEntryJustification('OFFLINE_CHARTING');
             setShowModal(true);
-          }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? `linear-gradient(135deg, ${currentProject.primary_color} 0%, ${currentProject.secondary_color || currentProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px var(--primary-shadow)' }}>
+          }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '12px', background: currentProject?.primary_color ? currentProject.primary_color : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', border: 'none', color: '#fff', fontWeight: 800, boxShadow: currentProject?.primary_color ? `0 4px 12px ${currentProject.primary_color}33` : '0 4px 12px var(--primary-shadow)' }}>
             <UserPlus size={18} /> Register New Patient
           </button>
         </div>
@@ -1488,7 +1595,7 @@ const Patients = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 <div style={{ 
                     padding: '0.75rem', 
-                    background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
+                    background: activeRegProject?.primary_color ? activeRegProject.primary_color : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', 
                     borderRadius: '16px', 
                     boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px var(--primary-shadow)' 
                 }}>
@@ -1656,12 +1763,23 @@ const Patients = () => {
                             {formData.employee_master && (
                                 <div className="form-group">
                                     <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Select Family Member</label>
-                                    <select 
-                                        className="form-control"
-                                        style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
-                                        onChange={(e) => {
+                                    <CustomSelect
+                                        options={[
+                                            { value: "", label: "Self (Primary)" },
+                                            ...(employeeMasters.find(emp => emp.id == formData.employee_master)?.family_members.map(fam => ({
+                                                value: String(fam.id),
+                                                label: `${fam.relationship}: ${fam.name}`
+                                            })) || [])
+                                        ]}
+                                        value={String(formData.family_member || "")}
+                                        primaryColor={activeRegProject?.primary_color}
+                                        onChange={(val) => {
+                                            if (!val) {
+                                                setFormData({ ...formData, family_member: "" });
+                                                return;
+                                            }
                                             const emp = employeeMasters.find(em => em.id === formData.employee_master);
-                                            const fam = emp.family_members.find(f => f.id === parseInt(e.target.value));
+                                            const fam = emp.family_members.find(f => f.id === parseInt(val));
                                             if (fam) {
                                                 setFormData({
                                                     ...formData,
@@ -1678,12 +1796,7 @@ const Patients = () => {
                                                 });
                                             }
                                         }}
-                                    >
-                                        <option value="">Self (Primary)</option>
-                                        {employeeMasters.find(emp => emp.id == formData.employee_master)?.family_members.map(fam => (
-                                            <option key={fam.id} value={fam.id}>{fam.relationship}: {fam.name}</option>
-                                        ))}
-                                    </select>
+                                    />
                                 </div>
                             )}
                         </div>
@@ -1710,18 +1823,18 @@ const Patients = () => {
                             <span style={{ fontSize: '0.625rem', background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', marginLeft: 'auto', fontWeight: 900 }}>LOCKED</span>
                         </div>
                     ) : (
-                        <select 
-                            required 
-                            className="form-control"
-                            style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
-                            value={formData.project} 
-                            onChange={e => setFormData({...formData, project: e.target.value})} 
-                        >
-                            <option value="">-- Select Project --</option>
-                            {projects && Array.isArray(projects) && projects.filter(p => p.category_mappings?.some(m => m.category === 'GENERAL')).map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                        <CustomSelect
+                            options={[
+                                { value: "", label: "-- Select Project --" },
+                                ...(projects && Array.isArray(projects) ? projects.filter(p => p.category_mappings?.some(m => m.category === 'GENERAL')).map(p => ({
+                                    value: String(p.id),
+                                    label: p.name
+                                })) : [])
+                            ]}
+                            value={formData.project}
+                            primaryColor={activeRegProject?.primary_color}
+                            onChange={val => setFormData({...formData, project: val})}
+                        />
                     )}
                   </div>
                 )}
@@ -1759,17 +1872,18 @@ const Patients = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}><Fingerprint size={14} /> ID Proof Type *</label>
-                            <select 
-                                className="form-control"
-                                style={{ height: '52px', borderRadius: '16px', background: 'var(--background)' }}
-                                value={formData.id_proof_type} onChange={e => setFormData({...formData, id_proof_type: e.target.value})}
-                            >
-                                <option value="AADHAAR">Aadhaar Card</option>
-                                <option value="VOTER_ID">Voter ID</option>
-                                <option value="DRIVING_LICENCE">Driving Licence</option>
-                                <option value="PASSPORT">Passport</option>
-                                <option value="CARD_NO">Card No</option>
-                            </select>
+                            <CustomSelect
+                                options={[
+                                    { value: "AADHAAR", label: "Aadhaar Card" },
+                                    { value: "VOTER_ID", label: "Voter ID" },
+                                    { value: "DRIVING_LICENCE", label: "Driving Licence" },
+                                    { value: "PASSPORT", label: "Passport" },
+                                    { value: "CARD_NO", label: "Card No" }
+                                ]}
+                                value={formData.id_proof_type}
+                                primaryColor={activeRegProject?.primary_color}
+                                onChange={val => setFormData({...formData, id_proof_type: val})}
+                            />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>ID proof Number <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1795,17 +1909,17 @@ const Patients = () => {
 
                 <div className="form-group">
                   <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Gender <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select 
-                    required 
-                    className="form-control"
-                    style={{ height: '52px', borderRadius: '16px' }}
-                    value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}
-                  >
-                    <option value="">-- Select --</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                  <CustomSelect
+                      options={[
+                          { value: "", label: "-- Select --" },
+                          { value: "MALE", label: "Male" },
+                          { value: "FEMALE", label: "Female" },
+                          { value: "OTHER", label: "Other" }
+                      ]}
+                      value={formData.gender}
+                      primaryColor={activeRegProject?.primary_color}
+                      onChange={val => setFormData({...formData, gender: val})}
+                  />
                   {formAttempted && !formData.gender && <p style={{ color: '#ef4444', fontSize: '9px', fontWeight: 800, marginTop: '4px', textTransform: 'uppercase' }}>Required</p>}
                 </div>
 
@@ -1825,16 +1939,17 @@ const Patients = () => {
                     </div>
                     <div className="form-group">
                       <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Patient Type</label>
-                      <select 
-                        className="form-control"
-                        style={{ height: '52px', borderRadius: '16px' }}
-                        value={formData.patient_type} onChange={e => setFormData({...formData, patient_type: e.target.value})}
-                      >
-                        <option value="OPD">Outpatient (OPD)</option>
-                        <option value="IPD">Inpatient (IPD)</option>
-                        <option value="Emergency">Emergency</option>
-                        <option value="Review">Review</option>
-                      </select>
+                      <CustomSelect
+                          options={[
+                              { value: "OPD", label: "Outpatient (OPD)" },
+                              { value: "IPD", label: "Inpatient (IPD)" },
+                              { value: "Emergency", label: "Emergency" },
+                              { value: "Review", label: "Review" }
+                          ]}
+                          value={formData.patient_type}
+                          primaryColor={activeRegProject?.primary_color}
+                          onChange={val => setFormData({...formData, patient_type: val})}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1891,18 +2006,17 @@ const Patients = () => {
                           <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
                             Late Entry Justification
                           </label>
-                          <select 
-                            className="form-control"
+                          <CustomSelect
+                            options={[
+                                { value: "OFFLINE_CHARTING", label: "Offline/Paper Charting Reconciliation" },
+                                { value: "DELAYED_DOCUMENTATION", label: "Delayed Administrative Documentation" },
+                                { value: "EMERGENCY_BACKLOG", label: "Emergency Backlog Prioritization" },
+                                { value: "SYSTEM_DOWNTIME", label: "System/Network Downtime Recovery" }
+                            ]}
                             value={lateEntryJustification}
-                            onChange={(e) => setLateEntryJustification(e.target.value)}
-                            required
-                            style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
-                          >
-                            <option value="OFFLINE_CHARTING">Offline/Paper Charting Reconciliation</option>
-                            <option value="DELAYED_DOCUMENTATION">Delayed Administrative Documentation</option>
-                            <option value="EMERGENCY_BACKLOG">Emergency Backlog Prioritization</option>
-                            <option value="SYSTEM_DOWNTIME">System/Network Downtime Recovery</option>
-                          </select>
+                            primaryColor={activeRegProject?.primary_color}
+                            onChange={val => setLateEntryJustification(val)}
+                          />
                         </div>
                       </div>
                     )}
@@ -1928,7 +2042,7 @@ const Patients = () => {
                         padding: '0.75rem 2.5rem', 
                         borderRadius: '16px', 
                         fontWeight: 800,
-                        background: activeRegProject?.primary_color ? `linear-gradient(135deg, ${activeRegProject.primary_color} 0%, ${activeRegProject.secondary_color || activeRegProject.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+                        background: activeRegProject?.primary_color ? activeRegProject.primary_color : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
                         border: 'none',
                         boxShadow: activeRegProject?.primary_color ? `0 4px 12px ${activeRegProject.primary_color}33` : '0 4px 12px var(--primary-shadow)',
                         opacity: isRegistering ? 0.5 : 1

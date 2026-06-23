@@ -37,7 +37,7 @@
   --glass-bg: rgba(30, 41, 59, 0.7);
   --header-bg: #1e293b;
   --input-bg: #0f172a;
-  --sidebar-bg: #0b1120;
+  --sidebar-bg: #0f172a;
   --sidebar-text: #94a3b8;
   --sidebar-active: #ffffff;
   --alert-low: #fca5a5;
@@ -188,7 +188,23 @@ input, select, textarea {
   background: var(--input-bg, #f8fafc);
   color: var(--text-main);
 }
-input:focus {
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1.1rem;
+  padding-right: 2.5rem !important;
+  cursor: pointer;
+}
+select option {
+  background-color: var(--surface);
+  color: var(--text-main);
+  font-family: 'Outfit', sans-serif;
+}
+input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
   background: var(--surface);

@@ -855,7 +855,7 @@ const Clinical = () => {
                               navigate('/consultations/examine');
                             }} 
                             style={{ 
-                              background: v.patient_details?.is_active === false ? '#94a3b8' : (projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'),
+                              background: v.patient_details?.is_active === false ? '#94a3b8' : (projectConfig?.primary_color ? projectConfig.primary_color : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'),
                               color: 'white',
                               border: 'none',
                               padding: '0.625rem 1.5rem',
@@ -1004,7 +1004,7 @@ const Clinical = () => {
             <div className="reference-panel fade-in" style={{ height: 'auto', maxHeight: '500px', border: isLoadingHistory ? '1.5px dashed var(--border)' : `1.5px solid ${projectConfig?.primary_color || 'var(--primary)'}`, marginBottom: '2rem' }}>
                 <div className="reference-header" style={{ padding: '0.75rem 1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : (projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)') }}>
+                        <div className="dossier-icon-box" style={{ width: '32px', height: '32px', background: isLoadingHistory ? '#e2e8f0' : (projectConfig?.primary_color ? projectConfig.primary_color : 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)') }}>
                             <History size={16} color={isLoadingHistory ? '#94a3b8' : 'white'} />
                         </div>
                         <h2 className="dossier-title" style={{ fontSize: '0.9rem', color: isLoadingHistory ? '#94a3b8' : '#1e293b' }}>
@@ -1259,21 +1259,21 @@ const Clinical = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1.5px solid ' + (projectConfig?.primary_color || 'var(--border)'), display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <User size={18} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <User size={18} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <Phone size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <Phone size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <ClipboardList size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <ClipboardList size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.reason?.substring(0, 30) || 'Routine'}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <Hash size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <Hash size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
                        {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
                      </p>
@@ -2114,7 +2114,7 @@ const Clinical = () => {
                </div>
 
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '0.875rem', fontWeight: 800, borderRadius: '12px', background: projectConfig?.primary_color ? projectConfig.primary_color : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: projectConfig?.primary_color ? `0 4px 12px ${projectConfig.primary_color}33` : '0 4px 12px rgba(99, 102, 241, 0.25)' }}>
                      Confirm and Transfer Case <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>

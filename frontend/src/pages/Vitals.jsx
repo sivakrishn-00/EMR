@@ -753,7 +753,7 @@ const Vitals = () => {
                               navigate('/vitals/assess');
                           }}
                           style={{ 
-                            background: v.patient_details?.is_active === false ? '#94a3b8' : (projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'),
+                            background: v.patient_details?.is_active === false ? '#94a3b8' : (projectConfig?.primary_color ? projectConfig.primary_color : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'),
                             color: 'white',
                             border: 'none',
                             padding: '0.625rem 1.5rem',
@@ -997,21 +997,21 @@ const Vitals = () => {
               </div>
               
               {/* Patient Profile Summary */}
-              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1px solid var(--border)', display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ background: 'var(--surface)', margin: '0 0.5rem 2rem 0.5rem', padding: '1.25rem 2rem', borderRadius: '24px', border: '1.5px solid ' + (projectConfig?.primary_color || 'var(--border)'), display: 'flex', gap: '2.5rem', alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative', overflow: 'hidden' }}>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <User size={18} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <User size={18} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.patient_details?.gender || 'N/A'} / {getAge(selectedVisit.patient_details?.dob)}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <Phone size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <Phone size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>+91 {selectedVisit.patient_details?.phone ? selectedVisit.patient_details.phone.replace(/(\d{6})(\d{4})/, '$1XXXX') : 'N/A'}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <ClipboardList size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <ClipboardList size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{selectedVisit.reason || 'OPD Consultation'}</p>
                  </div>
                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                     <Hash size={16} style={{ color: 'var(--primary)', opacity: 0.8 }} />
+                     <Hash size={16} style={{ color: projectConfig?.primary_color || 'var(--primary)', opacity: 0.8 }} />
                      <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
                        {selectedVisit.patient_details?.card_no || selectedVisit.patient_details?.id_proof_number || 'N/A'}
                      </p>
@@ -1280,7 +1280,7 @@ const Vitals = () => {
 
 
                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: projectConfig?.primary_color ? `linear-gradient(135deg, ${projectConfig.primary_color} 0%, ${projectConfig.secondary_color || projectConfig.primary_color} 100%)` : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', boxShadow: projectConfig?.primary_color ? `0 10px 15px -3px ${projectConfig.primary_color}4d` : '0 10px 15px -3px var(--primary-shadow)', transition: 'all 0.3s ease' }}>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '0.9375rem', fontWeight: 900, borderRadius: '16px', background: projectConfig?.primary_color ? projectConfig.primary_color : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', boxShadow: projectConfig?.primary_color ? `0 10px 15px -3px ${projectConfig.primary_color}4d` : '0 10px 15px -3px var(--primary-shadow)', transition: 'all 0.3s ease' }}>
                      Complete Assessment <ArrowRight size={16} style={{ marginLeft: '10px' }} />
                   </button>
                </div>

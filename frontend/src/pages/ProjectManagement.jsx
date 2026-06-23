@@ -1,8 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Database, Plus, X, Pencil, Trash2, Info, Activity, AlertTriangle } from 'lucide-react';
+import { Database, Plus, X, Pencil, Trash2, Info, Activity, AlertTriangle, ChevronDown, Check } from 'lucide-react';
 import api, { MEDIA_URL } from '../services/api';
 import toast from 'react-hot-toast';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor, height = '52px' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: height,
+          borderRadius: '12px',
+          background: 'var(--background)',
+          border: '1.5px solid var(--border)',
+          padding: '0 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          color: 'var(--text-main)',
+          textAlign: 'left',
+          fontWeight: 600
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={18} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '8px'
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.625rem 1rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value && <Check size={16} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ProjectManagement = () => {
     const [projects, setProjects] = useState([]);
@@ -12,9 +119,9 @@ const ProjectManagement = () => {
         description: '',
         logo: null,
         categories: [],
-        primary_color: '#1e3a8a',
-        secondary_color: '#a5b4fc',
-        accent_color: '#f43f5e',
+        primary_color: '#4f46e5',
+        secondary_color: '#10b981',
+        accent_color: '#f59e0b',
         allow_appointments: true,
         use_registry_for_personnel: false,
         vitals_mandatory: true,
@@ -86,7 +193,7 @@ const ProjectManagement = () => {
             });
 
             toast.success(isEditing ? "Project Configuration Updated!" : "Project K Initialized & Mapped!", { id: loadId });
-            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false });
+            setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#4f46e5', secondary_color: '#10b981', accent_color: '#f59e0b', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false });
             setLogoPreview(null);
             setIsEditing(false);
             setEditingProjectId(null);
@@ -104,9 +211,9 @@ const ProjectManagement = () => {
             description: p.description || '',
             categories: p.category_mappings?.map(m => m.category) || [],
             logo: null,
-            primary_color: p.primary_color || '#6366f1',
-            secondary_color: p.secondary_color || '#a5b4fc',
-            accent_color: p.accent_color || '#f43f5e',
+            primary_color: p.primary_color || '#4f46e5',
+            secondary_color: p.secondary_color || '#10b981',
+            accent_color: p.accent_color || '#f59e0b',
             allow_appointments: p.allow_appointments ?? true,
             use_registry_for_personnel: p.use_registry_for_personnel ?? false,
             vitals_mandatory: p.vitals_mandatory ?? true,
@@ -230,7 +337,7 @@ const ProjectManagement = () => {
                             <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>{isEditing ? 'Update Configuration' : 'Initialize New Project'}</h2>
                             {isEditing && (
                                 <button 
-                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#6366f1', secondary_color: '#a5b4fc', accent_color: '#f43f5e', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false }); setLogoPreview(null); }}
+                                    onClick={() => { setIsEditing(false); setEditingProjectId(null); setProjectFormData({ name: '', description: '', logo: null, categories: [], primary_color: '#4f46e5', secondary_color: '#10b981', accent_color: '#f59e0b', allow_appointments: true, use_registry_for_personnel: false, vitals_mandatory: true, allow_custom_visit_date: false }); setLogoPreview(null); }}
                                     style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                                 >
                                     CANCEL EDIT
@@ -281,8 +388,8 @@ const ProjectManagement = () => {
                                     <label style={{ fontWeight: 700, margin: 0 }}>Project Theme Colors</label>
                                     <button 
                                         type="button"
-                                        onClick={() => setProjectFormData({ ...projectFormData, primary_color: '#1e3a8a', secondary_color: '#a5b4fc', accent_color: '#f43f5e' })}
-                                        style={{ background: 'rgba(30, 58, 138, 0.05)', border: '1px solid #1e3a8a', color: '#1e3a8a', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}
+                                        onClick={() => setProjectFormData({ ...projectFormData, primary_color: '#4f46e5', secondary_color: '#10b981', accent_color: '#f59e0b' })}
+                                        style={{ background: 'rgba(79, 70, 229, 0.05)', border: '1px solid #4f46e5', color: '#4f46e5', fontSize: '0.65rem', fontWeight: 800, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}
                                     >
                                         RESTORE ELITE DEFAULT
                                     </button>
@@ -679,22 +786,22 @@ const BrandingManager = ({ projects }) => {
                         <div style={{ padding: '8px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '10px' }}>
                             <Activity size={20} color="var(--primary)" />
                         </div>
-                        <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>Project Branding Manager</h2>
+                        <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>Project Logos</h2>
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>SELECT PROJECT:</p>
-                        <select 
-                            className="form-control" 
-                            style={{ width: '240px', height: '40px', fontWeight: 600 }}
-                            value={selectedProjectId}
-                            onChange={e => setSelectedProjectId(e.target.value)}
-                        >
-                            <option value="">Choose a project...</option>
-                            {Array.isArray(projects) && projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
+                        <CustomSelect
+                            options={[
+                                { value: "", label: "Choose a project..." },
+                                ...(Array.isArray(projects) ? projects.map(p => ({ value: String(p.id), label: p.name })) : [])
+                            ]}
+                            value={String(selectedProjectId || "")}
+                            onChange={val => setSelectedProjectId(val)}
+                            placeholder="Choose a project..."
+                            height="40px"
+                            style={{ width: '240px' }}
+                        />
                     </div>
                 </div>
                 
