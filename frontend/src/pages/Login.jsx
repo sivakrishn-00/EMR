@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   ArrowRight,
   Loader2,
-  ChevronLeft
+  ChevronLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const Login = () => {
@@ -35,6 +37,9 @@ const Login = () => {
   const [otpArray, setOtpArray] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   //  SECURITY: Clean gateway entry
   useEffect(() => {
@@ -330,7 +335,7 @@ const Login = () => {
                 <label className="f-lbl">Individual / Personnel ID</label>
                 <div className="f-wrap">
                   <UserIcon size={18} color="#94a3b8" />
-                  <input className="f-input" placeholder="e.g. BHSPL0006 or admin" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+                  <input className="f-input" placeholder="Enter username" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
                 </div>
               </div>
               <button className="g-btn" type="submit" disabled={isLoading}>
@@ -364,8 +369,25 @@ const Login = () => {
             
             <form onSubmit={handleStaffLogin}>
               <div className="f-group">
-                <label className="f-lbl">Master Password</label>
-                <div className="f-wrap"><Lock size={18} color="#94a3b8" /><input className="f-input" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
+                <label className="f-lbl">Password</label>
+                <div className="f-wrap">
+                  <Lock size={18} color="#94a3b8" />
+                  <input 
+                    className="f-input" 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="Enter password" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button className="g-btn" type="submit" disabled={isLoading}>{isLoading ? <Loader2 size={18} className="spin" /> : 'Authorize Access'}</button>
             </form>
@@ -383,7 +405,24 @@ const Login = () => {
               {authMode === 'PASSWORD' ? (
                 <div className="f-group">
                   <label className="f-lbl">Password</label>
-                  <div className="f-wrap"><Lock size={18} color="#94a3b8" /><input className="f-input" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
+                  <div className="f-wrap">
+                    <Lock size={18} color="#94a3b8" />
+                    <input 
+                      className="f-input" 
+                      type={showPassword ? "text" : "password"} 
+                      placeholder="Enter password" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      required 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="f-group animate-in">
@@ -433,11 +472,45 @@ const Login = () => {
             <form onSubmit={handleFinalizePassword}>
               <div className="f-group">
                 <label className="f-lbl">New Password</label>
-                <div className="f-wrap"><Lock size={18} color="#94a3b8" /><input className="f-input" type="password" placeholder="Min. 6 chars" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
+                <div className="f-wrap">
+                  <Lock size={18} color="#94a3b8" />
+                  <input 
+                    className="f-input" 
+                    type={showNewPassword ? "text" : "password"} 
+                    placeholder="Min. 6 chars" 
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)} 
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowNewPassword(!showNewPassword)} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div className="f-group">
                 <label className="f-lbl">Confirm Password</label>
-                <div className="f-wrap"><ShieldCheck size={18} color="#94a3b8" /><input className="f-input" type="password" placeholder="Repeat password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
+                <div className="f-wrap">
+                  <ShieldCheck size={18} color="#94a3b8" />
+                  <input 
+                    className="f-input" 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    placeholder="Repeat password" 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button className="g-btn" type="submit" disabled={isLoading}>{isLoading ? <Loader2 size={18} className="spin" /> : 'Finalize Credentials'}</button>
             </form>

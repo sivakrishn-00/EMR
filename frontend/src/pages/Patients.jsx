@@ -32,7 +32,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 // Reusable Custom Select Dropdown for enhanced UI aesthetics
-const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor }) => {
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor, height = '52px', borderRadius = '16px' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -56,9 +56,9 @@ const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', sty
         className="form-control"
         style={{
           width: '100%',
-          height: '52px',
-          borderRadius: '16px',
-          background: 'var(--background)',
+          height: height,
+          borderRadius: borderRadius,
+          background: 'var(--surface)',
           border: '1px solid var(--border)',
           padding: '0 1.25rem',
           display: 'flex',
@@ -68,7 +68,10 @@ const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', sty
           fontFamily: 'inherit',
           fontSize: '0.875rem',
           color: 'var(--text-main)',
-          textAlign: 'left'
+          textAlign: 'left',
+          boxShadow: isOpen ? `0 0 0 3px ${(primaryColor || 'var(--primary)')}20` : 'none',
+          borderColor: isOpen ? (primaryColor || 'var(--primary)') : 'var(--border)',
+          transition: 'all 0.2s ease'
         }}
       >
         <span>{selectedOption ? selectedOption.label : placeholder}</span>
@@ -89,12 +92,13 @@ const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', sty
           marginTop: '6px',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: '16px',
+          borderRadius: borderRadius,
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
           zIndex: 1000,
           maxHeight: '250px',
           overflowY: 'auto',
-          padding: '6px'
+          padding: '6px',
+          animation: 'fadeIn 0.15s ease'
         }}>
           {options.map((opt) => (
             <div
@@ -1010,8 +1014,9 @@ const Patients = () => {
 
 
 
-  const currentProject = projects.find(p => p.id == (projectFilter || user?.project));
-  const activeRegProject = projects.find(p => p.id == (formData.project || user?.project));
+  const isAdmin = user?.role === 'ADMIN';
+  const currentProject = !isAdmin ? projects.find(p => p.id == (projectFilter || user?.project)) : null;
+  const activeRegProject = !isAdmin ? projects.find(p => p.id == (formData.project || user?.project)) : null;
 
   return (
     <div className="fade-in">
@@ -1128,15 +1133,19 @@ const Patients = () => {
             )}
           </div>
           {user?.role === 'ADMIN' && (
-              <select 
-                  className="form-control" 
-                  style={{ flex: '1 1 200px', height: '44px', background: 'var(--surface)', color: 'var(--text-main)', border: '1px solid var(--border)' }}
+              <CustomSelect
+                  options={[
+                      { value: "", label: "Global Filter (All Projects)" },
+                      ...projects.map(p => ({ value: String(p.id), label: p.name }))
+                  ]}
                   value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
-              >
-                  <option value="">Global Filter (All Projects)</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+                  primaryColor={currentProject?.primary_color}
+                  onChange={(val) => setProjectFilter(val)}
+                  style={{ flex: '1 1 200px' }}
+                  height="44px"
+                  borderRadius="12px"
+                  placeholder="Global Filter (All Projects)"
+              />
           )}
           {/* Filter button removed */}
         </div>
@@ -2057,138 +2066,158 @@ const Patients = () => {
       )}
 
       {/* INSTANT INTAKE MODAL FOR EXISTING PATIENTS */}
-      {showTriageModal && triagePatient && createPortal(
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div className="fade-in" style={{ background: 'var(--surface)', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px -4px rgba(245, 158, 11, 0.3)' }}>
-                  <Activity size={24} color="white" />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: '#1e293b' }}>Confirm Intake</h2>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Create new visit for returning patient</p>
-                </div>
-              </div>
-              <button onClick={() => setShowTriageModal(false)} style={{ border: 'none', background: '#f1f5f9', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
-              </button>
-            </div>
+      {showTriageModal && triagePatient && (() => {
+        const isAdmin = user?.role === 'ADMIN';
+        const triageProject = !isAdmin ? projects.find(p => p.id == (triagePatient.project || triagePatient.project_id)) : null;
+        const triagePrimaryColor = triageProject?.primary_color || 'var(--primary)';
+        const triageSecondaryColor = triageProject?.secondary_color || 'var(--primary-dark)';
 
-            <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)', marginBottom: '2rem' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#4f46e5', fontSize: '1rem' }}>
-                    {triagePatient.first_name[0]}
+        return createPortal(
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <div className="fade-in" style={{ background: 'var(--surface)', padding: '2.5rem', borderRadius: '28px', width: '100%', maxWidth: '480px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ 
+                    width: '48px', height: '48px', 
+                    background: `linear-gradient(135deg, ${triagePrimaryColor} 0%, ${triageSecondaryColor} 100%)`, 
+                    borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    boxShadow: `0 8px 16px -4px ${triagePrimaryColor}4d` 
+                  }}>
+                    <Activity size={24} color="white" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>{triagePatient.first_name} {triagePatient.last_name}</h3>
-                    <p style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>UHID: {triagePatient.patient_id} • {triagePatient.phone}</p>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Confirm Intake</h2>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Create new visit for returning patient</p>
                   </div>
-               </div>
-               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-                  Linked Project: {triagePatient.project_name || 'General Registry'}
-               </div>
-            </div>
-
-            <form onSubmit={handleInstantTriageSubmit}>
-              <div className="form-group" style={{ marginBottom: '2.5rem' }}>
-                <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Info size={14} /> Reason for Visit <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <select 
-                  className="form-control"
-                  style={{ height: '54px', borderRadius: '16px', background: 'var(--background)', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.875rem' }}
-                  value={triageReason}
-                  onChange={(e) => setTriageReason(e.target.value)}
-                  required
-                >
-                  <option value="Routine Checkup">Routine Checkup</option>
-                  <option value="Follow-up">Follow-up Visit</option>
-                  <option value="OPD Consultation">OPD Consultation</option>
-                  <option value="Emergency Care">Emergency Care</option>
-                  <option value="Diagnostic Review">Diagnostic Review</option>
-                </select>
-              </div>
-              
-              {projects.find(p => p.id == (triagePatient.project || triagePatient.project_id))?.allow_custom_visit_date && (
-                <div style={{ marginBottom: '2rem', background: '#f8fafc', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem', color: '#334155' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={isLateEntry} 
-                      onChange={(e) => setIsLateEntry(e.target.checked)} 
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                    Late Entry / Backdated Visit
-                  </label>
-                  
-                  {isLateEntry && (
-                    <div className="fade-in" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div>
-                        <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
-                          Visit Date & Time
-                        </label>
-                        <input 
-                          type="datetime-local" 
-                          className="form-control" 
-                          value={visitDate}
-                          onChange={(e) => setVisitDate(e.target.value)}
-                          max={getLocalISOString()}
-                          required
-                          style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>
-                          Late Entry Justification
-                        </label>
-                        <select 
-                          className="form-control"
-                          value={lateEntryJustification}
-                          onChange={(e) => setLateEntryJustification(e.target.value)}
-                          required
-                          style={{ height: '48px', borderRadius: '12px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
-                        >
-                          <option value="OFFLINE_CHARTING">Offline/Paper Charting Reconciliation</option>
-                          <option value="DELAYED_DOCUMENTATION">Delayed Administrative Documentation</option>
-                          <option value="EMERGENCY_BACKLOG">Emergency Backlog Prioritization</option>
-                          <option value="SYSTEM_DOWNTIME">System/Network Downtime Recovery</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  style={{ 
-                    padding: '1rem', borderRadius: '18px', fontWeight: 900, letterSpacing: '0.01em',
-                    background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', border: 'none',
-                    boxShadow: '0 10px 15px -3px var(--primary-shadow)',
-                    opacity: isTriaging ? 0.5 : 1
-                  }}
-                  disabled={isTriaging}
-                >
-                  {isTriaging ? 'Starting...' : 'START CLINICAL VISIT'}
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowTriageModal(false)}
-                  style={{ padding: '0.875rem', borderRadius: '18px', fontWeight: 800, border: '1px solid var(--border)', background: 'var(--surface)' }}
-                >
-                  Back to Registry
+                <button onClick={() => setShowTriageModal(false)} style={{ border: 'none', background: 'var(--background)', width: '36px', height: '36px', borderRadius: '12px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={20} />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+
+              <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)', marginBottom: '2rem' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ 
+                      width: '40px', height: '40px', background: 'var(--surface)', border: '1px solid var(--border)', 
+                      borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      fontWeight: 900, color: triagePrimaryColor, fontSize: '1rem' 
+                    }}>
+                      {triagePatient.first_name[0]}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-main)' }}>{triagePatient.first_name} {triagePatient.last_name}</h3>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>UHID: {triagePatient.patient_id} • {triagePatient.phone}</p>
+                    </div>
+                 </div>
+                 <div style={{ 
+                   fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', 
+                   letterSpacing: '0.05em', borderTop: '1px solid var(--border)', paddingTop: '10px',
+                   display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
+                 }}>
+                    <span>Linked Project</span>
+                    <span style={{ color: triagePrimaryColor, fontWeight: 900 }}>{triagePatient.project_name || 'General Registry'}</span>
+                 </div>
+              </div>
+
+              <form onSubmit={handleInstantTriageSubmit}>
+                <div className="form-group" style={{ marginBottom: '2rem' }}>
+                  <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Info size={14} /> Reason for Visit <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <CustomSelect
+                    options={[
+                      { value: "Routine Checkup", label: "Routine Checkup" },
+                      { value: "Follow-up", label: "Follow-up Visit" },
+                      { value: "OPD Consultation", label: "OPD Consultation" },
+                      { value: "Emergency Care", label: "Emergency Care" },
+                      { value: "Diagnostic Review", label: "Diagnostic Review" }
+                    ]}
+                    value={triageReason}
+                    primaryColor={triagePrimaryColor}
+                    onChange={(val) => setTriageReason(val)}
+                  />
+                </div>
+                
+                {projects.find(p => p.id == (triagePatient.project || triagePatient.project_id))?.allow_custom_visit_date && (
+                  <div style={{ marginBottom: '2rem', background: 'var(--background)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-main)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isLateEntry} 
+                        onChange={(e) => setIsLateEntry(e.target.checked)} 
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: triagePrimaryColor }}
+                      />
+                      Late Entry / Backdated Visit
+                    </label>
+                    
+                    {isLateEntry && (
+                      <div className="fade-in" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div>
+                          <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>
+                            Visit Date & Time
+                          </label>
+                          <input 
+                            type="datetime-local" 
+                            className="form-control" 
+                            value={visitDate}
+                            onChange={(e) => setVisitDate(e.target.value)}
+                            max={getLocalISOString()}
+                            required
+                            style={{ height: '52px', borderRadius: '16px', background: 'var(--surface)', color: 'var(--text-main)', fontWeight: 700 }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label style={{ fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>
+                            Late Entry Justification
+                          </label>
+                          <CustomSelect
+                            options={[
+                              { value: "OFFLINE_CHARTING", label: "Offline/Paper Charting Reconciliation" },
+                              { value: "DELAYED_DOCUMENTATION", label: "Delayed Administrative Documentation" },
+                              { value: "EMERGENCY_BACKLOG", label: "Emergency Backlog Prioritization" },
+                              { value: "SYSTEM_DOWNTIME", label: "System/Network Downtime Recovery" }
+                            ]}
+                            value={lateEntryJustification}
+                            primaryColor={triagePrimaryColor}
+                            onChange={val => setLateEntryJustification(val)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '2.5rem' }}>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    style={{ 
+                      padding: '1rem', borderRadius: '18px', fontWeight: 900, letterSpacing: '0.01em',
+                      background: `linear-gradient(135deg, ${triagePrimaryColor} 0%, ${triageSecondaryColor} 100%)`, border: 'none',
+                      boxShadow: `0 10px 15px -3px ${triagePrimaryColor}4d`,
+                      opacity: isTriaging ? 0.5 : 1,
+                      color: 'white'
+                    }}
+                    disabled={isTriaging}
+                  >
+                    {isTriaging ? 'Starting...' : 'START CLINICAL VISIT'}
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowTriageModal(false)}
+                    style={{ padding: '0.875rem', borderRadius: '18px', fontWeight: 800, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-main)' }}
+                  >
+                    Back to Registry
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
       {/* MODAL 2: Register in Masters (Ported for AP-GENCO Access) */}
       {showMasterModal && createPortal(
         <div className="modal-overlay" style={{ background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(12px)", zIndex: 100000 }}>
@@ -2210,24 +2239,31 @@ const Patients = () => {
             <form onSubmit={handleMasterOnboardingSubmit} style={{ padding: "2rem" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
                 <div className="form-group">
-                  <label>Card No *</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Card No *</label>
                   <input required readOnly value={masterFormData.card_no} placeholder="Auto-generating..." className="form-control" style={{ background: '#f8fafc', cursor: 'not-allowed', color: '#64748b' }} />
                 </div>
                 <div className="form-group">
-                  <label>Full Name *</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Full Name *</label>
                   <input required value={masterFormData.name} onChange={(e) => setMasterFormData({ ...masterFormData, name: e.target.value })} placeholder="e.g. P. BABU RAO" className="form-control" />
                 </div>
                 <div className="form-group">
-                  <label>DOB *</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>DOB *</label>
                   <input type="date" required max={new Date().toLocaleDateString('en-CA')} value={masterFormData.dob} onChange={(e) => setMasterFormData({ ...masterFormData, dob: e.target.value })} className="form-control" />
                 </div>
                 <div className="form-group">
-                  <label>Gender *</label>
-                  <select value={masterFormData.gender} onChange={(e) => setMasterFormData({ ...masterFormData, gender: e.target.value })} className="form-control">
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>Gender *</label>
+                  <CustomSelect
+                    options={[
+                      { value: "MALE", label: "Male" },
+                      { value: "FEMALE", label: "Female" },
+                      { value: "OTHER", label: "Other" }
+                    ]}
+                    value={masterFormData.gender}
+                    primaryColor={activeRegProject?.primary_color}
+                    onChange={(val) => setMasterFormData({ ...masterFormData, gender: val })}
+                    height="44px"
+                    borderRadius="8px"
+                  />
                 </div>
                 <div className="form-group">
                   <label>Mobile No *</label>
@@ -2349,35 +2385,49 @@ const Patients = () => {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>Full Name *</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Full Name *</label>
                   <input required value={familyFormData.name} onChange={(e) => setFamilyFormData({ ...familyFormData, name: e.target.value })} placeholder="e.g. Baby.P. SONITHA" className="form-control" />
                 </div>
                 <div className="form-group">
-                  <label>DOB *</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>DOB *</label>
                   <input type="date" required max={new Date().toLocaleDateString('en-CA')} value={familyFormData.dob} onChange={(e) => setFamilyFormData({ ...familyFormData, dob: e.target.value })} className="form-control" />
                 </div>
                 <div className="form-group">
-                  <label>Relationship *</label>
-                  <select value={familyFormData.relationship} onChange={(e) => setFamilyFormData({ ...familyFormData, relationship: e.target.value })} className="form-control">
-                    <option value="SPOUSE">Spouse</option>
-                    <option value="WIFE">Wife</option>
-                    <option value="HUSBAND">Husband</option>
-                    <option value="SON">Son</option>
-                    <option value="DAUGHTER">Daughter</option>
-                    <option value="FATHER">Father</option>
-                    <option value="MOTHER">Mother</option>
-                    <option value="BROTHER">Brother</option>
-                    <option value="SISTER">Sister</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>Relationship *</label>
+                  <CustomSelect
+                    options={[
+                      { value: "SPOUSE", label: "Spouse" },
+                      { value: "WIFE", label: "Wife" },
+                      { value: "HUSBAND", label: "Husband" },
+                      { value: "SON", label: "Son" },
+                      { value: "DAUGHTER", label: "Daughter" },
+                      { value: "FATHER", label: "Father" },
+                      { value: "MOTHER", label: "Mother" },
+                      { value: "BROTHER", label: "Brother" },
+                      { value: "SISTER", label: "Sister" },
+                      { value: "OTHER", label: "Other" }
+                    ]}
+                    value={familyFormData.relationship}
+                    primaryColor={activeRegProject?.primary_color}
+                    onChange={(val) => setFamilyFormData({ ...familyFormData, relationship: val })}
+                    height="44px"
+                    borderRadius="8px"
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Gender *</label>
-                  <select value={familyFormData.gender} onChange={(e) => setFamilyFormData({ ...familyFormData, gender: e.target.value })} className="form-control">
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'block' }}>Gender *</label>
+                  <CustomSelect
+                    options={[
+                      { value: "MALE", label: "Male" },
+                      { value: "FEMALE", label: "Female" },
+                      { value: "OTHER", label: "Other" }
+                    ]}
+                    value={familyFormData.gender}
+                    primaryColor={activeRegProject?.primary_color}
+                    onChange={(val) => setFamilyFormData({ ...familyFormData, gender: val })}
+                    height="44px"
+                    borderRadius="8px"
+                  />
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>
