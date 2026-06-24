@@ -228,12 +228,12 @@ function App() {
             <ToastBar 
               toast={t}
               style={{
-                background: 'var(--surface)',
-                color: 'var(--text-main)',
+                background: 'var(--sidebar-bg)',
+                color: 'var(--sidebar-text)',
                 borderRadius: '16px',
                 padding: '8px 16px',
-                border: '1px solid var(--border)',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
                 fontFamily: "'Outfit', sans-serif",
                 fontSize: '0.875rem',
                 fontWeight: 600,
@@ -255,7 +255,7 @@ function App() {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--text-muted)',
+                        color: 'var(--sidebar-text)',
                         cursor: 'pointer',
                         marginLeft: '8px',
                         padding: '4px 8px',
@@ -269,13 +269,13 @@ function App() {
                         opacity: 0.6
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--background)';
-                        e.currentTarget.style.color = 'var(--text-main)';
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.color = '#ffffff';
                         e.currentTarget.style.opacity = '1';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'none';
-                        e.currentTarget.style.color = 'var(--text-muted)';
+                        e.currentTarget.style.color = 'var(--sidebar-text)';
                         e.currentTarget.style.opacity = '0.6';
                       }}
                     >
