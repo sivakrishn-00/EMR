@@ -22,7 +22,7 @@ import OperationsHub from './pages/OperationsHub';
 import BridgeHub from './pages/BridgeHub';
 import Indents from './pages/Indents';
 import PatientDashboard from './pages/Portal/PatientDashboard';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastBar, toast } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children, requiredModule }) => {
   const { user, loading } = useAuth();
@@ -223,21 +223,70 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ThemedApp>
-        <Toaster position="top-right" 
-          containerStyle={{ zIndex: 9999999 }}
-          toastOptions={{
-            style: {
-              borderRadius: '12px',
-              background: '#1e293b',
-              color: '#fff',
-              fontSize: '14px',
-              padding: '12px 24px',
-            },
-            success: {
-              iconTheme: { primary: '#10b981', secondary: '#fff' }
-            }
-          }} 
-        />
+        <Toaster position="top-right" containerStyle={{ zIndex: 9999999 }}>
+          {(t) => (
+            <ToastBar 
+              toast={t}
+              style={{
+                background: 'var(--surface)',
+                color: 'var(--text-main)',
+                borderRadius: '16px',
+                padding: '8px 16px',
+                border: '1px solid var(--border)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                fontFamily: "'Outfit', sans-serif",
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                maxWidth: '400px'
+              }}
+            >
+              {({ icon, message }) => (
+                <>
+                  {icon}
+                  <div style={{ flex: 1, padding: '0 4px', display: 'flex', alignItems: 'center', lineHeight: '1.4' }}>
+                    {message}
+                  </div>
+                  {t.type !== 'loading' && (
+                    <button 
+                      onClick={() => toast.dismiss(t.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        marginLeft: '8px',
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        fontSize: '18px',
+                        lineHeight: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        opacity: 0.6
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--background)';
+                        e.currentTarget.style.color = 'var(--text-main)';
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'none';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                        e.currentTarget.style.opacity = '0.6';
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </>
+              )}
+            </ToastBar>
+          )}
+        </Toaster>
         <Routes>
           <Route path="/login" element={<Login />} />
           
