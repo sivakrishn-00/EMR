@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -31,11 +31,126 @@ import {
   RotateCcw,
   Sun,
   RefreshCw,
-  Image
+  Image,
+  Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import Indents from './Indents';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor, height = '52px', borderRadius = '16px' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: height,
+          borderRadius: borderRadius,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          padding: style.padding || '0 0.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: style.fontSize || '0.875rem',
+          fontWeight: style.fontWeight || 'normal',
+          color: 'var(--text-main)',
+          textAlign: 'left',
+          boxShadow: isOpen ? `0 0 0 3px ${(primaryColor || 'var(--primary)')}20` : 'none',
+          borderColor: isOpen ? (primaryColor || 'var(--primary)') : 'var(--border)',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown size={14} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '4px',
+          flexShrink: 0
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: borderRadius,
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px',
+          animation: 'fadeIn 0.15s ease'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.5rem 0.75rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: style.fontSize || '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+              {value === opt.value && <Check size={14} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 const Clinical = () => {
@@ -1627,20 +1742,25 @@ const Clinical = () => {
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr 0.8fr 1fr 1fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {/* ITEM GROUP DROPDOWN */}
-                      <select
+                      <CustomSelect
+                        options={[
+                          { value: "", label: "SELECT GROUP" },
+                          ...([...new Set(pharmacyInventory.map(d => getDrugGroup(d).toUpperCase()))].sort().map(g => ({
+                            value: g,
+                            label: g
+                          })))
+                        ]}
                         value={selectedGroup}
-                        onChange={e => {
-                          setSelectedGroup(e.target.value);
+                        primaryColor={projectConfig?.primary_color}
+                        height="36px"
+                        borderRadius="12px"
+                        style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                        onChange={val => {
+                          setSelectedGroup(val);
                           setDrugSearch('');
-                          setNewMed({...newMed, name: '', item_code: '', item_group: e.target.value});
+                          setNewMed({...newMed, name: '', item_code: '', item_group: val});
                         }}
-                        style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 700 }}
-                      >
-                        <option value="">SELECT GROUP</option>
-                        {[...new Set(pharmacyInventory.map(d => getDrugGroup(d).toUpperCase()))].sort().map(g => (
-                          <option key={g} value={g}>{g}</option>
-                        ))}
-                      </select>
+                      />
 
                       <div style={{ position: 'relative' }}>
                         <div style={{ position: 'relative' }}>
@@ -1757,39 +1877,47 @@ const Clinical = () => {
                           onChange={e => setNewMed({...newMed, dosage: e.target.value})} 
                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem', fontWeight: 800, color: 'var(--text-main)' }} 
                        />
-                       <select 
-                          value={newMed.frequency} 
-                          onChange={e => setNewMed({...newMed, frequency: e.target.value})} 
-                          style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem' }}
-                       >
-                           <option value="1-0-1">1-0-1</option>
-                           <option value="1-1-1">1-1-1</option>
-                           <option value="0.5-0-0.5">0.5-0-0.5 (Half Morning/Night)</option>
-                           <option value="0.5-0-0">0.5-0-0 (Half Morning Only)</option>
-                           <option value="0-0-0.5">0-0-0.5 (Half Night Only)</option>
-                           <option value="0.5-0.5-0.5">0.5-0.5-0.5 (Half Thrice a day)</option>
-                           <option value="1-0-0">1-0-0 (Morning Only)</option>
-                           <option value="0-1-0">0-1-0 (Afternoon Only)</option>
-                           <option value="0-0-1">0-0-1 (Night Only)</option>
-                           <option value="1-1-0">1-1-0 (Morning/Afternoon)</option>
-                           <option value="0-1-1">0-1-1 (Afternoon/Night)</option>
-                           <option value="OD">OD (Once a day)</option>
-                           <option value="BD">BD (Twice a day)</option>
-                           <option value="TDS">TDS (Thrice a day)</option>
-                           <option value="QID">QID (Four times a day)</option>
-                           <option value="HS">HS (At Bedtime)</option>
-                           <option value="SOS">SOS (When needed)</option>
-                           <option value="STAT">STAT (Immediately)</option>
-                       </select>
-                       <select 
-                           value={newMed.timing} 
-                           onChange={e => setNewMed({...newMed, timing: e.target.value})} 
-                           style={{ background: 'var(--surface)', height: '36px', fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '12px', padding: '0 0.5rem' }}
-                        >
-                           <option value="Before Food">Before Food</option>
-                           <option value="After Food">After Food</option>
-                           <option value="Empty Stomach">Empty Stomach</option>
-                        </select>
+                       <CustomSelect
+                         options={[
+                           { value: "1-0-1", label: "1-0-1" },
+                           { value: "1-1-1", label: "1-1-1" },
+                           { value: "0.5-0-0.5", label: "0.5-0-0.5 (Half Morning/Night)" },
+                           { value: "0.5-0-0", label: "0.5-0-0 (Half Morning Only)" },
+                           { value: "0-0-0.5", label: "0-0-0.5 (Half Night Only)" },
+                           { value: "0.5-0.5-0.5", label: "0.5-0.5-0.5 (Half Thrice a day)" },
+                           { value: "1-0-0", label: "1-0-0 (Morning Only)" },
+                           { value: "0-1-0", label: "0-1-0 (Afternoon Only)" },
+                           { value: "0-0-1", label: "0-0-1 (Night Only)" },
+                           { value: "1-1-0", label: "1-1-0 (Morning/Afternoon)" },
+                           { value: "0-1-1", label: "0-1-1 (Afternoon/Night)" },
+                           { value: "OD", label: "OD (Once a day)" },
+                           { value: "BD", label: "BD (Twice a day)" },
+                           { value: "TDS", label: "TDS (Thrice a day)" },
+                           { value: "QID", label: "QID (Four times a day)" },
+                           { value: "HS", label: "HS (At Bedtime)" },
+                           { value: "SOS", label: "SOS (When needed)" },
+                           { value: "STAT", label: "STAT (Immediately)" }
+                         ]}
+                         value={newMed.frequency}
+                         onChange={val => setNewMed({...newMed, frequency: val})}
+                         primaryColor={projectConfig?.primary_color}
+                         height="36px"
+                         borderRadius="12px"
+                         style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                       />
+                       <CustomSelect
+                         options={[
+                           { value: "Before Food", label: "Before Food" },
+                           { value: "After Food", label: "After Food" },
+                           { value: "Empty Stomach", label: "Empty Stomach" }
+                         ]}
+                         value={newMed.timing}
+                         onChange={val => setNewMed({...newMed, timing: val})}
+                         primaryColor={projectConfig?.primary_color}
+                         height="36px"
+                         borderRadius="12px"
+                         style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                       />
                         <input 
                            placeholder="Days" 
                            type="number" 
