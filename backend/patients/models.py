@@ -18,6 +18,8 @@ class Project(models.Model):
     allow_appointments = models.BooleanField(default=True)
     vitals_mandatory = models.BooleanField(default=True, help_text="Enforce mandatory collection of core vitals (Temp/Weight)")
     allow_custom_visit_date = models.BooleanField(default=False, help_text="Enables retroactive/late entry protocols for this project's visits.")
+    low_stock_threshold = models.IntegerField(default=10, help_text="Low stock threshold limit for pharmacy inventory")
+    allow_non_admin_threshold_edit = models.BooleanField(default=False, help_text="Allow non-admin staff to edit low stock threshold")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

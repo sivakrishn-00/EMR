@@ -1482,8 +1482,7 @@ class RegistryReportView(viewsets.ViewSet):
                 qty = get_dose_qty(p)
                 add_to_series(timezone.localtime(p.created_at).date(), qty, p.medication_name)
 
-        # 1b. Total Historical Consumption (All Time)
-        total_units_sum = 0
+        # 1b. Total Historical Consumption (All Time) - Highly Optimized
         all_time_dispensed = DispensingRecord.objects.all()
         all_time_prescriptions = Prescription.objects.filter(status__in=['DISPENSED', 'PARTIALLY_DISPENSED'])
         
@@ -1497,15 +1496,17 @@ class RegistryReportView(viewsets.ViewSet):
                 Q(visit__patient__employee_master__project=active_project)
             )
 
-        # Sum Dispensed Records
-        for dr in all_time_dispensed:
-            total_units_sum += get_dose_qty(dr)
+        # Sum Dispensed Records directly in the database
+        total_units_sum = all_time_dispensed.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
         
         # Add prescriptions that don't have dispensed records yet (calculated fallback)
-        all_time_processed_pids = set(all_time_dispensed.values_list('prescription_id', flat=True))
-        for p in all_time_prescriptions:
-            if p.id not in all_time_processed_pids:
-                total_units_sum += get_dose_qty(p)
+        # We only fetch the prescriptions that do NOT have any DispensingRecord
+        dispensed_prescription_ids = all_time_dispensed.values_list('prescription_id', flat=True)
+        prescriptions_without_dispensing = all_time_prescriptions.exclude(id__in=dispensed_prescription_ids)
+        
+        # Loop only over the small subset of prescriptions without a dispensing record
+        for p in prescriptions_without_dispensing[:1000]: # Safety limit to prevent hanging
+            total_units_sum += get_dose_qty(p)
 
         # Trends are sorted chronologically
         trends = sorted([{'date': k, 'units': v} for k, v in daily_series.items()], key=lambda x: x['date'])

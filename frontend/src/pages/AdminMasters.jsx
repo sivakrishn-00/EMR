@@ -469,6 +469,10 @@ const AdminMasters = () => {
   }, [showMasterModal, isEditingMaster]);
 
   useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       if (activeBoard === "DIAGNOSTICS") {
         fetchLabTests();
@@ -485,18 +489,20 @@ const AdminMasters = () => {
       }
     }, 400);
     
-    fetchProjects();
     return () => clearTimeout(timer);
   }, [selectedProject, exploringProtocolId, searchQuery, activeBoard, lowStockThreshold]);
 
   useEffect(() => {
-    if (selectedProject) {
-      const saved = parseInt(localStorage.getItem(`low_stock_threshold_${selectedProject}`)) || 10;
-      setLowStockThreshold(saved);
-      setTempThreshold(saved);
-      setAllowNonAdmin(localStorage.getItem(`low_stock_threshold_allow_non_admin_${selectedProject}`) === 'true');
+    if (selectedProject && projects.length > 0) {
+      const proj = projects.find(p => p.id === parseInt(selectedProject));
+      if (proj) {
+        const thresh = proj.low_stock_threshold ?? 10;
+        setLowStockThreshold(thresh);
+        setTempThreshold(thresh);
+        setAllowNonAdmin(proj.allow_non_admin_threshold_edit ?? false);
+      }
     }
-  }, [selectedProject]);
+  }, [selectedProject, projects]);
 
   useEffect(() => {
     const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
@@ -513,6 +519,8 @@ const AdminMasters = () => {
   const fetchDashboardStats = async () => {
     if (!selectedProject) return;
     setIsDepletionLoading(true);
+    setDepletionDisplayLimit(15);
+    setBatchDisplayLimit(15);
     try {
       const res = await api.get(`patients/reports/?project=${selectedProject}&low_threshold=${lowStockThreshold}`);
       setDashboardStats(res.data);
@@ -2314,7 +2322,7 @@ const AdminMasters = () => {
                                         <button
                                           onClick={() => {
                                             setLowStockThreshold(tempThreshold);
-                                            localStorage.setItem(`low_stock_threshold_${selectedProject}`, tempThreshold);
+                                            api.patch(`patients/projects/${selectedProject}/`, { low_stock_threshold: tempThreshold }).then(() => fetchProjects()).catch(() => toast.error("Failed to save low stock threshold on server."));
                                             toast.success(`Low stock threshold updated to ${tempThreshold} units!`);
                                           }}
                                           style={{
@@ -2377,7 +2385,7 @@ const AdminMasters = () => {
                                         onClick={() => {
                                           const newVal = !allowNonAdmin;
                                           setAllowNonAdmin(newVal);
-                                          localStorage.setItem(`low_stock_threshold_allow_non_admin_${selectedProject}`, newVal);
+                                          api.patch(`patients/projects/${selectedProject}/`, { allow_non_admin_threshold_edit: newVal }).then(() => fetchProjects()).catch(() => { setAllowNonAdmin(!newVal); toast.error("Failed to update staff edit permission on server."); });
                                           toast.success(newVal ? "Staff members are now permitted to modify low stock threshold!" : "Access restricted. Only Admins can modify threshold now.");
                                         }}
                                         style={{
@@ -2793,7 +2801,10 @@ const AdminMasters = () => {
                                            type="text"
                                            placeholder="Filter batch database..."
                                            value={batchSearchQuery}
-                                           onChange={(e) => setBatchSearchQuery(e.target.value)}
+                                           onChange={(e) => {
+                                              setBatchSearchQuery(e.target.value);
+                                              setBatchDisplayLimit(15);
+                                           }}
                                            style={{
                                               width: "100%",
                                               padding: "0.5rem 0.75rem 0.5rem 2rem",
@@ -2814,7 +2825,15 @@ const AdminMasters = () => {
                                      </div>
                                   </div>
 
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
+                                  <div 
+                                     style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}
+                                     onScroll={(e) => {
+                                        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                                        if (scrollTop + clientHeight >= scrollHeight - 20) {
+                                           setBatchDisplayLimit(prev => prev + 15);
+                                        }
+                                     }}
+                                  >
                                      {dashboardStats.batches && dashboardStats.batches.length > 0 ? (
                                         (() => {
                                            // Group and find currently consuming batch (earliest non-expired, non-depleted)
@@ -2856,7 +2875,7 @@ const AdminMasters = () => {
                                               );
                                            }
 
-                                           return sortedBatches.map((b) => {
+                                           return sortedBatches.slice(0, batchDisplayLimit).map((b) => {
                                               const isExpired = b.status === 'EXPIRED' || b.days_to_expiry <= 0;
                                               const isDepleted = b.quantity <= 0;
                                               const isConsuming = !isExpired && !isDepleted && activeBatchForMed[b.medication_name] === b.batch_number;

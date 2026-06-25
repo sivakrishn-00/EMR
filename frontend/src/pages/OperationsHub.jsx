@@ -214,8 +214,8 @@ const OperationsHub = () => {
       {/* 🎖️ HEADER AREA */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <TrendingUp size={34} style={{ color: 'var(--primary)' }} /> Executive Operations Hub
+          <h1 style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--text-main)' }}>
+            Executive Operations Hub
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
             {selectedProject !== 'all' ? `Tracking ${currentProjectName} Operations` : 'Global Cross-Project Registry Intelligence'}
