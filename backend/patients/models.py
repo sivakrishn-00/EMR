@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from .storage import MongoGridFSStorage
 
 GENDER_CHOICES = (
     ('MALE', 'Male'),
@@ -70,7 +71,7 @@ class EmployeeMaster(models.Model):
     address = models.TextField(blank=True, null=True)
     designation = models.CharField(max_length=100, blank=True, null=True)
     additional_fields = models.JSONField(default=dict, blank=True)
-    proof_image = models.ImageField(upload_to='employee_proofs/', blank=True, null=True)
+    proof_image = models.ImageField(storage=MongoGridFSStorage(), upload_to='employee_proofs/', blank=True, null=True)
     is_active = models.BooleanField(default=True, help_text="Designates whether this employee is active.")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -106,7 +107,7 @@ class FamilyMember(models.Model):
     mobile_no = models.CharField(max_length=15, blank=True, null=True)
     relationship = models.CharField(max_length=50, choices=RELATIONSHIP_CHOICES)
     additional_fields = models.JSONField(default=dict, blank=True)
-    proof_image = models.ImageField(upload_to='family_proofs/', blank=True, null=True)
+    proof_image = models.ImageField(storage=MongoGridFSStorage(), upload_to='family_proofs/', blank=True, null=True)
 
     @property
     def card_no(self):

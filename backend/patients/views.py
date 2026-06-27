@@ -2264,3 +2264,23 @@ class RegistryUploadSessionViewSet(viewsets.ReadOnlyModelViewSet):
         if registry_type_id:
             qs = qs.filter(registry_type_id=registry_type_id)
         return qs
+
+
+from django.http import HttpResponse, Http404
+from bson.objectid import ObjectId
+from pymongo import MongoClient
+import gridfs
+from django.conf import settings
+
+def serve_mongo_media(request, file_id):
+    try:
+        client = MongoClient(settings.MONGO_URI, serverSelectionTimeoutMS=2000)
+        db = client[settings.MONGO_DB_NAME]
+        fs = gridfs.GridFS(db, collection='patient_proofs')
+        grid_out = fs.get(ObjectId(file_id))
+        response = HttpResponse(grid_out.read(), content_type=grid_out.content_type or 'image/jpeg')
+        response['Cache-Control'] = 'public, max-age=86400'  # Cache for 1 day
+        return response
+    except Exception as e:
+        raise Http404("Image not found")
+

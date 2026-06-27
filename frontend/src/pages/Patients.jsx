@@ -210,8 +210,9 @@ const Patients = () => {
   // Personnel Registry Access
   const [showMasterModal, setShowMasterModal] = useState(false);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [masterFormData, setMasterFormData] = useState({
-    project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", is_active: true, additional_fields: {},
+    project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", proof_image: null, is_active: true, additional_fields: {},
   });
   const [familyFormData, setFamilyFormData] = useState({
     card_no_suffix: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", relationship: "SPOUSE", additional_fields: {},
@@ -291,6 +292,7 @@ const Patients = () => {
       setMasterFormData(prev => ({ ...prev, project: currentProject.id }));
       fetchNextCardNo(currentProject.id);
     }
+    setImagePreviewUrl(null);
     setShowMasterModal(true);
   };
 
@@ -305,7 +307,11 @@ const Patients = () => {
     try {
       const data = new FormData();
       Object.keys(masterFormData).forEach(key => {
-        if (key === 'additional_fields') {
+        if (key === 'proof_image') {
+          if (masterFormData[key] instanceof File) {
+            data.append(key, masterFormData[key]);
+          }
+        } else if (key === 'additional_fields') {
           data.append(key, JSON.stringify(masterFormData[key]));
         } else {
           data.append(key, masterFormData[key]);
@@ -315,8 +321,9 @@ const Patients = () => {
       toast.success("Personnel Master Onboarded Successfully!", { id: loadId });
       setShowMasterModal(false);
       setMasterFormAttempted(false);
+      setImagePreviewUrl(null);
       setMasterFormData({
-        project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", is_active: true, additional_fields: {},
+        project: "", card_no: "", name: "", dob: "", gender: "MALE", mobile_no: "", aadhar_no: "", address: "", designation: "", proof_image: null, is_active: true, additional_fields: {},
       });
       fetchEmployeeMasters();
     } catch (err) {
@@ -2276,6 +2283,116 @@ const Patients = () => {
                 <div className="form-group" style={{ gridColumn: "span 2" }}>
                   <label>Home Address</label>
                   <textarea value={masterFormData.address} onChange={(e) => setMasterFormData({ ...masterFormData, address: e.target.value })} className="form-control" placeholder="Village/City, District, State" style={{ height: '80px', paddingTop: '12px' }} />
+                </div>
+                <div className="form-group" style={{ gridColumn: "span 2" }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                    Profile Photo / Proof Image
+                  </label>
+                  <div
+                    style={{
+                      border: "2px dashed var(--border)",
+                      borderRadius: "16px",
+                      padding: "1.5rem",
+                      textAlign: "center",
+                      background: "var(--background)",
+                      position: "relative",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s",
+                      minHeight: "140px"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = activeRegProject?.primary_color || "var(--primary)";
+                      e.currentTarget.style.background = "white";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "var(--border)";
+                      e.currentTarget.style.background = "var(--background)";
+                    }}
+                  >
+                    {imagePreviewUrl ? (
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <img
+                          src={imagePreviewUrl}
+                          alt="Profile Proof"
+                          style={{
+                            width: "120px",
+                            height: "120px",
+                            borderRadius: "12px",
+                            objectFit: "cover",
+                            border: "2.5px solid white",
+                            boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)"
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMasterFormData({ ...masterFormData, proof_image: null });
+                            setImagePreviewUrl(null);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: "-10px",
+                            right: "-10px",
+                            background: "#ef4444",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "50%",
+                            width: "26px",
+                            height: "26px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 6px rgba(239, 68, 68, 0.3)",
+                            transition: "transform 0.2s"
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ pointerEvents: "none" }}>
+                        <Upload size={32} color={activeRegProject?.primary_color || "var(--primary)"} style={{ marginBottom: "0.5rem", opacity: 0.8 }} />
+                        <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "4px" }}>
+                          Click to upload photo
+                        </div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                          PNG, JPG or JPEG up to 5MB
+                        </div>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast.error("Image file size must be less than 5MB");
+                            return;
+                          }
+                          setMasterFormData({ ...masterFormData, proof_image: file });
+                          setImagePreviewUrl(URL.createObjectURL(file));
+                        }
+                      }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: 0,
+                        cursor: "pointer",
+                        zIndex: 10
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "2rem" }}>

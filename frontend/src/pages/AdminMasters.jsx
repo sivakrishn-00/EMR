@@ -397,6 +397,8 @@ const AdminMasters = () => {
   });
 
   const [masterFormAttempted, setMasterFormAttempted] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
   const [familyFormAttempted, setFamilyFormAttempted] = useState(false);
 
   const getProjectDesignationsKey = (projId) => `emr_designations_${projId || 'global'}`;
@@ -907,7 +909,13 @@ const AdminMasters = () => {
     const data = new FormData();
     Object.keys(masterFormData).forEach((key) => {
       const val = masterFormData[key];
-      if (val !== null && val !== undefined && val !== "") {
+      if (key === "proof_image") {
+        if (val instanceof File) {
+          data.append(key, val);
+        } else if (val === null && isEditingMaster) {
+          data.append(key, "");
+        }
+      } else if (val !== null && val !== undefined && val !== "") {
         if (key === "additional_fields") {
           data.append(key, JSON.stringify(val));
         } else if (key === "is_active") {
@@ -935,6 +943,7 @@ const AdminMasters = () => {
       setIsEditingMaster(false);
       setEditingMasterId(null);
       setMasterFormAttempted(false);
+      setImagePreviewUrl(null);
       setMasterFormData({
         project: selectedProject || "",
         card_no: "",
@@ -999,12 +1008,23 @@ const AdminMasters = () => {
         // Legacy Protocol Persistence
         const data = new FormData();
         Object.keys(familyFormData).forEach((key) => {
-          if (key === "relationship") data.append(key, finalRelationship);
-          else if (
+          if (key === "relationship") {
+            data.append(key, finalRelationship);
+          } else if (key === "proof_image") {
+            const val = familyFormData[key];
+            if (val instanceof File) {
+              data.append(key, val);
+            } else if (val === null && isEditingFamily) {
+              data.append(key, "");
+            }
+          } else if (
             key !== "custom_relationship" &&
-            familyFormData[key] !== null
-          )
+            familyFormData[key] !== null &&
+            familyFormData[key] !== undefined &&
+            familyFormData[key] !== ""
+          ) {
             data.append(key, familyFormData[key]);
+          }
         });
         data.append("employee", selectedEmployeeForFamily);
 
@@ -1049,6 +1069,7 @@ const AdminMasters = () => {
       setIsEditingFamily(false);
       setEditingFamilyId(null);
       setFamilyFormAttempted(false);
+      setImagePreviewUrl(null);
       setFamilyFormData({
         card_no_suffix: "",
         name: "",
@@ -1845,6 +1866,7 @@ const AdminMasters = () => {
                           is_active: true,
                           additional_fields: { employee_id: "" },
                         });
+                        setImagePreviewUrl(null);
                         fetchNextCardNo(selectedProject || user?.project);
                         setShowMasterModal(true);
                       }}
@@ -4720,7 +4742,45 @@ const AdminMasters = () => {
                                           fontSize: "0.875rem",
                                         }}
                                       >
-                                        {m.name}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                          {m.proof_image ? (
+                                            <img
+                                              src={m.proof_image}
+                                              alt={m.name}
+                                              style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                borderRadius: '50%',
+                                                objectFit: 'cover',
+                                                border: '1.5px solid var(--border)',
+                                                cursor: 'zoom-in',
+                                                transition: 'transform 0.2s',
+                                              }}
+                                              onClick={() => setLightboxImage(m.proof_image)}
+                                              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                            />
+                                          ) : (
+                                            <div
+                                              style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                borderRadius: '50%',
+                                                background: 'var(--background)',
+                                                border: '1px solid var(--border)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 900,
+                                                color: 'var(--text-muted)',
+                                              }}
+                                            >
+                                              {m.name?.[0]?.toUpperCase() || 'E'}
+                                            </div>
+                                          )}
+                                          <span>{m.name}</span>
+                                        </div>
                                       </td>
                                       <td style={{ fontWeight: 800, color: "var(--text-main)", fontSize: "0.8125rem" }}>
                                         {age !== "N/A" ? `${age} / ${m.gender?.[0] || m.gender}` : (m.gender || "--")}
@@ -4849,6 +4909,8 @@ const AdminMasters = () => {
                                               }
                                             }
 
+
+
                                             return (
                                               <td
                                                 key={f.id || f.slug}
@@ -4928,6 +4990,7 @@ const AdminMasters = () => {
                                                   relationship: "SPOUSE",
                                                   proof_image: null,
                                                 });
+                                                setImagePreviewUrl(null);
                                                 setShowFamilyModal(true);
                                               } else {
                                                 const nextSuffix =
@@ -4947,6 +5010,7 @@ const AdminMasters = () => {
                                                   relationship: "SPOUSE",
                                                   proof_image: null,
                                                 });
+                                                setImagePreviewUrl(null);
                                                 setShowFamilyModal(true);
                                               }
                                             }}
@@ -5021,12 +5085,14 @@ const AdminMasters = () => {
                                               address: m.address,
                                               designation:
                                                 m.designation || "",
+                                              proof_image: m.proof_image || null,
                                               is_active: m.is_active ?? true,
                                               additional_fields: {
                                                 employee_id: "",
                                                 ...(m.additional_fields || {})
                                               },
                                             });
+                                            setImagePreviewUrl(m.proof_image || null);
                                             setEditingMasterId(m.id);
                                             setIsEditingMaster(true);
                                             setShowMasterModal(true);
@@ -5108,7 +5174,45 @@ const AdminMasters = () => {
                                             color: "var(--text-main)",
                                           }}
                                         >
-                                          {f.name}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                             {f.proof_image ? (
+                                               <img
+                                                 src={f.proof_image}
+                                                 alt={f.name}
+                                                 style={{
+                                                   width: '28px',
+                                                   height: '28px',
+                                                   borderRadius: '50%',
+                                                   objectFit: 'cover',
+                                                   border: '1.5px solid var(--border)',
+                                                   cursor: 'zoom-in',
+                                                   transition: 'transform 0.2s',
+                                                 }}
+                                                 onClick={() => setLightboxImage(f.proof_image)}
+                                                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                               />
+                                             ) : (
+                                               <div
+                                                 style={{
+                                                   width: '28px',
+                                                   height: '28px',
+                                                   borderRadius: '50%',
+                                                   background: 'var(--background)',
+                                                   border: '1px solid var(--border)',
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   justifyContent: 'center',
+                                                   fontSize: '0.7rem',
+                                                   fontWeight: 900,
+                                                   color: 'var(--text-muted)',
+                                                 }}
+                                               >
+                                                 {f.name?.[0]?.toUpperCase() || 'F'}
+                                               </div>
+                                             )}
+                                             <span>{f.name}</span>
+                                           </div>
                                         </td>
                                         <td style={{ fontWeight: 600, color: "var(--text-muted)" }}>
                                           {fAge} / {f.gender?.[0] || f.gender}
@@ -5199,7 +5303,9 @@ const AdminMasters = () => {
                                                     f.aadhar_no || "",
                                                   relationship:
                                                     f.relationship,
+                                                  proof_image: f.proof_image || null,
                                                 });
+                                                setImagePreviewUrl(f.proof_image || null);
                                                 setSelectedEmployeeForFamily(
                                                   m.id,
                                                 );
@@ -5270,19 +5376,60 @@ const AdminMasters = () => {
                                               fontWeight: 600,
                                             }}
                                           >
-                                            {String(
-                                              f.additional_fields?.[
-                                              fieldDef.slug
-                                              ] ||
-                                              f.additional_fields?.[
-                                              fieldDef.slug.toLowerCase()
-                                              ] ||
-                                              f[fieldDef.slug] ||
-                                              "--",
-                                            )}
-                                            {fieldDef.slug.includes(
-                                              "name",
-                                            ) && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                              {fieldDef.slug.includes("name") && (
+                                                f.additional_fields?.proof_image ? (
+                                                  <img
+                                                    src={f.additional_fields.proof_image}
+                                                    alt={f.name || "Dependent"}
+                                                    style={{
+                                                      width: '28px',
+                                                      height: '28px',
+                                                      borderRadius: '50%',
+                                                      objectFit: 'cover',
+                                                      border: '1.5px solid var(--border)',
+                                                      cursor: 'zoom-in',
+                                                      transition: 'transform 0.2s',
+                                                    }}
+                                                    onClick={() => setLightboxImage(f.additional_fields.proof_image)}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                  />
+                                                ) : (
+                                                  <div
+                                                    style={{
+                                                      width: '28px',
+                                                      height: '28px',
+                                                      borderRadius: '50%',
+                                                      background: 'var(--background)',
+                                                      border: '1px solid var(--border)',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      fontSize: '0.7rem',
+                                                      fontWeight: 900,
+                                                      color: 'var(--text-muted)',
+                                                    }}
+                                                  >
+                                                    {(f.name || f.additional_fields?.name)?.[0]?.toUpperCase() || 'F'}
+                                                  </div>
+                                                )
+                                              )}
+                                              <span>
+                                                {String(
+                                                  f.additional_fields?.[
+                                                  fieldDef.slug
+                                                  ] ||
+                                                  f.additional_fields?.[
+                                                  fieldDef.slug.toLowerCase()
+                                                  ] ||
+                                                  f[fieldDef.slug] ||
+                                                  "--",
+                                                )}
+                                              </span>
+                                              {fieldDef.slug.includes(
+                                                "name",
+                                              ) && (
                                                 <span
                                                   style={{
                                                     marginLeft: "8px",
@@ -5297,6 +5444,7 @@ const AdminMasters = () => {
                                                   DEPENDENT
                                                 </span>
                                               )}
+                                            </div>
                                           </td>
                                         ))}
                                         <td
@@ -5328,7 +5476,9 @@ const AdminMasters = () => {
                                                   mobile_no: f.additional_fields?.mobile_no || "",
                                                   aadhar_no: f.additional_fields?.aadhar_no || "",
                                                   relationship: f.additional_fields?.relationship || "SPOUSE",
+                                                  proof_image: f.additional_fields?.proof_image || null,
                                                 });
+                                                setImagePreviewUrl(f.additional_fields?.proof_image || null);
                                                 setSelectedEmployeeForFamily(m.ucode);
                                                 setEditingFamilyId(f.id);
                                                 setIsEditingFamily(true);
@@ -5780,6 +5930,117 @@ const AdminMasters = () => {
                     ></textarea>
                   </div>
 
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label style={{ fontWeight: 800, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>
+                      Profile Photo / Proof Image
+                    </label>
+                    <div
+                      style={{
+                        border: "2px dashed var(--border)",
+                        borderRadius: "16px",
+                        padding: "1.5rem",
+                        textAlign: "center",
+                        background: "var(--background)",
+                        position: "relative",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                        minHeight: "140px"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--primary)";
+                        e.currentTarget.style.background = "white";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.background = "var(--background)";
+                      }}
+                    >
+                      {imagePreviewUrl ? (
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Profile Proof"
+                            style={{
+                              width: "120px",
+                              height: "120px",
+                              borderRadius: "12px",
+                              objectFit: "cover",
+                              border: "2.5px solid white",
+                              boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)"
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMasterFormData({ ...masterFormData, proof_image: null });
+                              setImagePreviewUrl(null);
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "-10px",
+                              right: "-10px",
+                              background: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "50%",
+                              width: "26px",
+                              height: "26px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 4px 6px rgba(239, 68, 68, 0.3)",
+                              transition: "transform 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ pointerEvents: "none" }}>
+                          <Upload size={32} color="var(--primary)" style={{ marginBottom: "0.5rem", opacity: 0.8 }} />
+                          <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "4px" }}>
+                            Click to upload photo
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                            PNG, JPG or JPEG up to 5MB
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast.error("Image file size must be less than 5MB");
+                              return;
+                            }
+                            setMasterFormData({ ...masterFormData, proof_image: file });
+                            setImagePreviewUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          opacity: 0,
+                          cursor: "pointer",
+                          zIndex: 10
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group" style={{ gridColumn: "span 2", display: "flex", alignItems: "center", gap: "10px", marginTop: "0.5rem" }}>
                     <input
                       type="checkbox"
@@ -6050,6 +6311,60 @@ const AdminMasters = () => {
           document.body
         )}
 
+        {lightboxImage && createPortal(
+          <div 
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(15, 23, 42, 0.8)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 300000,
+              cursor: "zoom-out"
+            }}
+            onClick={() => setLightboxImage(null)}
+          >
+            <img 
+              src={lightboxImage} 
+              alt="Enlarged view" 
+              style={{ 
+                maxWidth: "90%", 
+                maxHeight: "95%", 
+                borderRadius: "16px", 
+                boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
+                cursor: "default" 
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              style={{
+                position: "absolute",
+                top: "20px",
+                right: "20px",
+                background: "rgba(255,255,255,0.2)",
+                border: "none",
+                borderRadius: "50%",
+                width: "40px",
+                height: "40px",
+                color: "white",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
+              <X size={24} />
+            </button>
+          </div>,
+          document.body
+        )}
+
         {showFamilyModal && createPortal(
           <div
             style={{
@@ -6218,6 +6533,117 @@ const AdminMasters = () => {
                         Required
                       </p>
                     )}
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: "span 2" }}>
+                    <label style={{ fontWeight: 800, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>
+                      Profile Photo / Proof Image
+                    </label>
+                    <div
+                      style={{
+                        border: "2px dashed var(--border)",
+                        borderRadius: "16px",
+                        padding: "1.5rem",
+                        textAlign: "center",
+                        background: "var(--background)",
+                        position: "relative",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                        minHeight: "140px"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--primary)";
+                        e.currentTarget.style.background = "white";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.background = "var(--background)";
+                      }}
+                    >
+                      {imagePreviewUrl ? (
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Profile Proof"
+                            style={{
+                              width: "120px",
+                              height: "120px",
+                              borderRadius: "12px",
+                              objectFit: "cover",
+                              border: "2.5px solid white",
+                              boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)"
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFamilyFormData({ ...familyFormData, proof_image: null });
+                              setImagePreviewUrl(null);
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "-10px",
+                              right: "-10px",
+                              background: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "50%",
+                              width: "26px",
+                              height: "26px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 4px 6px rgba(239, 68, 68, 0.3)",
+                              transition: "transform 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ pointerEvents: "none" }}>
+                          <Upload size={32} color="var(--primary)" style={{ marginBottom: "0.5rem", opacity: 0.8 }} />
+                          <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)", marginBottom: "4px" }}>
+                            Click to upload photo
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 650 }}>
+                            PNG, JPG or JPEG up to 5MB
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast.error("Image file size must be less than 5MB");
+                              return;
+                            }
+                            setFamilyFormData({ ...familyFormData, proof_image: file });
+                            setImagePreviewUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          opacity: 0,
+                          cursor: "pointer",
+                          zIndex: 10
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div

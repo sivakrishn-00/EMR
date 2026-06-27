@@ -4,7 +4,7 @@ from .views import (
     PatientViewSet, EmployeeMasterViewSet, FamilyMemberViewSet,
     ProjectViewSet, ProjectCategoryMappingViewSet, ProjectFieldConfigViewSet,
     RegistryTypeViewSet, RegistryDataViewSet, RegistryFieldViewSet, RegistryReportView, ProjectLogoViewSet,
-    RegistryUploadSessionViewSet
+    RegistryUploadSessionViewSet, serve_mongo_media
 )
 
 router = DefaultRouter()
@@ -22,5 +22,7 @@ router.register(r'upload-sessions', RegistryUploadSessionViewSet, basename='uplo
 router.register(r'reports', RegistryReportView, basename='report')
 
 urlpatterns = [
+    path('mongo-media/<str:file_id>/', serve_mongo_media, name='serve-mongo-media'),
     path('', include(router.urls)),
 ]
+
