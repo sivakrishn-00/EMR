@@ -120,8 +120,10 @@ const Users = () => {
     const [tempUserRoles, setTempUserRoles] = useState([]);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [formData, setFormData] = useState({
-        username: '', email: '', password: '', role: 'NURSE', first_name: '', last_name: '', phone: '', user_roles: [], project: ''
+        username: '', email: '', password: '', role: 'NURSE', first_name: '', last_name: '', phone: '', user_roles: [], project: '',
+        assigned_room: '', can_raise_indent: true, can_log_dispensation: true
     });
+    const [rooms, setRooms] = useState([]);
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [viewMode, setViewMode] = useState('CLINICAL');
@@ -138,6 +140,19 @@ const Users = () => {
         fetchRoles();
         fetchProjects();
     }, []);
+
+    useEffect(() => {
+        if (formData.project) {
+            api.get(`pharmacy/facility-rooms/?project=${formData.project}`)
+                .then(res => {
+                    const data = res.data.results || res.data || [];
+                    setRooms(data.filter(r => r.is_active));
+                })
+                .catch(err => console.error("Failed to fetch rooms", err));
+        } else {
+            setRooms([]);
+        }
+    }, [formData.project]);
 
     const fetchUsers = async (pageNum = 1) => {
         try {
@@ -186,12 +201,16 @@ const Users = () => {
                 phone: user.phone || '',
                 user_roles: user.user_roles || [],
                 project: user.project || '',
+                assigned_room: user.room_assignment?.room_id || '',
+                can_raise_indent: user.room_assignment ? user.room_assignment.can_raise_indent : true,
+                can_log_dispensation: user.room_assignment ? user.room_assignment.can_log_dispensation : true,
                 password: '' // Keep empty unless changing
             });
         } else {
             setEditingUser(null);
             setFormData({
-                username: '', email: '', password: '', role: 'NURSE', first_name: '', last_name: '', phone: '', user_roles: [], project: ''
+                username: '', email: '', password: '', role: 'NURSE', first_name: '', last_name: '', phone: '', user_roles: [], project: '',
+                assigned_room: '', can_raise_indent: true, can_log_dispensation: true
             });
         }
         setShowModal(true);
@@ -209,6 +228,10 @@ const Users = () => {
             if (editingUser && !dataToSubmit.password) {
                 delete dataToSubmit.password;
             }
+            // Room assignment is now handled strictly via roles
+            delete dataToSubmit.assigned_room;
+            delete dataToSubmit.can_raise_indent;
+            delete dataToSubmit.can_log_dispensation;
             
             if (editingUser) {
                 await api.put(`accounts/users/${editingUser.id}/`, dataToSubmit);
@@ -505,7 +528,7 @@ const Users = () => {
                                                 })}
                                             </div>
                                         ) : (
-                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '280px' }}>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '280px', alignItems: 'center' }}>
                                                 {u.user_roles_details?.length > 0 ? (
                                                     u.user_roles_details.map(ur => (
                                                         <span key={ur.id} className="badge" style={{ background: 'var(--background)', color: 'var(--text-main)', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem', border: '1px solid var(--border)' }}>
@@ -515,6 +538,12 @@ const Users = () => {
                                                 ) : (
                                                     <span className="badge" style={{ background: '#fef2f2', color: '#ef4444', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem' }}>
                                                         No Access Roles
+                                                    </span>
+                                                )}
+                                                {u.room_assignment && (
+                                                    <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.08)', color: 'var(--primary)', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary)' }}></span>
+                                                        {u.room_assignment.room_name}
                                                     </span>
                                                 )}
                                             </div>
@@ -720,7 +749,7 @@ const Users = () => {
                                             ...projects.map(p => ({ value: String(p.id), label: p.name }))
                                         ]}
                                         value={String(formData.project || "")}
-                                        onChange={val => setFormData({...formData, project: val})}
+                                        onChange={val => setFormData({...formData, project: val, assigned_room: ""})}
                                         placeholder="-- Select Project Facility --"
                                     />
                                 </div>

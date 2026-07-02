@@ -44,6 +44,100 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => String(opt.value) === String(value));
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.75rem 1rem',
+          fontSize: '0.875rem',
+          borderRadius: '12px',
+          border: '1.5px solid var(--border)',
+          background: 'var(--background)',
+          color: selectedOption ? 'var(--text-main)' : 'var(--text-muted)',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          minHeight: '45px'
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'flex', alignItems: 'center' }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '105%',
+          left: 0,
+          right: 0,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+          zIndex: 99999,
+          maxHeight: '200px',
+          overflowY: 'auto',
+          padding: '4px'
+        }}>
+          {options.map((opt, idx) => (
+            <div 
+              key={idx}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.6rem 0.875rem',
+                fontSize: '0.85rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: String(opt.value) === String(value) ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                color: String(opt.value) === String(value) ? 'var(--primary)' : 'var(--text-main)',
+                fontWeight: String(opt.value) === String(value) ? 800 : 500,
+                textAlign: 'left',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                if (String(opt.value) !== String(value)) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (String(opt.value) !== String(value)) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminMasters = () => {
   const navigate = useNavigate();
   const { board } = useParams();
@@ -63,7 +157,8 @@ const AdminMasters = () => {
     DIAGNOSTICS: hasFullAdminMasters || userPerms.includes('/admin-masters/diagnostics'),
     MACHINES: hasFullAdminMasters || userPerms.includes('/admin-masters/machines'),
     STATS: hasFullAdminMasters || userPerms.includes('/admin-masters/stats'),
-    UPLOAD_HISTORY: hasFullAdminMasters || userPerms.includes('/admin-masters/upload_history')
+    UPLOAD_HISTORY: hasFullAdminMasters || userPerms.includes('/admin-masters/upload_history'),
+    ROOMS: hasFullAdminMasters || userPerms.includes('/admin-masters/rooms') || isAdmin
   };
 
   const permittedTabsCount = Object.values(tabPermissions).filter(Boolean).length;
@@ -325,6 +420,141 @@ const AdminMasters = () => {
   const [customFieldForm, setCustomFieldForm] = useState(customFieldFormBase);
   const [activeProjectFields, setActiveProjectFields] = useState([]);
 
+  // Facility Rooms Tab State
+  const [facilityRooms, setFacilityRooms] = useState([]);
+  const [userRoomAssignments, setUserRoomAssignments] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [roomTypes, setRoomTypes] = useState([]);
+
+  const fetchRoomTypes = async () => {
+    try {
+      const res = await api.get("pharmacy/facility-rooms/room-types/");
+      setRoomTypes(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch room types", err);
+    }
+  };
+  
+  // Modals for Rooms
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  
+  // Form States
+  const [roomForm, setRoomForm] = useState({
+    name: "",
+    room_type: "NURSE_ROOM",
+    is_active: true
+  });
+  const [assignmentForm, setAssignmentForm] = useState({
+    user: "",
+    room: "",
+    can_raise_indent: true,
+    can_log_dispensation: true
+  });
+  
+  const [currentRoom, setCurrentRoom] = useState(null);
+  const [isEditingRoom, setIsEditingRoom] = useState(false);
+
+  const fetchFacilityRooms = async () => {
+    if (!selectedProject) return;
+    setIsLoadingRooms(true);
+    try {
+      const res = await api.get(`pharmacy/facility-rooms/?project=${selectedProject}`);
+      setFacilityRooms(res.data.results || res.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch facility rooms");
+    } finally {
+      setIsLoadingRooms(false);
+    }
+  };
+
+  const fetchUserRoomAssignments = async () => {
+    if (!selectedProject) return;
+    try {
+      const res = await api.get(`pharmacy/user-room-assignments/?project=${selectedProject}`);
+      setUserRoomAssignments(res.data.results || res.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch user room assignments");
+    }
+  };
+
+  const fetchSystemUsers = async () => {
+    try {
+      const res = await api.get("accounts/users/?page_size=1000");
+      const allUsers = res.data.results || res.data || [];
+      const projectUsers = allUsers.filter(u => !u.project || String(u.project) === String(selectedProject));
+      setSystemUsers(projectUsers);
+    } catch (err) {
+      console.error("Failed to fetch users", err);
+    }
+  };
+
+  const handleRoomSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProject) return toast.error("Select project first");
+    try {
+      const payload = { ...roomForm, project: selectedProject };
+      if (isEditingRoom && currentRoom) {
+        await api.put(`pharmacy/facility-rooms/${currentRoom.id}/`, payload);
+        toast.success("Facility Room Updated");
+      } else {
+        await api.post("pharmacy/facility-rooms/", payload);
+        toast.success("Facility Room Created");
+      }
+      setShowRoomModal(false);
+      setRoomForm({ name: "", room_type: "NURSE_ROOM", is_active: true });
+      setIsEditingRoom(false);
+      setCurrentRoom(null);
+      fetchFacilityRooms();
+    } catch (err) {
+      toast.error("Failed to save facility room");
+    }
+  };
+
+  const handleDeleteRoom = async (roomId) => {
+    if (!window.confirm("Are you sure you want to delete this room?")) return;
+    try {
+      await api.delete(`pharmacy/facility-rooms/${roomId}/`);
+      toast.success("Facility Room Deleted");
+      fetchFacilityRooms();
+    } catch (err) {
+      toast.error("Failed to delete room");
+    }
+  };
+
+  const handleAssignmentSubmit = async (e) => {
+    e.preventDefault();
+    if (!assignmentForm.user || !assignmentForm.room) {
+      return toast.error("Please select both User and Room");
+    }
+    try {
+      await api.post("pharmacy/user-room-assignments/", {
+        user: assignmentForm.user,
+        assigned_room: assignmentForm.room,
+        can_raise_indent: assignmentForm.can_raise_indent,
+        can_log_dispensation: assignmentForm.can_log_dispensation
+      });
+      toast.success("User Room Assignment Created");
+      setShowAssignmentModal(false);
+      setAssignmentForm({ user: "", room: "", can_raise_indent: true, can_log_dispensation: true });
+      fetchUserRoomAssignments();
+    } catch (err) {
+      toast.error(err.response?.data?.non_field_errors?.[0] || "Failed to create assignment");
+    }
+  };
+
+  const handleDeleteAssignment = async (id) => {
+    if (!window.confirm("Are you sure you want to remove this assignment?")) return;
+    try {
+      await api.delete(`pharmacy/user-room-assignments/${id}/`);
+      toast.success("Assignment Removed");
+      fetchUserRoomAssignments();
+    } catch (err) {
+      toast.error("Failed to remove assignment");
+    }
+  };
+
   useEffect(() => {
     if (showBulkModal && selectedProject) {
       setBulkProject(selectedProject);
@@ -486,6 +716,11 @@ const AdminMasters = () => {
         fetchDashboardStats();
       } else if (activeBoard === "UPLOAD_HISTORY") {
         fetchUploadSessions();
+      } else if (activeBoard === "ROOMS") {
+        fetchFacilityRooms();
+        fetchUserRoomAssignments();
+        fetchSystemUsers();
+        fetchRoomTypes();
       } else {
         fetchEmployeeMasters(1);
       }
@@ -507,7 +742,7 @@ const AdminMasters = () => {
   }, [selectedProject, projects]);
 
   useEffect(() => {
-    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
+    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY", "ROOMS"];
     const activePermKey = activeBoard === "REGISTRY" ? "PROTOCOLS" : activeBoard;
     
     if (!tabPermissions[activePermKey]) {
@@ -1898,7 +2133,7 @@ const AdminMasters = () => {
                   onClick={() => {
                     setSelectedProject(p.id);
                     setViewMode("DATA");
-                    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY"];
+                    const tabsOrder = ["PROTOCOLS", "DIAGNOSTICS", "MACHINES", "STATS", "UPLOAD_HISTORY", "ROOMS"];
                     const firstPermitted = tabsOrder.find(t => tabPermissions[t]) || "PROTOCOLS";
                     setActiveBoard(firstPermitted);
                     if (firstPermitted === "STATS") {
@@ -1909,6 +2144,10 @@ const AdminMasters = () => {
                       fetchLabMachines();
                     } else if (firstPermitted === "UPLOAD_HISTORY") {
                       fetchUploadSessions();
+                    } else if (firstPermitted === "ROOMS") {
+                      fetchFacilityRooms();
+                      fetchUserRoomAssignments();
+                      fetchSystemUsers();
                     } else {
                       fetchEmployeeMasters(1, p.id);
                     }
@@ -2191,6 +2430,34 @@ const AdminMasters = () => {
                     }}
                   >
                     <History size={16} color={activeBoard === "UPLOAD_HISTORY" ? "#3b82f6" : "#64748b"} /> Upload Audit Logs
+                  </button>
+                )}
+
+                {tabPermissions.ROOMS && (
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      color: activeBoard === "ROOMS" ? "#ec4899" : "#64748b",
+                      fontSize: "0.85rem",
+                      padding: "0.5rem 0.5rem 0.75rem 0.5rem",
+                      borderRadius: "0",
+                      transition: "all 0.2s",
+                      fontWeight: activeBoard === "ROOMS" ? 600 : 500,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      borderBottom: activeBoard === "ROOMS" ? "2px solid #ec4899" : "2px solid transparent",
+                      marginBottom: "-1px",
+                    }}
+                    onClick={() => {
+                      setActiveBoard("ROOMS");
+                      fetchFacilityRooms();
+                      fetchUserRoomAssignments();
+                      fetchSystemUsers();
+                    }}
+                  >
+                    <MapPin size={16} color={activeBoard === "ROOMS" ? "#ec4899" : "#64748b"} /> Facility Rooms
                   </button>
                 )}
               </div>
@@ -4196,6 +4463,158 @@ const AdminMasters = () => {
                           </tbody>
                       </table>
                     </div>
+                </div>
+              </div>
+            ) : activeBoard === "ROOMS" ? (
+              <div className="fade-in">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)' }}>Facility Rooms</h3>
+                    <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '4px' }}>
+                      Configure dynamic rooms (e.g., Nurse Room, Laboratory, OHC) to isolate stock and inventory workflows.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      className="btn"
+                      onClick={() => {
+                        setIsEditingRoom(false);
+                        setRoomForm({ name: "", room_type: "NURSE_ROOM", is_active: true });
+                        setShowRoomModal(true);
+                      }}
+                      style={{ 
+                        borderRadius: '12px', 
+                        padding: '0.75rem 1.25rem', 
+                        fontSize: '0.75rem',
+                        background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                        color: 'white',
+                        border: 'none',
+                        fontWeight: 800,
+                        boxShadow: '0 4px 12px rgba(236, 72, 153, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={16} /> New Facility Room
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginTop: '1rem' }}>
+                  {/* Facility Rooms Table */}
+                  <div className="card" style={{ flex: '1 1 100%', padding: '1.5rem', borderRadius: '24px', border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={18} color="#ec4899" /> Registered Facility Rooms
+                    </h4>
+                    
+                    {isLoadingRooms ? (
+                      <div style={{ padding: '4rem', textAlign: 'center' }}>
+                        <div className="spin" style={{ width: '32px', height: '32px', border: '3px solid #ec4899', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
+                        <p style={{ marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading rooms...</p>
+                      </div>
+                    ) : facilityRooms.length === 0 ? (
+                      <div style={{ padding: '4rem 2rem', textAlign: 'center', border: '2px dashed var(--border)', borderRadius: '16px', width: '100%' }}>
+                        <MapPin size={36} style={{ opacity: 0.2, margin: '0 auto 1rem' }} />
+                        <p style={{ fontWeight: 700, color: 'var(--text-muted)' }}>No facility rooms configured.</p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Create a room to isolate stock and inventory workflows.</p>
+                      </div>
+                    ) : (
+                      <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--background)' }}>
+                              <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Room Name</th>
+                              <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Room Type</th>
+                              <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Status</th>
+                              <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {facilityRooms.map(room => {
+                              let typeColor = '#3b82f6';
+                              let typeBg = 'rgba(59, 130, 246, 0.1)';
+                              if (room.room_type === 'NURSE_ROOM') {
+                                typeColor = '#f97316';
+                                typeBg = 'rgba(249, 115, 22, 0.1)';
+                              } else if (room.room_type === 'LABORATORY') {
+                                typeColor = '#a855f7';
+                                typeBg = 'rgba(168, 85, 247, 0.1)';
+                              } else if (room.room_type === 'OHC') {
+                                typeColor = '#10b981';
+                                typeBg = 'rgba(16, 185, 129, 0.1)';
+                              } else if (room.room_type === 'EMERGENCY') {
+                                typeColor = '#ef4444';
+                                typeBg = 'rgba(239, 68, 68, 0.1)';
+                              }
+                              
+                              return (
+                                <tr key={room.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.2s' }} className="hover-row">
+                                  <td style={{ padding: '1rem', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem' }}>
+                                    {room.name}
+                                  </td>
+                                  <td style={{ padding: '1rem' }}>
+                                    <span style={{ 
+                                      fontSize: '0.7rem', 
+                                      fontWeight: 900, 
+                                      color: typeColor, 
+                                      background: typeBg, 
+                                      padding: '3px 8px', 
+                                      borderRadius: '8px',
+                                      textTransform: 'uppercase' 
+                                    }}>
+                                      {room.room_type_display || room.room_type}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '1rem' }}>
+                                    <span style={{ 
+                                      fontSize: '0.7rem', 
+                                      fontWeight: 900, 
+                                      color: room.is_active ? '#10b981' : '#64748b', 
+                                      background: room.is_active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)', 
+                                      padding: '3px 8px', 
+                                      borderRadius: '8px'
+                                    }}>
+                                      {room.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px' }}
+                                        onClick={() => {
+                                          setCurrentRoom(room);
+                                          setRoomForm({
+                                            name: room.name,
+                                            room_type: room.room_type,
+                                            is_active: room.is_active
+                                          });
+                                          setIsEditingRoom(true);
+                                          setShowRoomModal(true);
+                                        }}
+                                        title="Edit Room"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px', background: '#fef2f2', color: '#dc2626' }}
+                                        onClick={() => handleDeleteRoom(room.id)}
+                                        title="Delete Room"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -9839,6 +10258,284 @@ const AdminMasters = () => {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      , document.body)}
+
+      {showRoomModal && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div className="card" style={{
+            width: '100%',
+            maxWidth: '480px',
+            background: 'var(--surface)',
+            borderRadius: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+            border: '1px solid var(--border)',
+            padding: '2rem',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowRoomModal(false)}
+              style={{
+                position: 'absolute',
+                right: '1.5rem',
+                top: '1.5rem',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)'
+              }}
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 950, color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MapPin size={22} color="#ec4899" /> {isEditingRoom ? 'Edit Facility Room' : 'New Facility Room'}
+            </h3>
+            
+            <form onSubmit={handleRoomSubmit}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                  Room Name
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g., OHC Indent Room, Nurse Room A"
+                  value={roomForm.name}
+                  onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.875rem',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--background)',
+                    color: 'var(--text-main)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                  Room Type
+                </label>
+                <CustomSelect
+                  options={roomTypes.map(t => ({ value: t.value, label: t.label }))}
+                  value={roomForm.room_type}
+                  onChange={(val) => setRoomForm({ ...roomForm, room_type: val })}
+                  placeholder="-- Select Room Type --"
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox"
+                  id="room_active"
+                  checked={roomForm.is_active}
+                  onChange={(e) => setRoomForm({ ...roomForm, is_active: e.target.checked })}
+                  style={{ width: '16px', height: '16px', accentColor: '#ec4899' }}
+                />
+                <label htmlFor="room_active" style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer', textTransform: 'none' }}>
+                  Active & Available for Inventory
+                </label>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowRoomModal(false)}
+                  style={{ borderRadius: '12px', padding: '0.75rem 1.5rem', fontSize: '0.75rem' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ 
+                    borderRadius: '12px', 
+                    padding: '0.75rem 1.5rem', 
+                    fontSize: '0.75rem',
+                    background: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(236, 72, 153, 0.2)'
+                  }}
+                >
+                  {isEditingRoom ? 'Save Changes' : 'Create Room'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      , document.body)}
+
+      {showAssignmentModal && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div className="card" style={{
+            width: '100%',
+            maxWidth: '480px',
+            background: 'var(--surface)',
+            borderRadius: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+            border: '1px solid var(--border)',
+            padding: '2rem',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowAssignmentModal(false)}
+              style={{
+                position: 'absolute',
+                right: '1.5rem',
+                top: '1.5rem',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted)'
+              }}
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 950, color: 'var(--text-main)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={22} color="#8b5cf6" /> Assign Staff to Facility Room
+            </h3>
+            
+            <form onSubmit={handleAssignmentSubmit}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                  Select Staff Member
+                </label>
+                <select 
+                  required
+                  value={assignmentForm.user}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, user: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.875rem',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--background)',
+                    color: 'var(--text-main)',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">-- Choose Staff --</option>
+                  {systemUsers.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.username} {u.first_name || u.last_name ? `(${u.first_name} ${u.last_name})` : ''} - {u.role || 'No Role'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                  Select Facility Room
+                </label>
+                <select 
+                  required
+                  value={assignmentForm.room}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, room: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.875rem',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--background)',
+                    color: 'var(--text-main)',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">-- Choose Room --</option>
+                  {facilityRooms.filter(r => r.is_active).map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.room_type_display || r.room_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox"
+                  id="can_raise_indent"
+                  checked={assignmentForm.can_raise_indent}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, can_raise_indent: e.target.checked })}
+                  style={{ width: '16px', height: '16px', accentColor: '#8b5cf6' }}
+                />
+                <label htmlFor="can_raise_indent" style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer', textTransform: 'none' }}>
+                  Permit to Raise Indents
+                </label>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox"
+                  id="can_log_dispensation"
+                  checked={assignmentForm.can_log_dispensation}
+                  onChange={(e) => setAssignmentForm({ ...assignmentForm, can_log_dispensation: e.target.checked })}
+                  style={{ width: '16px', height: '16px', accentColor: '#8b5cf6' }}
+                />
+                <label htmlFor="can_log_dispensation" style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer', textTransform: 'none' }}>
+                  Permit to Log Dispensations
+                </label>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAssignmentModal(false)}
+                  style={{ borderRadius: '12px', padding: '0.75rem 1.5rem', fontSize: '0.75rem' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ 
+                    borderRadius: '12px', 
+                    padding: '0.75rem 1.5rem', 
+                    fontSize: '0.75rem',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)'
+                  }}
+                >
+                  Create Assignment
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       , document.body)}

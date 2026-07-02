@@ -474,37 +474,8 @@ const Laboratory = () => {
       </header>
       )}
 
-      {!selectedRequestGroup && (
-        <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
-          <button 
-              onClick={() => setActiveSubTab('queue')}
-              style={{ 
-                  padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                  borderBottom: activeSubTab === 'queue' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
-                  fontWeight: 800, color: activeSubTab === 'queue' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
-                  cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
-              }}
-          >
-              Workload Queue ({groupedList.length})
-          </button>
-          {(user?.role === 'ADMIN' || user?.permissions?.includes('/indents/inventory')) && (
-            <button 
-                onClick={() => setActiveSubTab('stock')}
-                style={{ 
-                    padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                    borderBottom: activeSubTab === 'stock' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
-                    fontWeight: 800, color: activeSubTab === 'stock' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
-                    cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
-                }}
-            >
-                Room Stock
-            </button>
-          )}
-        </div>
-      )}
-
       <div style={{ width: '100%', margin: '0 auto' }}>
-        {!selectedRequestGroup && activeSubTab === 'queue' && (
+        {!selectedRequestGroup && (
         <div className="card" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
              <div>
@@ -850,11 +821,7 @@ const Laboratory = () => {
              </div>
         </div>)}
 
-        {!selectedRequestGroup && activeSubTab === 'stock' && (
-          <div className="fade-in">
-             <Indents isEmbed={true} embedRoom="Lab Room" />
-          </div>
-        )}
+
 
         {selectedRequestGroup && (
           <div className="card fade-in" style={{ borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>

@@ -8,6 +8,9 @@ class UserRole(models.Model):
     project = models.ForeignKey('patients.Project', on_delete=models.CASCADE, null=True, blank=True, related_name='roles')
     data_isolation = models.BooleanField(default=False, help_text="If True, users with this role can only see records they created.")
     permissions = models.JSONField(default=list, blank=True, help_text="List of allowed module paths, e.g., ['/patients', '/vitals']")
+    assigned_room = models.ForeignKey('pharmacy.FacilityRoom', on_delete=models.SET_NULL, null=True, blank=True, related_name='roles')
+    can_raise_indent = models.BooleanField(default=True)
+    can_log_dispensation = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -24,6 +27,21 @@ class User(AbstractUser):
     phone = models.CharField(max_length=15, blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     is_password_set = models.BooleanField(default=False)
+
+    @property
+    def dynamic_room_assignment(self):
+        try:
+            if hasattr(self, 'room_assignment') and self.room_assignment:
+                return self.room_assignment
+        except Exception:
+            pass
+        try:
+            for r in self.user_roles.all():
+                if r.assigned_room:
+                    return r
+        except Exception:
+            pass
+        return None
 
     def __str__(self):
         return f"{self.username}"

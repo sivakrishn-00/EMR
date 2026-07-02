@@ -65,15 +65,29 @@ def generate_consumption_pdf_report(data):
     for visit in data.get('items', []):
         for med in visit.get('medications', []):
             log_data.append([
-                Paragraph(visit['visit_date'], theme['value']),
+                visit['visit_date'],
                 Paragraph(f"<b>{visit['patient_id']}</b><br/>{visit['patient_name']}", theme['value']),
                 Paragraph(med['name'], theme['value']),
-                Paragraph(str(med['quantity']), theme['badge_green']),
-                Paragraph(f"₹{med['total_cost']:,.2f}", theme['value'])
+                str(med['quantity']),
+                f"₹{med['total_cost']:,.2f}"
             ])
 
     log_t = Table(log_data, colWidths=[1.0*inch, 1.8*inch, 1.8*inch, 0.8*inch, 1.2*inch])
     log_t.setStyle(std_grid)
+    log_t.setStyle([
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (0, -1), 8),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        
+        ('FONTNAME', (3, 1), (3, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (3, 1), (3, -1), 8),
+        ('TEXTCOLOR', (3, 1), (3, -1), '#10b981'),
+        ('ALIGN', (3, 1), (3, -1), 'CENTER'),
+        
+        ('FONTNAME', (4, 1), (4, -1), 'Helvetica'),
+        ('FONTSIZE', (4, 1), (4, -1), 8),
+        ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
+    ])
     elements.append(log_t)
 
     doc.build(elements, onFirstPage=PageBorder, onLaterPages=PageBorder)
@@ -137,6 +151,7 @@ def generate_consumption_xlsx_report(data):
     ws.append([]) # Spacer
     ws.append([]) # Spacer
     headers = ["Date", "Card No", "Patient ID", "Patient Name", "Medication Name", "Quantity", "Unit Cost", "Total Cost"]
+    col_widths = {i: len(h) for i, h in enumerate(headers, start=1)}
     ws.append(headers)
     
     # Style Headers
@@ -161,6 +176,11 @@ def generate_consumption_xlsx_report(data):
                 med['total_cost']
             ]
             ws.append(row)
+            
+            # Track column widths
+            for col_idx, val in enumerate(row, start=1):
+                val_len = len(str(val)) if val is not None else 0
+                col_widths[col_idx] = max(col_widths.get(col_idx, 0), val_len)
             
             # Add borders and alternating row colors (subtle)
             for col in range(1, 9):
@@ -199,21 +219,11 @@ def generate_consumption_xlsx_report(data):
             cell.border = border
             cell.alignment = center_align
 
-    # Auto-adjust column widths
+    # Auto-adjust column widths using pre-calculated sizes
     from openpyxl.utils import get_column_letter
-    for col in ws.columns:
-        max_length = 0
-        column_cell = col[0]
-        column_letter = get_column_letter(column_cell.column)
-        
-        for cell in col:
-            try:
-                if cell.value:
-                    val_len = len(str(cell.value))
-                    if val_len > max_length:
-                        max_length = val_len
-            except: pass
-        ws.column_dimensions[column_letter].width = min(max_length + 2, 40) # Cap at 40
+    for col_idx, width in col_widths.items():
+        column_letter = get_column_letter(col_idx)
+        ws.column_dimensions[column_letter].width = min(width + 2, 40) # Cap at 40
 
     buffer = BytesIO()
     wb.save(buffer)

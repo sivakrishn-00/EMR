@@ -18,7 +18,8 @@ import {
   BarChart3,
   HardDrive,
   Radio,
-  TrendingUp
+  TrendingUp,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -48,25 +49,6 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
     navigate('/login');
   };
 
-  const navItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { name: 'Patients', icon: Users, path: '/patients' },
-    { name: 'Vitals Area', icon: Activity, path: '/vitals' },
-    { name: 'Consult Desk', icon: Stethoscope, path: '/consultations' },
-    { name: 'Lab Hub', icon: FlaskConical, path: '/lab' },
-    { name: 'Pharmacy', icon: Pill, path: '/pharmacy' },
-    { name: 'Reports', icon: BarChart3, path: '/reports' },
-    { name: 'Operations Hub', icon: TrendingUp, path: '/operations-hub' },
-  ];
-
-  const adminItems = [
-    { name: 'Admin Masters', icon: Database, path: '/admin-masters' },
-    { name: 'Project Management', icon: Settings, path: '/projects' },
-    { name: 'Role Management', icon: ShieldCheck, path: '/roles' },
-    { name: 'User Management', icon: UserCheck, path: '/users' },
-    { name: 'Audit Logs', icon: ClipboardList, path: '/audit' },
-  ];
-
   const userPerms = user?.permissions || [];
   const checkAccess = (path) => {
     if (path === '/admin-masters') {
@@ -84,10 +66,47 @@ const Sidebar = ({ isOpen, onToggleCollapsed, isCollapsed }) => {
              userPerms.includes('ADMIN_ALL') || 
              userPerms.includes('/indents') ||
              userPerms.includes('/indents/inventory') ||
-             userPerms.includes('/indents/approval');
+             userPerms.includes('/indents/approval') ||
+             !!user?.room_assignment;
     }
     return user?.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(path);
   };
+
+  const getRoomIcon = (roomType) => {
+    return Home;
+  };
+
+  const navItems = [
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { name: 'Patients', icon: Users, path: '/patients' },
+    { name: 'Vitals Area', icon: Activity, path: '/vitals' },
+    { name: 'Consult Desk', icon: Stethoscope, path: '/consultations' },
+    { name: 'Lab Hub', icon: FlaskConical, path: '/lab' },
+    { name: 'Pharmacy', icon: Pill, path: '/pharmacy' },
+  ];
+
+  if (checkAccess('/indents')) {
+    if (user?.room_assignment) {
+      navItems.push({
+        name: user.room_assignment.room_name || 'My Room',
+        icon: getRoomIcon(user.room_assignment.room_type),
+        path: '/indents'
+      });
+    }
+  }
+
+  navItems.push(
+    { name: 'Reports', icon: BarChart3, path: '/reports' },
+    { name: 'Operations Hub', icon: TrendingUp, path: '/operations-hub' }
+  );
+
+  const adminItems = [
+    { name: 'Admin Masters', icon: Database, path: '/admin-masters' },
+    { name: 'Project Management', icon: Settings, path: '/projects' },
+    { name: 'Role Management', icon: ShieldCheck, path: '/roles' },
+    { name: 'User Management', icon: UserCheck, path: '/users' },
+    { name: 'Audit Logs', icon: ClipboardList, path: '/audit' },
+  ];
 
   const filteredNav = navItems.filter(item => checkAccess(item.path));
   const filteredAdmin = adminItems.filter(item => checkAccess(item.path));

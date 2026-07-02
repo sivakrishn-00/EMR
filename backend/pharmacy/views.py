@@ -5,8 +5,8 @@ from django.db.models import Sum, F, Q, Count, DecimalField, ExpressionWrapper
 from django.utils import timezone
 from datetime import timedelta, datetime
 from patients.models import RegistryData, RegistryType, EmployeeMaster
-from .models import Prescription, DispensingRecord, Indent, IndentItem, RoomStock, RoomStockTransfer, RoomStockDispensation
-from .serializers import PrescriptionSerializer, DispensingRecordSerializer, IndentSerializer, IndentItemSerializer, RoomStockSerializer, RoomStockDispensationSerializer
+from .models import Prescription, DispensingRecord, Indent, IndentItem, RoomStock, RoomStockTransfer, RoomStockDispensation, FacilityRoom, UserRoomAssignment
+from .serializers import PrescriptionSerializer, DispensingRecordSerializer, IndentSerializer, IndentItemSerializer, RoomStockSerializer, RoomStockDispensationSerializer, FacilityRoomSerializer, UserRoomAssignmentSerializer
 from accounts.models import Notification
 from accounts.utils import log_action
 from .reports import generate_consumption_pdf_report, generate_consumption_xlsx_report
@@ -587,6 +587,27 @@ class ConsumptionReportView(views.APIView):
                 except (ValueError, TypeError):
                     queryset = queryset.filter(prescription__visit__patient__id_proof_number=employee_id)
 
+        # 3.5. Specific Medicine Filter (Optimized for scale to prevent timeouts)
+        medicine_id = request.query_params.get('medicine')
+        if medicine_id:
+            from patients.models import RegistryData
+            try:
+                med_item = RegistryData.objects.get(id=medicine_id)
+                med_name = med_item.name
+                med_ucode = med_item.ucode
+            except RegistryData.DoesNotExist:
+                med_item = None
+                med_name = None
+                med_ucode = None
+
+            if med_item:
+                # Filter by RegistryData link or name/code fallback to handle legacy/historical entries
+                queryset = queryset.filter(
+                    Q(batch__registry_item=med_item) |
+                    Q(prescription__medication_name__iexact=med_name) |
+                    (Q(prescription__item_code__iexact=med_ucode) if med_ucode else Q())
+                )
+
         # Ensure unique records to prevent Sum inflation from joins
         queryset = queryset.distinct()
 
@@ -613,8 +634,7 @@ class ConsumptionReportView(views.APIView):
 
         # 5. Aggregation Engine (MNC Standard: Clinical Dose Calculation Strategy)
         # We fetch records and calculate units based on prescription logic to ensure 100% accuracy
-        matching_ids = queryset.values_list('id', flat=True)
-        clean_agg_queryset = DispensingRecord.objects.filter(id__in=matching_ids).select_related('prescription', 'prescription__visit')
+        clean_agg_queryset = queryset.select_related('prescription', 'prescription__visit')
         
         clean_agg_records = clean_agg_queryset.values(
             'id', 
@@ -751,23 +771,12 @@ class ConsumptionReportView(views.APIView):
                 Q(outside_patient_aadhaar=employee_id)
             )
 
-        # Group room stock dispensations that occurred at the same time to the same recipient (Optimized to O(N log N))
-        room_records = list(room_qs)
-        
-        def get_sort_key(rec):
-            recipient_val = rec.patient_id if rec.recipient_type == 'PATIENT' else rec.outside_patient_name
-            recipient_val = str(recipient_val or '')
-            location = rec.room_stock.location if (rec.room_stock and rec.room_stock.location) else ''
-            dispensed_at_ts = rec.dispensed_at.timestamp() if rec.dispensed_at else 0.0
-            return (
-                rec.recipient_type or '',
-                recipient_val,
-                rec.dispensed_by_id or 0,
-                location,
-                dispensed_at_ts
-            )
+        if medicine_id:
+            room_qs = room_qs.filter(room_stock__registry_item_id=medicine_id)
 
-        sorted_records = sorted(room_records, key=get_sort_key)
+        # Group room stock dispensations that occurred at the same time to the same recipient (Optimized to database-level sorting)
+        room_qs = room_qs.order_by('recipient_type', 'patient_id', 'outside_patient_name', 'dispensed_by_id', 'room_stock__location', 'dispensed_at')
+        sorted_records = list(room_qs)
         
         grouped_room = []
         if sorted_records:
@@ -877,14 +886,39 @@ class ConsumptionReportView(views.APIView):
 
         final_items.sort(key=lambda x: (x['visit_date'], str(x['visit_id'])), reverse=True)
 
+        # 1. Original business logic for pharmacy records (untouched database aggregations - optimized to a single query)
+        pharmacy_stats = clean_agg_queryset.aggregate(
+            v=Count('prescription__visit', distinct=True),
+            p=Count('prescription__visit__patient', distinct=True)
+        )
+        pharmacy_visits = pharmacy_stats['v'] or 0
+        pharmacy_patients = pharmacy_stats['p'] or 0
+
+        # 2. Add-on logic for Room Stock dispensings
+        room_visits = len(grouped_room)
+        room_patients = set()
+        for group in grouped_room:
+            disp = group[0]
+            if disp.recipient_type == 'PATIENT' and disp.patient_id:
+                room_patients.add(disp.patient_id)
+            else:
+                room_patients.add(f"outside_{disp.outside_patient_aadhaar or disp.outside_patient_name}")
+
+        # 3. Combine both systems cleanly
+        total_visits = pharmacy_visits + room_visits
+        
+        pharm_patient_ids = set(clean_agg_queryset.values_list('prescription__visit__patient_id', flat=True))
+        pharm_patient_ids.discard(None)
+        total_patients = len(pharm_patient_ids.union(room_patients))
+
         # 6. Response Router (JSON or PDF)
         report_data = {
             "project_id": project_id,
             "project_name": project_name,
             "range": range_type,
             "items": final_items,
-            "total_visits": clean_agg_queryset.aggregate(v=Count('prescription__visit', distinct=True))['v'] or 0,
-            "total_patients": clean_agg_queryset.aggregate(p=Count('prescription__visit__patient', distinct=True))['p'] or 0,
+            "total_visits": total_visits,
+            "total_patients": total_patients,
             "grand_total_cost": round(grand_total_cost, 2),
             "grand_total_units": grand_total_units,
             "generated_at": now.isoformat(),
@@ -918,7 +952,7 @@ class IndentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         project_param = self.request.query_params.get('project')
         
-        queryset = Indent.objects.all().prefetch_related('items')
+        queryset = Indent.objects.all().select_related('raised_by', 'doctor').prefetch_related('items')
         
         if user.is_superuser or user.role == 'ADMIN':
             if project_param:
@@ -927,6 +961,12 @@ class IndentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project=user.project)
         else:
             queryset = queryset.none()
+            
+        # Enforce room assignment isolation if not admin
+        if user.role != 'ADMIN' and not user.is_superuser:
+            assignment = user.dynamic_room_assignment
+            if assignment:
+                queryset = queryset.filter(requesting_location=assignment.assigned_room.name)
             
         status_param = self.request.query_params.get('status')
         if status_param:
@@ -944,7 +984,15 @@ class IndentViewSet(viewsets.ModelViewSet):
         if not project:
             return Response({'error': 'Your user profile is not linked to any project. Cannot raise indent.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        requesting_location = request.data.get('requesting_location')
+        # Enforce room assignment permission & lock location
+        assignment = user.dynamic_room_assignment
+        if assignment:
+            if not assignment.can_raise_indent:
+                return Response({'error': 'You do not have permission to raise indents for this room.'}, status=status.HTTP_403_FORBIDDEN)
+            requesting_location = assignment.assigned_room.name
+        else:
+            requesting_location = request.data.get('requesting_location')
+            
         if not requesting_location:
             return Response({'error': 'Requesting location/room is required'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -990,7 +1038,11 @@ class IndentViewSet(viewsets.ModelViewSet):
             if not drug_item:
                 return Response({'error': f"Medicine '{name}' not found in project pharmacy registry."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Allow requesting any quantity (even if exceeds current stock, e.g. for replenishment/procurement)
+            # Validate against main pharmacy inventory stock
+            if drug_item.quantity < qty:
+                return Response({
+                    'error': f"Insufficient stock in main pharmacy inventory for '{name}'. Available: {drug_item.quantity}, Requested: {qty}."
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             items_to_create.append({
                 'medication_name': name,
@@ -1233,6 +1285,12 @@ class RoomStockViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             queryset = queryset.none()
             
+        # Enforce room assignment isolation if not admin
+        if user.role != 'ADMIN' and not user.is_superuser:
+            assignment = user.dynamic_room_assignment
+            if assignment:
+                queryset = queryset.filter(location=assignment.assigned_room.name)
+            
         location = self.request.query_params.get('location')
         if location:
             queryset = queryset.filter(location=location)
@@ -1248,7 +1306,7 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         project_param = self.request.query_params.get('project')
         
-        queryset = RoomStockDispensation.objects.all().select_related('room_stock__registry_item', 'patient')
+        queryset = RoomStockDispensation.objects.all().select_related('room_stock__registry_item', 'patient', 'dispensed_by')
         if user.is_superuser or user.role == 'ADMIN':
             if project_param:
                 queryset = queryset.filter(project_id=project_param)
@@ -1256,6 +1314,12 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(project=user.project)
         else:
             queryset = queryset.none()
+            
+        # Enforce room assignment isolation if not admin
+        if user.role != 'ADMIN' and not user.is_superuser:
+            assignment = user.dynamic_room_assignment
+            if assignment:
+                queryset = queryset.filter(room_stock__location=assignment.assigned_room.name)
             
         return queryset
 
@@ -1327,6 +1391,12 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
         if not project:
             return Response({'error': 'Your user profile is not linked to any project.'}, status=status.HTTP_400_BAD_REQUEST)
             
+        # Enforce room assignment permission
+        assignment = user.dynamic_room_assignment
+        if assignment:
+            if not assignment.can_log_dispensation:
+                return Response({'error': 'You do not have permission to log dispensations for this room.'}, status=status.HTTP_403_FORBIDDEN)
+            
         recipient_type = request.data.get('recipient_type', 'PATIENT')
         patient_id = request.data.get('patient_id')
         outside_name = request.data.get('outside_patient_name')
@@ -1381,6 +1451,12 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
                     except RoomStock.DoesNotExist:
                         raise Exception('Room stock item not found')
                         
+                    # Verify room stock belongs to the user's assigned room
+                    assignment = user.dynamic_room_assignment
+                    if assignment:
+                        if room_stock.location != assignment.assigned_room.name:
+                            raise Exception('You cannot dispense from a room other than your assigned room.')
+                            
                     if room_stock.quantity < q:
                         raise Exception(f'Insufficient room stock for {room_stock.registry_item.name}. Available: {room_stock.quantity}')
                         
@@ -1418,3 +1494,62 @@ class RoomStockDispensationViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(dispensation_records[0])
             
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class FacilityRoomViewSet(viewsets.ModelViewSet):
+    serializer_class = FacilityRoomSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = FacilityRoom.objects.all()
+        
+        if user.project:
+            queryset = queryset.filter(project=user.project)
+        else:
+            project_param = self.request.query_params.get('project')
+            if project_param:
+                queryset = queryset.filter(project_id=project_param)
+                
+        active_only = self.request.query_params.get('active_only', 'true')
+        if active_only.lower() == 'true':
+            queryset = queryset.filter(is_active=True)
+            
+        return queryset
+
+    @action(detail=False, methods=['get'], url_path='room-types')
+    def room_types(self, request):
+        types = [{'value': code, 'label': name} for code, name in FacilityRoom.ROOM_TYPES]
+        return Response(types)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        project = user.project
+        if not project and self.request.data.get('project'):
+            from patients.models import Project
+            project = Project.objects.get(id=self.request.data.get('project'))
+            
+        if not project:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'error': 'Project is required.'})
+            
+        serializer.save(project=project)
+
+
+class UserRoomAssignmentViewSet(viewsets.ModelViewSet):
+    serializer_class = UserRoomAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = UserRoomAssignment.objects.all().select_related('user', 'assigned_room')
+        
+        if user.project:
+            queryset = queryset.filter(assigned_room__project=user.project)
+        else:
+            project_param = self.request.query_params.get('project')
+            if project_param:
+                queryset = queryset.filter(assigned_room__project_id=project_param)
+                
+        return queryset
+

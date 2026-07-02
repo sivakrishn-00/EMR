@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Prescription, DispensingRecord, Indent, IndentItem, RoomStock, RoomStockTransfer, RoomStockDispensation
+from .models import Prescription, DispensingRecord, Indent, IndentItem, RoomStock, RoomStockTransfer, RoomStockDispensation, FacilityRoom, UserRoomAssignment
 
 class DispensingRecordSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='prescription.visit.patient.__str__', read_only=True, default='Unknown')
@@ -126,3 +126,21 @@ class RoomStockDispensationSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomStockDispensation
         fields = '__all__'
+
+
+class FacilityRoomSerializer(serializers.ModelSerializer):
+    room_type_display = serializers.CharField(source='get_room_type_display', read_only=True)
+
+    class Meta:
+        model = FacilityRoom
+        fields = '__all__'
+
+
+class UserRoomAssignmentSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    room_name = serializers.CharField(source='assigned_room.name', read_only=True)
+
+    class Meta:
+        model = UserRoomAssignment
+        fields = '__all__'
+

@@ -54,7 +54,8 @@ const ProtectedRoute = ({ children, requiredModule }) => {
   let hasAccess = user.role === 'ADMIN' || userPerms.includes('ADMIN_ALL') || userPerms.includes(requiredModule);
   if (requiredModule === '/indents' && !hasAccess) {
     hasAccess = userPerms.includes('/indents/inventory') ||
-                userPerms.includes('/indents/approval');
+                userPerms.includes('/indents/approval') ||
+                !!user.room_assignment;
   }
   if (requiredModule === '/admin-masters' && !hasAccess) {
     hasAccess = userPerms.includes('/admin-masters/protocols') ||
@@ -215,7 +216,25 @@ const RootRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'PATIENT' ? "/portal/dashboard" : "/dashboard"} replace />;
+  
+  if (user.role === 'PATIENT') {
+    return <Navigate to="/portal/dashboard" replace />;
+  } else if (user.room_assignment) {
+    return <Navigate to="/indents" replace />;
+  } else {
+    switch (user.role) {
+      case 'DOCTOR':
+        return <Navigate to="/consultations" replace />;
+      case 'NURSE':
+        return <Navigate to="/vitals" replace />;
+      case 'LAB_TECH':
+        return <Navigate to="/lab" replace />;
+      case 'PHARMACIST':
+        return <Navigate to="/pharmacy" replace />;
+      default:
+        return <Navigate to="/dashboard" replace />;
+    }
+  }
 };
 
 function App() {

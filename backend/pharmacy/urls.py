@@ -6,7 +6,9 @@ from .views import (
     ConsumptionReportView,
     IndentViewSet,
     RoomStockViewSet,
-    RoomStockDispensationViewSet
+    RoomStockDispensationViewSet,
+    FacilityRoomViewSet,
+    UserRoomAssignmentViewSet
 )
 
 router = DefaultRouter()
@@ -15,6 +17,8 @@ router.register(r'dispensing', DispensingRecordViewSet)
 router.register(r'indents', IndentViewSet, basename='indent')
 router.register(r'room-stock', RoomStockViewSet, basename='room-stock')
 router.register(r'room-dispensation', RoomStockDispensationViewSet, basename='room-dispensation')
+router.register(r'facility-rooms', FacilityRoomViewSet, basename='facility-room')
+router.register(r'user-room-assignments', UserRoomAssignmentViewSet, basename='user-room-assignment')
 
 urlpatterns = [
     path('audit-export/', ConsumptionReportView.as_view(), name='audit-export'),

@@ -73,6 +73,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
   const [dispensationsList, setDispensationsList] = useState([]);
   const [registryDrugs, setRegistryDrugs] = useState([]);
   const [patientResults, setPatientResults] = useState([]);
+  const [rooms, setRooms] = useState([]);
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -172,6 +173,9 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
       if (stateRoom) {
         setSelectedRoom(stateRoom);
         setIndentForm(f => ({ ...f, requesting_location: stateRoom }));
+      } else if (user.room_assignment?.room_name) {
+        setSelectedRoom(user.room_assignment.room_name);
+        setIndentForm(f => ({ ...f, requesting_location: user.room_assignment.room_name }));
       } else if (user.role === 'LAB_TECH' || user.role === 'LABORATORY') {
         setSelectedRoom('Lab Room');
         setIndentForm(f => ({ ...f, requesting_location: 'Lab Room' }));
@@ -359,6 +363,46 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
     }
   };
 
+  const fetchRooms = async () => {
+    try {
+      const projectId = user?.project?.id || user?.project;
+      const projectQuery = (projectId && projectId !== 'undefined') ? `&project=${projectId}` : '';
+      const res = await api.get(`pharmacy/facility-rooms/?active_only=true${projectQuery}`);
+      const loadedRooms = res.data.results || res.data || [];
+      
+      // Deduplicate rooms by name
+      const uniqueRooms = [];
+      const seenNames = new Set();
+      for (const r of loadedRooms) {
+        if (r && r.name) {
+          const nameTrimmed = r.name.trim();
+          if (!seenNames.has(nameTrimmed)) {
+            seenNames.add(nameTrimmed);
+            uniqueRooms.push(r);
+          }
+        }
+      }
+      setRooms(uniqueRooms);
+      
+      if (user?.room_assignment?.room_name) {
+        setSelectedRoom(user.room_assignment.room_name);
+        setIndentForm(f => ({ ...f, requesting_location: user.room_assignment.room_name }));
+      } else if (uniqueRooms.length > 0) {
+        const roomNames = uniqueRooms.map(r => r.name);
+        if (!roomNames.includes(selectedRoom)) {
+          setSelectedRoom(roomNames[0]);
+          setIndentForm(f => ({ ...f, requesting_location: roomNames[0] }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch facility rooms:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRooms();
+  }, [user]);
+
   const fetchRegistryDrugs = async () => {
     let url = 'patients/registry-data/?all=true&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory';
     if (user?.project) {
@@ -521,6 +565,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
       title: 'Cancel Indent Request',
       message: 'Are you sure you want to cancel this indent request? This will permanently close the replenishment request.',
       onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, show: false }));
         try {
           await api.post(`pharmacy/indents/${id}/cancel/`);
           toast.success('Indent request cancelled');
@@ -540,6 +585,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
       title: 'Fulfill & Dispense Indent',
       message: 'Are you sure you want to dispense medicines for this indent? The items will be immediately transferred to the sub-store stock.',
       onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, show: false }));
         const loadingToast = toast.loading('Transferring stocks to sub-store...');
         try {
           await api.post(`pharmacy/indents/${id}/dispense/`);
@@ -701,10 +747,29 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {activeTab !== 'approval' ? (
             <>
-              {isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
+              {user?.room_assignment?.room_name ? (
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  color: 'var(--primary)',
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)' }}></span>
+                  {user.room_assignment.room_name}
+                </div>
+              ) : isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY') ? (
                 <select 
                   value={selectedRoom}
-                  onChange={(e) => setSelectedRoom(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedRoom(e.target.value);
+                    setIndentForm(f => ({ ...f, requesting_location: e.target.value }));
+                  }}
                   style={{ 
                     padding: '0.625rem 1.25rem', 
                     borderRadius: '12px', 
@@ -713,11 +778,13 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                     fontWeight: 700,
                     fontSize: '0.8125rem',
                     color: 'var(--text-main)',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)'
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                    cursor: 'pointer'
                   }}
                 >
-                  <option value="Nurse Room">Nurse Room Inventory</option>
-                  <option value="Lab Room">Laboratory Room Inventory</option>
+                  {rooms.map(r => (
+                    <option key={r.id} value={r.name}>{r.name} Inventory</option>
+                  ))}
                 </select>
               ) : (
                 <button 
@@ -791,7 +858,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
               {(location.state?.from === '/pharmacy' || isPharmacyUser) ? 'Back to Pharmacy' : 'Back to Consult Desk'}
             </button>
           )}
-          {activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
+          {activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (user?.room_assignment ? user.room_assignment.can_raise_indent : true) && (
             <button 
               className="btn btn-primary"
               onClick={() => setShowRequestModal(true)}
@@ -826,116 +893,110 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              {isEmbed && (isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY')) && (
-                <div ref={dropdownRef} style={{ position: 'relative', minWidth: '190px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)',
-                      fontWeight: 700,
-                      fontSize: '0.75rem',
-                      color: 'var(--text-main)',
-                      height: '34px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isRoomDropdownOpen) {
-                        e.currentTarget.style.borderColor = 'var(--border)';
-                      }
-                    }}
-                  >
-                    <span>{selectedRoom === 'Nurse Room' ? 'Nurse Room Inventory' : 'Laboratory Room Inventory'}</span>
-                    <ChevronDown size={14} style={{ color: 'var(--text-muted)', marginLeft: '8px', transform: isRoomDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
-                  </button>
-                  {isRoomDropdownOpen && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 4px)',
-                      left: 0,
-                      right: 0,
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '10px',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                      zIndex: 1000,
-                      overflow: 'hidden',
-                      padding: '4px'
-                    }}>
-                      <div 
-                        onClick={() => {
-                          setSelectedRoom('Nurse Room');
-                          setIndentForm(f => ({ ...f, requesting_location: 'Nurse Room' }));
-                          setIsRoomDropdownOpen(false);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          background: selectedRoom === 'Nurse Room' ? 'var(--primary)' : 'transparent',
-                          color: selectedRoom === 'Nurse Room' ? 'white' : 'var(--text-main)',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedRoom !== 'Nurse Room') {
-                            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedRoom !== 'Nurse Room') {
-                            e.currentTarget.style.background = 'transparent';
-                          }
-                        }}
-                      >
-                        Nurse Room Inventory
+              {isEmbed && (
+                user?.room_assignment?.room_name ? (
+                  <div style={{
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    color: 'var(--primary)',
+                    padding: '6px 14px',
+                    borderRadius: '10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '34px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)' }}></span>
+                    {user.room_assignment.room_name}
+                  </div>
+                ) : (isPharmacyUser || !(user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY')) && (
+                  <div ref={dropdownRef} style={{ position: 'relative', minWidth: '190px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        fontWeight: 700,
+                        fontSize: '0.75rem',
+                        color: 'var(--text-main)',
+                        height: '34px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isRoomDropdownOpen) {
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                        }
+                      }}
+                    >
+                      <span>{selectedRoom} Inventory</span>
+                      <ChevronDown size={14} style={{ color: 'var(--text-muted)', marginLeft: '8px', transform: isRoomDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
+                    </button>
+                    {isRoomDropdownOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                        zIndex: 1000,
+                        overflow: 'hidden',
+                        padding: '4px'
+                      }}>
+                        {rooms.map(r => (
+                          <div 
+                            key={r.id}
+                            onClick={() => {
+                              setSelectedRoom(r.name);
+                              setIndentForm(f => ({ ...f, requesting_location: r.name }));
+                              setIsRoomDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: selectedRoom === r.name ? 'var(--primary)' : 'transparent',
+                              color: selectedRoom === r.name ? 'white' : 'var(--text-main)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (selectedRoom !== r.name) {
+                                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (selectedRoom !== r.name) {
+                                e.currentTarget.style.background = 'transparent';
+                              }
+                            }}
+                          >
+                            {r.name} Inventory
+                          </div>
+                        ))}
                       </div>
-                      <div 
-                        onClick={() => {
-                          setSelectedRoom('Lab Room');
-                          setIndentForm(f => ({ ...f, requesting_location: 'Lab Room' }));
-                          setIsRoomDropdownOpen(false);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          background: selectedRoom === 'Lab Room' ? 'var(--primary)' : 'transparent',
-                          color: selectedRoom === 'Lab Room' ? 'white' : 'var(--text-main)',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedRoom !== 'Lab Room') {
-                            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedRoom !== 'Lab Room') {
-                            e.currentTarget.style.background = 'transparent';
-                          }
-                        }}
-                      >
-                        Laboratory Room Inventory
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )
               )}
               <div className="search-container" style={{ position: 'relative', width: '320px' }}>
                 <Search size={14} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
@@ -981,7 +1042,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                   </button>
                 )}
               </div>
-              {isEmbed && activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (
+              {isEmbed && activeTab !== 'approval' && !isPharmacy && (user?.role === 'NURSE' || user?.role === 'LAB_TECH' || user?.role === 'LABORATORY' || user?.role === 'ADMIN') && (user?.room_assignment ? user.room_assignment.can_raise_indent : true) && (
                 <button 
                   className="btn btn-primary"
                   onClick={() => setShowRequestModal(true)}
@@ -1143,7 +1204,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                           )}
                         </td>
                         <td style={{ padding: '1rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted)', verticalAlign: 'middle' }}>{new Date(item.updated_at).toLocaleString()}</td>
-                        {!isPharmacyUser && (
+                        {!isPharmacyUser && (user?.room_assignment ? user.room_assignment.can_log_dispensation : true) && (
                           <td style={{ padding: '1rem 1.5rem 1rem 1rem', textAlign: 'right', verticalAlign: 'middle' }}>
                             <button 
                               className="btn"
@@ -1909,10 +1970,12 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                     value={indentForm.requesting_location}
                     onChange={(e) => setIndentForm(f => ({ ...f, requesting_location: e.target.value }))}
                     required
+                    disabled={!!user?.room_assignment?.room_name}
                     style={{ width: '100%', marginTop: '0.25rem' }}
                   >
-                    <option value="Nurse Room">Nurse Room</option>
-                    <option value="Lab Room">Laboratory Room</option>
+                    {rooms.map(r => (
+                      <option key={r.id} value={r.name}>{r.name}</option>
+                    ))}
                   </select>
                 ) : (
                   <div style={{
@@ -1925,7 +1988,7 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
                     marginTop: '0.25rem',
                     color: 'var(--text-main)'
                   }}>
-                    {indentForm.requesting_location === 'Nurse Room' ? `Nurse Room (${projectConfig?.name || ''})` : `Laboratory Room (${projectConfig?.name || ''})`}
+                    {indentForm.requesting_location} ({projectConfig?.name || ''})
                   </div>
                 )}
               </div>
@@ -2223,8 +2286,8 @@ const Indents = ({ isEmbed = false, embedRoom = 'Nurse Room', embedTab = null, i
               <button 
                 type="button"
                 onClick={() => {
-                  if (confirmDialog.onConfirm) confirmDialog.onConfirm();
                   setConfirmDialog(prev => ({ ...prev, show: false }));
+                  if (confirmDialog.onConfirm) confirmDialog.onConfirm();
                 }}
                 className="btn btn-primary"
                 style={{ 

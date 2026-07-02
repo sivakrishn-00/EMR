@@ -1,8 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Check, Pencil, Trash2, Briefcase, ChevronDown } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+
+// Reusable Custom Select Dropdown for enhanced UI aesthetics
+const CustomSelect = ({ options, value, onChange, placeholder = 'Select...', style = {}, primaryColor }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-control"
+        style={{
+          width: '100%',
+          height: '52px',
+          borderRadius: '16px',
+          background: 'var(--background)',
+          border: '1px solid var(--border)',
+          padding: '0 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          color: 'var(--text-main)',
+          textAlign: 'left'
+        }}
+      >
+        <span>{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={18} style={{ 
+          color: 'var(--text-muted)', 
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '8px'
+        }} />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '6px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000,
+          maxHeight: '250px',
+          overflowY: 'auto',
+          padding: '6px'
+        }}>
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.875rem',
+                fontWeight: value === opt.value ? 700 : 500,
+                background: value === opt.value ? `${primaryColor || 'var(--primary)'}15` : 'transparent',
+                color: value === opt.value ? (primaryColor || 'var(--primary)') : 'var(--text-main)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'var(--background)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (value !== opt.value) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <span>{opt.label}</span>
+              {value === opt.value && <Check size={16} color={primaryColor || 'var(--primary)'} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SYSTEM_MODULES = [
     { id: '/dashboard', name: 'Dashboard Analytics', icon: 'LayoutDashboard' },
@@ -37,9 +143,23 @@ const RoleManagement = () => {
     const [selectedProjectId, setSelectedProjectId] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
-    const [roleForm, setRoleForm] = useState({ name: '', description: '', data_isolation: false, permissions: [] });
+    const [roleForm, setRoleForm] = useState({ name: '', description: '', data_isolation: false, permissions: [], assigned_room: '', can_raise_indent: true, can_log_dispensation: true });
     const [isEditingRole, setIsEditingRole] = useState(false);
     const [editingRoleId, setEditingRoleId] = useState(null);
+    const [rooms, setRooms] = useState([]);
+
+    useEffect(() => {
+        if (selectedProjectId) {
+            api.get(`pharmacy/facility-rooms/?project=${selectedProjectId}`)
+                .then(res => {
+                    const data = res.data.results || res.data || [];
+                    setRooms(data.filter(r => r.is_active));
+                })
+                .catch(err => console.error("Failed to fetch rooms", err));
+        } else {
+            setRooms([]);
+        }
+    }, [selectedProjectId]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -92,7 +212,8 @@ const RoleManagement = () => {
         try {
             const payload = {
                 ...roleForm,
-                project: selectedProjectId
+                project: selectedProjectId,
+                assigned_room: roleForm.assigned_room || null
             };
             if (isEditingRole) {
                 await api.put(`accounts/user-roles/${editingRoleId}/`, payload);
@@ -101,7 +222,7 @@ const RoleManagement = () => {
                 await api.post('accounts/user-roles/', payload);
                 toast.success("New role created!", { id: loadId });
             }
-            setRoleForm({ name: '', description: '', data_isolation: false, permissions: [] });
+            setRoleForm({ name: '', description: '', data_isolation: false, permissions: [], assigned_room: '', can_raise_indent: true, can_log_dispensation: true });
             setIsEditingRole(false);
             setEditingRoleId(null);
             fetchRoles(selectedProjectId);
@@ -304,6 +425,55 @@ const RoleManagement = () => {
                                 />
                             </label>
                         </div>
+
+                        {selectedProjectId && (
+                            <>
+                                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem' }}>Assigned Facility Room</label>
+                                    <CustomSelect
+                                        options={
+                                            rooms.length > 0 
+                                                ? [
+                                                    { value: "", label: "-- None / Unassigned --" },
+                                                    ...rooms.map(r => ({ value: String(r.id), label: `${r.name} (${r.room_type_display || r.room_type})` }))
+                                                  ]
+                                                : [{ value: "", label: "-- No Rooms Configured for this Project --" }]
+                                        }
+                                        value={String(roleForm.assigned_room || "")}
+                                        onChange={val => {
+                                            if (rooms.length > 0) {
+                                                setRoleForm({...roleForm, assigned_room: val});
+                                            }
+                                        }}
+                                        placeholder={rooms.length > 0 ? "-- None / Unassigned --" : "-- No Rooms Configured for this Project --"}
+                                    />
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Optional. Users with this role will inherit this room assignment.</p>
+                                </div>
+
+                                {roleForm.assigned_room && (
+                                    <div className="form-group" style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', marginTop: '0.5rem' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={roleForm.can_raise_indent} 
+                                                onChange={e => setRoleForm({...roleForm, can_raise_indent: e.target.checked})}
+                                                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                                            />
+                                            Can Raise Indents
+                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={roleForm.can_log_dispensation} 
+                                                onChange={e => setRoleForm({...roleForm, can_log_dispensation: e.target.checked})}
+                                                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                                            />
+                                            Can Log Dispensations
+                                        </label>
+                                    </div>
+                                )}
+                            </>
+                        )}
                         
                         <div className="form-group" style={{ marginBottom: '2.5rem' }}>
                             <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -346,7 +516,7 @@ const RoleManagement = () => {
                             {isEditingRole ? 'Save Changes' : 'Initialize Rule'}
                         </button>
                         {isEditingRole && (
-                            <button type="button" onClick={() => { setIsEditingRole(false); setRoleForm({ name: '', description: '', data_isolation: false, permissions: [] }); }} style={{ width: '100%', marginTop: '0.75rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, padding: '0.75rem', cursor: 'pointer' }}>Cancel Edit</button>
+                            <button type="button" onClick={() => { setIsEditingRole(false); setRoleForm({ name: '', description: '', data_isolation: false, permissions: [], assigned_room: '', can_raise_indent: true, can_log_dispensation: true }); }} style={{ width: '100%', marginTop: '0.75rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, padding: '0.75rem', cursor: 'pointer' }}>Cancel Edit</button>
                         )}
                     </form>
                 </div>
@@ -377,15 +547,28 @@ const RoleManagement = () => {
                                             <span style={{ fontSize: '0.65rem', fontWeight: 850, padding: '6px 12px', background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', letterSpacing: '0.05em' }}>SYSTEM PROTECTED</span>
                                         ) : (
                                             <>
-                                                <button onClick={() => { setEditingRoleId(r.id); setIsEditingRole(true); setRoleForm({ name: r.name, description: r.description, data_isolation: r.data_isolation, permissions: r.permissions || [] }); window.scrollTo({top:0, behavior:'smooth'}) }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Pencil size={14} /></button>
+                                                <button onClick={() => { setEditingRoleId(r.id); setIsEditingRole(true); setRoleForm({ name: r.name, description: r.description, data_isolation: r.data_isolation, permissions: r.permissions || [], assigned_room: r.assigned_room || '', can_raise_indent: r.can_raise_indent ?? true, can_log_dispensation: r.can_log_dispensation ?? true }); window.scrollTo({top:0, behavior:'smooth'}) }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Pencil size={14} /></button>
                                                 <button onClick={async () => { if(window.confirm(`Delete role ${r.name}?`)) { await api.delete(`accounts/user-roles/${r.id}/`); fetchRoles(selectedProjectId); } }} style={{ padding: '0.5rem', background: 'var(--surface)', border: '1px solid var(--border)', color: '#ef4444', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}><Trash2 size={14} /></button>
                                             </>
                                         )}
                                     </div>
                                 </div>
-                                <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                     <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}><span style={{ color: 'var(--primary)', fontWeight: 800 }}>{r.permissions?.length || 0}</span> Modules Mapped</p>
-                                     <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}><span style={{ color: '#10b981', fontWeight: 800 }}>{r.users?.length || 0}</span> Users Assigned</p>
+                                <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                    {r.assigned_room_name && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.08)', color: 'var(--primary)', fontWeight: 800, fontSize: '0.625rem', padding: '0.3rem 0.6rem', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--primary)' }}></span>
+                                                Room: {r.assigned_room_name}
+                                            </span>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                                                ({r.can_raise_indent ? 'Indent' : ''}{r.can_raise_indent && r.can_log_dispensation ? ' / ' : ''}{r.can_log_dispensation ? 'Dispense' : ''})
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                         <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}><span style={{ color: 'var(--primary)', fontWeight: 800 }}>{r.permissions?.length || 0}</span> Modules Mapped</p>
+                                         <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}><span style={{ color: '#10b981', fontWeight: 800 }}>{r.users?.length || 0}</span> Users Assigned</p>
+                                    </div>
                                 </div>
                             </div>
                         ))}

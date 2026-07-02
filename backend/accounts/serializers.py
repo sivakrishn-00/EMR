@@ -5,6 +5,7 @@ from django.db.models import Q
 
 class UserRoleSerializer(serializers.ModelSerializer):
     users = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), required=False)
+    assigned_room_name = serializers.ReadOnlyField(source='assigned_room.name')
     
     class Meta:
         model = UserRole
@@ -17,12 +18,34 @@ class UserSerializer(serializers.ModelSerializer):
     project_name = serializers.ReadOnlyField(source='project.name')
     branding = serializers.SerializerMethodField()
     password = serializers.CharField(write_only=True, required=False)
+    room_assignment = serializers.SerializerMethodField()
+    
+    # New write-only fields for managing room assignment
+    assigned_room = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    can_raise_indent = serializers.BooleanField(write_only=True, required=False, default=True)
+    can_log_dispensation = serializers.BooleanField(write_only=True, required=False, default=True)
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name', 'branding', 'is_password_set', 'password')
+        fields = ('id', 'username', 'email', 'role', 'phone', 'address', 'first_name', 'last_name', 'is_active', 'date_joined', 'user_roles', 'user_roles_details', 'permissions', 'data_isolation', 'project', 'project_name', 'branding', 'is_password_set', 'password', 'room_assignment', 'assigned_room', 'can_raise_indent', 'can_log_dispensation')
+
+    def get_room_assignment(self, obj):
+        assignment = obj.dynamic_room_assignment
+        if assignment:
+            return {
+                'room_id': assignment.assigned_room.id,
+                'room_name': assignment.assigned_room.name,
+                'room_type': assignment.assigned_room.room_type,
+                'can_raise_indent': assignment.can_raise_indent,
+                'can_log_dispensation': assignment.can_log_dispensation,
+            }
+        return None
 
     def update(self, instance, validated_data):
+        assigned_room_id = validated_data.pop('assigned_room', None)
+        can_raise_indent = validated_data.pop('can_raise_indent', True)
+        can_log_dispensation = validated_data.pop('can_log_dispensation', True)
+
         password = validated_data.pop('password', None)
         if password:
             instance.set_password(password)
@@ -53,7 +76,26 @@ class UserSerializer(serializers.ModelSerializer):
                         mapped_roles.append(r_proj)
                 instance.user_roles.set(mapped_roles)
 
-        return super().update(instance, validated_data)
+        user = super().update(instance, validated_data)
+
+        # Handle room assignment
+        if assigned_room_id is not None:
+            from pharmacy.models import UserRoomAssignment, FacilityRoom
+            if assigned_room_id == 0 or assigned_room_id == "" or assigned_room_id == "null":
+                UserRoomAssignment.objects.filter(user=user).delete()
+            else:
+                try:
+                    room = FacilityRoom.objects.get(id=assigned_room_id)
+                    assignment, created = UserRoomAssignment.objects.get_or_create(user=user, defaults={'assigned_room': room})
+                    if not created:
+                        assignment.assigned_room = room
+                    assignment.can_raise_indent = can_raise_indent
+                    assignment.can_log_dispensation = can_log_dispensation
+                    assignment.save()
+                except FacilityRoom.DoesNotExist:
+                    pass
+
+        return user
 
     def get_permissions(self, obj):
         if obj.role == 'ADMIN':
@@ -85,14 +127,23 @@ class UserSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     user_roles = serializers.PrimaryKeyRelatedField(queryset=UserRole.objects.all(), many=True, required=False)
+    
+    # New write-only fields for managing room assignment
+    assigned_room = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    can_raise_indent = serializers.BooleanField(write_only=True, required=False, default=True)
+    can_log_dispensation = serializers.BooleanField(write_only=True, required=False, default=True)
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'role', 'first_name', 'last_name', 'phone', 'user_roles', 'project')
+        fields = ('username', 'email', 'password', 'role', 'first_name', 'last_name', 'phone', 'user_roles', 'project', 'assigned_room', 'can_raise_indent', 'can_log_dispensation')
 
     def create(self, validated_data):
         user_roles_data = validated_data.pop('user_roles', [])
         project = validated_data.get('project', None)
+        assigned_room_id = validated_data.pop('assigned_room', None)
+        can_raise_indent = validated_data.pop('can_raise_indent', True)
+        can_log_dispensation = validated_data.pop('can_log_dispensation', True)
+
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
@@ -113,6 +164,21 @@ class RegisterSerializer(serializers.ModelSerializer):
                 if r_proj and r_proj not in mapped_roles:
                     mapped_roles.append(r_proj)
             user.user_roles.set(mapped_roles)
+
+        # Handle room assignment
+        if assigned_room_id:
+            from pharmacy.models import UserRoomAssignment, FacilityRoom
+            try:
+                room = FacilityRoom.objects.get(id=assigned_room_id)
+                UserRoomAssignment.objects.create(
+                    user=user,
+                    assigned_room=room,
+                    can_raise_indent=can_raise_indent,
+                    can_log_dispensation=can_log_dispensation
+                )
+            except FacilityRoom.DoesNotExist:
+                pass
+
         return user
 
 class AuditLogSerializer(serializers.ModelSerializer):
@@ -138,9 +204,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         roles = user.user_roles.all()
         token['roles'] = [r.name for r in roles]
         
-        # Determine Data Isolation: If ALL assigned roles have data_isolation=True, enforce it.
-        # If any role is global (data_isolation=False), they get global access.
-        # If no roles are assigned, fallback to primary 'role' (e.g. basic PATIENT isolation)
+        # Determine Data Isolation
         if roles.exists():
             token['data_isolation'] = all(r.data_isolation for r in roles)
         else:
@@ -159,34 +223,52 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         token['username'] = user.username
         token['name'] = f"{user.first_name} {user.last_name}"
+        
+        assignment = user.dynamic_room_assignment
+        if assignment:
+            token['room_assignment'] = {
+                'room_id': assignment.assigned_room.id,
+                'room_name': assignment.assigned_room.name,
+                'room_type': assignment.assigned_room.room_type,
+            }
+            
         return token
 
     def validate(self, attrs):
         identifier = attrs.get("username")
         password = attrs.get("password")
 
-        # 🚀 MULTI-IDENTIFIER LOGIC: Resolve User by ID (Username) or mobile number (Phone)
         user = User.objects.filter(Q(username=identifier) | Q(phone=identifier)).first()
         
         if user and not user.is_active:
             raise serializers.ValidationError({"error": "Your account is deactivated. Please contact the clinical administrator."})
 
         if user and user.check_password(password):
-            # Map the resolved username back to keep JWT built-in validation happy
             attrs['username'] = user.username
         
         data = super().validate(attrs)
 
-        # 🛡️ SECURITY: ZERO-ROLE BLOCK (MNC Standard)
         if not self.user.is_superuser and not self.user.user_roles.exists():
              raise serializers.ValidationError({"error": "Access Restricted: Your account has no assigned permissions. Please contact clinical administration to link your role."})
         
-        # 🚀 PORTAL SYNC: Include user info in the response body for immediate frontend use
+        room_data = None
+        assignment = self.user.dynamic_room_assignment
+        if assignment:
+            room_data = {
+                'room_id': assignment.assigned_room.id,
+                'room_name': assignment.assigned_room.name,
+                'room_type': assignment.assigned_room.room_type,
+                'can_raise_indent': assignment.can_raise_indent,
+                'can_log_dispensation': assignment.can_log_dispensation,
+            }
+
         data['user'] = {
             'id': self.user.id,
             'username': self.user.username,
             'role': self.user.role if hasattr(self.user, 'role') else 'PATIENT',
-            'is_password_set': self.user.is_password_set
+            'is_password_set': self.user.is_password_set,
+            'room_assignment': room_data
         }
         
         return data
+

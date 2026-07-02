@@ -87,6 +87,7 @@ const Reports = () => {
   const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isProjDropdownOpen, setIsProjDropdownOpen] = useState(false);
+  const [filterType, setFilterType] = useState('employee'); // 'employee' or 'medicine'
 
   useEffect(() => {
     fetchProjects();
@@ -107,6 +108,9 @@ const Reports = () => {
       }
       if (projDropdownRef.current && !projDropdownRef.current.contains(event.target)) {
         setIsProjDropdownOpen(false);
+      }
+      if (medicineDropdownRef.current && !medicineDropdownRef.current.contains(event.target)) {
+        setShowMedicineDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -161,6 +165,30 @@ const Reports = () => {
     }
   };
 
+  const medicineDropdownRef = React.useRef(null);
+  const [selectedMedicine, setSelectedMedicine] = useState('');
+  const [medicineSearchTerm, setMedicineSearchTerm] = useState('');
+  const [showMedicineDropdown, setShowMedicineDropdown] = useState(false);
+  const [medicineList, setMedicineList] = useState([]);
+  const [medicinePage, setMedicinePage] = useState(1);
+  const [hasMoreMedicines, setHasMoreMedicines] = useState(true);
+  const [isSearchingMedicines, setIsSearchingMedicines] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'PERSONNEL' && selectedProject !== 'all') {
+      fetchMedicines(1, true);
+    }
+  }, [selectedProject, activeTab]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeTab === 'PERSONNEL' && selectedProject !== 'all') {
+        fetchMedicines(1, true);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [medicineSearchTerm]);
+
   const fetchEmployees = async (page = 1, isNewSearch = false) => {
     if (selectedProject === 'all') return;
     setIsSearching(true);
@@ -183,6 +211,29 @@ const Reports = () => {
     }
   };
 
+  const fetchMedicines = async (page = 1, isNewSearch = false) => {
+    if (selectedProject === 'all') return;
+    setIsSearchingMedicines(true);
+    try {
+      const endpoint = `patients/registry-data/?all=true&type_category=CLINICAL_DRUGS,PHARMACY&registry_type__slug=pharmacy,pharmacy_drugs,pharmacy_inventory&project=${selectedProject}&search=${medicineSearchTerm}&page=${page}&page_size=30`;
+      const res = await api.get(endpoint);
+      const newData = res.data.results || res.data || [];
+      
+      if (isNewSearch) {
+        setMedicineList(newData);
+      } else {
+        setMedicineList(prev => [...prev, ...newData]);
+      }
+      
+      setHasMoreMedicines(!!res.data.next);
+      setMedicinePage(page);
+    } catch (err) {
+      console.error("Medicine fetch error:", err);
+    } finally {
+      setIsSearchingMedicines(false);
+    }
+  };
+
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkData, setBulkData] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -191,6 +242,13 @@ const Reports = () => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     if (scrollHeight - scrollTop <= clientHeight + 50 && hasMoreEmployees && !isSearching) {
       fetchEmployees(employeePage + 1);
+    }
+  };
+
+  const handleMedicineScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && hasMoreMedicines && !isSearchingMedicines) {
+      fetchMedicines(medicinePage + 1);
     }
   };
 
@@ -208,7 +266,7 @@ const Reports = () => {
     
     setLoading(true);
     try {
-      let url = `pharmacy/consumption-report/?project=${selectedProject}&employee=${selectedEmployee}&range=${timeRange}`;
+      let url = `pharmacy/consumption-report/?project=${selectedProject}&employee=${selectedEmployee}&medicine=${selectedMedicine}&range=${timeRange}`;
       if (timeRange === 'custom') {
         url += `&start_date=${startDate}&end_date=${endDate}`;
       }
@@ -321,7 +379,7 @@ const Reports = () => {
         }
       }
       try {
-        let url = `pharmacy/audit-export/?project=${selectedProject}&employee=${selectedEmployee}&range=${timeRange}&export_format=xlsx`;
+        let url = `pharmacy/audit-export/?project=${selectedProject}&employee=${selectedEmployee}&medicine=${selectedMedicine}&range=${timeRange}&export_format=xlsx`;
         if (timeRange === 'custom') {
           url += `&start_date=${startDate}&end_date=${endDate}`;
         }
@@ -746,178 +804,339 @@ const Reports = () => {
 
           <div className="no-print" style={{ 
             display: 'flex', 
-            justifyContent: 'space-between', 
+            flexDirection: 'column',
+            gap: '1rem',
             background: 'var(--surface)', 
-            padding: '1rem', 
-            borderRadius: '16px', 
+            padding: '1.25rem', 
+            borderRadius: '20px', 
             border: '1px solid var(--border)',
             marginBottom: '1.5rem',
-            gap: '1rem',
-            alignItems: 'center'
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)'
           }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1 }} ref={dropdownRef}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    type="text"
-                    placeholder="Search Employee / Card No / Family..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setShowDropdown(true);
-                      if (!e.target.value) setSelectedEmployee('');
+            {/* Row 1: Filter Mode Selector (Left) & Active Search Input (Right) */}
+            <div style={{ display: 'flex', gap: '1.25rem', width: '100%', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Filter Mode Selector */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: '4px' }}>
+                  Filter Mode:
+                </span>
+                {['employee', 'medicine'].map(t => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setFilterType(t);
+                      if (t === 'employee') {
+                        setSelectedMedicine('');
+                        setMedicineSearchTerm('');
+                      } else {
+                        setSelectedEmployee('');
+                        setSearchTerm('');
+                      }
                     }}
-                    onFocus={() => setShowDropdown(true)}
                     style={{
-                      width: '100%',
-                      padding: '12px 12px 12px 2.5rem',
-                      background: 'var(--surface)',
+                      padding: '8px 16px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
                       border: '1px solid var(--border)',
-                      borderRadius: '14px',
-                      fontSize: '0.875rem',
-                      fontWeight: 700,
-                      outline: 'none',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                    }}
-                  />
-                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  {searchTerm && (
-                    <button 
-                      onClick={() => { setSearchTerm(''); setSelectedEmployee(''); }}
-                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-                    >✕</button>
-                  )}
-                </div>
-
-                {showDropdown && (
-                  <div 
-                    onScroll={handleScroll}
-                    style={{ 
-                      position: 'absolute', 
-                      top: '110%', 
-                      left: 0, 
-                      right: 0, 
-                      background: 'var(--surface)', 
-                      border: '1px solid var(--border)', 
-                      borderRadius: '16px', 
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
-                      maxHeight: '350px', 
-                      overflowY: 'auto', 
-                      zIndex: 1000,
-                      padding: '8px'
+                      cursor: 'pointer',
+                      background: filterType === t ? '#6366f1' : 'var(--surface)',
+                      color: filterType === t ? 'white' : 'var(--text-muted)',
+                      transition: '0.2s',
+                      textTransform: 'capitalize',
+                      boxShadow: filterType === t ? '0 4px 10px rgba(99, 102, 241, 0.2)' : 'none'
                     }}
                   >
-                    <div 
-                      onClick={() => handleEmployeeSelect('', 'Full Project Consumption')}
-                      style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 800, color: '#6366f1', background: !selectedEmployee ? '#6366f110' : 'transparent', marginBottom: '4px' }}
-                    >
-                      All Personnel (Project View)
+                    {t === 'employee' ? 'By Employee' : 'By Medicine'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Active Search Input (Remaining Width) */}
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                {filterType === 'employee' ? (
+                  <div style={{ position: 'relative', width: '100%' }} ref={dropdownRef}>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="text"
+                        placeholder="Search Employee / Card No / Family..."
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          setShowDropdown(true);
+                          if (!e.target.value) setSelectedEmployee('');
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 12px 12px 2.5rem',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '14px',
+                          fontSize: '0.875rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                        }}
+                      />
+                      <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      {searchTerm && (
+                        <button 
+                          onClick={() => { setSearchTerm(''); setSelectedEmployee(''); }}
+                          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        >✕</button>
+                      )}
                     </div>
-                    {filteredEmployees.map(emp => (
-                      <div key={emp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '4px', marginBottom: '4px' }}>
+
+                    {showDropdown && (
+                      <div 
+                        onScroll={handleScroll}
+                        style={{ 
+                          position: 'absolute', 
+                          top: '110%', 
+                          left: 0, 
+                          right: 0, 
+                          background: 'var(--surface)', 
+                          border: '1px solid var(--border)', 
+                          borderRadius: '16px', 
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+                          maxHeight: '350px', 
+                          overflowY: 'auto', 
+                          zIndex: 1000,
+                          padding: '8px'
+                        }}
+                      >
                         <div 
-                          onClick={() => handleEmployeeSelect(emp.card_no, `${emp.card_no} - ${emp.name}`)}
-                          style={{ 
-                            padding: '10px 12px', 
-                            borderRadius: '10px', 
-                            cursor: 'pointer', 
-                            fontSize: '0.8125rem', 
-                            fontWeight: 700, 
-                            color: 'var(--text-main)', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '8px',
-                            background: selectedEmployee === emp.id ? 'var(--background)' : 'transparent'
-                          }}
+                          onClick={() => handleEmployeeSelect('', 'Full Project Consumption')}
+                          style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 800, color: '#6366f1', background: !selectedEmployee ? '#6366f110' : 'transparent', marginBottom: '4px' }}
                         >
-                          <User size={14} style={{ color: '#6366f1' }} /> {emp.card_no} - {emp.name}
+                          All Personnel (Project View)
                         </div>
-                        {emp.family_members?.map(f => (
-                          <div 
-                            key={`${emp.id}-${f.id}`}
-                            onClick={() => handleEmployeeSelect(`${emp.card_no}${f.card_no_suffix}`, `${emp.card_no}${f.card_no_suffix} - ${f.name}`)}
-                            style={{ 
-                              padding: '6px 12px 6px 2.5rem', 
-                              borderRadius: '8px', 
-                              cursor: 'pointer', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 600, 
-                              color: 'var(--text-muted)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Users size={12} /> {f.name} ({f.relationship})
+                        {filteredEmployees.map(emp => (
+                          <div key={emp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '4px', marginBottom: '4px' }}>
+                            <div 
+                              onClick={() => handleEmployeeSelect(emp.card_no, `${emp.card_no} - ${emp.name}`)}
+                              style={{ 
+                                padding: '10px 12px', 
+                                borderRadius: '10px', 
+                                cursor: 'pointer', 
+                                fontSize: '0.8125rem', 
+                                fontWeight: 700, 
+                                color: 'var(--text-main)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                background: selectedEmployee === emp.id ? 'var(--background)' : 'transparent'
+                              }}
+                            >
+                              <User size={14} style={{ color: '#6366f1' }} /> {emp.card_no} - {emp.name}
+                            </div>
+                            {emp.family_members?.map(f => (
+                              <div 
+                                key={`${emp.id}-${f.id}`}
+                                onClick={() => handleEmployeeSelect(`${emp.card_no}${f.card_no_suffix}`, `${emp.card_no}${f.card_no_suffix} - ${f.name}`)}
+                                style={{ 
+                                  padding: '6px 12px 6px 2.5rem', 
+                                  borderRadius: '8px', 
+                                  cursor: 'pointer', 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 600, 
+                                  color: 'var(--text-muted)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                <Users size={12} /> {f.name} ({f.relationship})
+                              </div>
+                            ))}
                           </div>
                         ))}
+                        {isSearching && (
+                          <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Loading more...</div>
+                        )}
                       </div>
-                    ))}
-                    {isSearching && (
-                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Loading more...</div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', width: '100%' }} ref={medicineDropdownRef}>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="text"
+                        placeholder="Search Medicine..."
+                        value={medicineSearchTerm}
+                        onChange={(e) => {
+                          setMedicineSearchTerm(e.target.value);
+                          setShowMedicineDropdown(true);
+                          if (!e.target.value) setSelectedMedicine('');
+                        }}
+                        onFocus={() => setShowMedicineDropdown(true)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 12px 12px 2.5rem',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '14px',
+                          fontSize: '0.875rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                        }}
+                      />
+                      <Activity size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      {medicineSearchTerm && (
+                        <button 
+                          onClick={() => { setMedicineSearchTerm(''); setSelectedMedicine(''); }}
+                          style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        >✕</button>
+                      )}
+                    </div>
+
+                    {showMedicineDropdown && (
+                      <div 
+                        onScroll={handleMedicineScroll}
+                        style={{ 
+                          position: 'absolute', 
+                          top: '110%', 
+                          left: 0, 
+                          right: 0, 
+                          background: 'var(--surface)', 
+                          border: '1px solid var(--border)', 
+                          borderRadius: '16px', 
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+                          maxHeight: '350px', 
+                          overflowY: 'auto', 
+                          zIndex: 1000,
+                          padding: '8px'
+                        }}
+                      >
+                        <div 
+                          onClick={() => {
+                            setSelectedMedicine('');
+                            setMedicineSearchTerm('');
+                            setShowMedicineDropdown(false);
+                          }}
+                          style={{ padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 800, color: '#6366f1', background: !selectedMedicine ? '#6366f110' : 'transparent', marginBottom: '4px' }}
+                        >
+                          All Medicines
+                        </div>
+                        {medicineList.map(med => (
+                          <div 
+                            key={med.id}
+                            onClick={() => {
+                              setSelectedMedicine(med.id);
+                              setMedicineSearchTerm(med.name);
+                              setShowMedicineDropdown(false);
+                            }}
+                            style={{ 
+                              padding: '10px 12px', 
+                              borderRadius: '10px', 
+                              cursor: 'pointer', 
+                              fontSize: '0.8125rem', 
+                              fontWeight: 700, 
+                              color: 'var(--text-main)', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '8px',
+                              background: selectedMedicine === med.id ? 'var(--background)' : 'transparent',
+                              borderBottom: '1px solid var(--border)'
+                            }}
+                          >
+                            <Activity size={14} style={{ color: '#10b981' }} /> {med.name} ({med.ucode})
+                          </div>
+                        ))}
+                        {isSearchingMedicines && (
+                          <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Loading more...</div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
               </div>
+            </div>
 
-              <div style={{ display: 'flex', background: 'var(--surface)', padding: '6px', borderRadius: '12px', border: '1px solid var(--border)', gap: '4px' }}>
-                {['week', 'month', 'year', 'all', 'custom'].map(r => (
-                  <button 
-                    key={r}
-                    onClick={() => setTimeRange(r)}
-                    style={{
-                      padding: '4px 12px',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      border: 'none',
-                      borderRadius: '8px',
-                      background: timeRange === r ? '#6366f1' : 'transparent',
-                      color: timeRange === r ? 'white' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      transition: '0.2s',
-                      textTransform: 'capitalize'
-                    }}
-                  >{r}</button>
-                ))}
+            {/* Row 2: Controls & Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', background: 'var(--surface)', padding: '6px', borderRadius: '12px', border: '1px solid var(--border)', gap: '4px' }}>
+                  {['week', 'month', 'year', 'all', 'custom'].map(r => (
+                    <button 
+                      key={r}
+                      onClick={() => setTimeRange(r)}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        border: 'none',
+                        borderRadius: '8px',
+                        background: timeRange === r ? '#6366f1' : 'transparent',
+                        color: timeRange === r ? 'white' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        transition: '0.2s',
+                        textTransform: 'capitalize'
+                      }}
+                    >{r}</button>
+                  ))}
+                </div>
+
+                {timeRange === 'custom' && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--surface)', padding: '4px 12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                     <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
+                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>to</span>
+                     <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
+                  </div>
+                )}
               </div>
 
-              {timeRange === 'custom' && (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--surface)', padding: '4px 12px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
-                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>to</span>
-                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-main)', outline: 'none' }} />
-                </div>
-              )}
-
-              <button 
-                onClick={fetchConsumption}
-                style={{
-                  padding: '10px 24px',
-                  background: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '0.875rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-                }}
-              >
-                <Search size={16} /> Generate Analytics
-              </button>
-
-
-              {(user?.role === 'ADMIN' || user?.permissions?.includes('ADMIN_ALL') || user?.permissions?.includes('/reports/bulk-import')) && (
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 <button 
-                  onClick={() => setShowBulkModal(true)}
+                  onClick={fetchConsumption}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '0.875rem',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                  }}
+                >
+                  <Search size={16} /> Generate Analytics
+                </button>
+
+                {(user?.role === 'ADMIN' || user?.permissions?.includes('ADMIN_ALL') || user?.permissions?.includes('/reports/bulk-import')) && (
+                  <button 
+                    onClick={() => setShowBulkModal(true)}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '0.8125rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <UploadIcon size={16} /> Bulk Import History
+                  </button>
+                )}
+
+                <button 
+                  onClick={exportToXLSX}
                   style={{
                     padding: '10px 20px',
-                    background: '#f8fafc',
-                    color: '#64748b',
-                    border: '1px solid #e2e8f0',
+                    background: 'var(--text-main)',
+                    color: 'var(--surface)',
+                    border: 'none',
                     borderRadius: '12px',
                     fontSize: '0.8125rem',
                     fontWeight: 800,
@@ -925,30 +1144,12 @@ const Reports = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
                   }}
                 >
-                  <UploadIcon size={16} /> Bulk Import History
+                  <Download size={16} /> Export Excel
                 </button>
-              )}
-              <button 
-                onClick={exportToXLSX}
-                style={{
-                  padding: '10px 20px',
-                  background: 'var(--text-main)',
-                  color: 'var(--surface)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '0.8125rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                }}
-              >
-                <Download size={16} /> Export Excel
-              </button>
+              </div>
             </div>
           </div>
 
@@ -1173,7 +1374,8 @@ const Reports = () => {
           <div style={{
             background: 'var(--surface)', width: '600px', borderRadius: '24px',
             padding: '2rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
-            border: '1px solid var(--border)', color: 'var(--text-main)'
+            border: '1px solid var(--border)',
+            color: 'var(--text-main)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Bulk Historical Consumption Import</h2>

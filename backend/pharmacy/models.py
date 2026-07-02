@@ -53,7 +53,7 @@ class DispensingRecord(models.Model):
     quantity = models.IntegerField()
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     total_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
-    dispensed_at = models.DateTimeField(default=timezone.now)
+    dispensed_at = models.DateTimeField(default=timezone.now, db_index=True)
     remarks = models.TextField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -150,7 +150,7 @@ class RoomStockDispensation(models.Model):
     outside_patient_details = models.TextField(blank=True, null=True)
     
     quantity = models.IntegerField()
-    dispensed_at = models.DateTimeField(default=timezone.now)
+    dispensed_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         ordering = ['-dispensed_at']
@@ -158,3 +158,39 @@ class RoomStockDispensation(models.Model):
     def __str__(self):
         recipient = self.patient if self.recipient_type == 'PATIENT' else f"{self.outside_patient_name} (Aadhaar: {self.outside_patient_aadhaar})"
         return f"Given {self.quantity} of {self.room_stock.registry_item.name} to {recipient} from {self.room_stock.location}"
+
+
+class FacilityRoom(models.Model):
+    ROOM_TYPES = (
+        ('NURSE_ROOM', 'Nurse Room'),
+        ('LABORATORY', 'Laboratory'),
+        ('OHC', 'Occupational Health Centre (OHC)'),
+        ('EMERGENCY', 'Emergency Room'),
+        ('WARD', 'General Ward'),
+        ('OTHER', 'Other Facility'),
+    )
+    
+    project = models.ForeignKey('patients.Project', on_delete=models.CASCADE, related_name='facility_rooms')
+    name = models.CharField(max_length=100)
+    room_type = models.CharField(max_length=20, choices=ROOM_TYPES, default='NURSE_ROOM')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('project', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_room_type_display()}) - {self.project.name}"
+
+
+class UserRoomAssignment(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='room_assignment')
+    assigned_room = models.ForeignKey(FacilityRoom, on_delete=models.CASCADE, related_name='assigned_staff')
+    can_raise_indent = models.BooleanField(default=True)
+    can_log_dispensation = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.assigned_room.name}"
+

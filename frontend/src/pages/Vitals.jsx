@@ -500,47 +500,18 @@ const Vitals = () => {
   return (
     <div className="fade-in">
       {!selectedVisit && (
-        <>
-          <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
-              <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
-            </div>
-          </header>
-
-          <div style={{ display: 'flex', gap: '2rem', borderBottom: '1px solid var(--border)', marginBottom: '2rem', overflowX: 'auto' }}>
-            <button 
-                onClick={() => setActiveSubTab('queue')}
-                style={{ 
-                    padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                    borderBottom: activeSubTab === 'queue' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
-                    fontWeight: 800, color: activeSubTab === 'queue' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
-                    cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
-                }}
-            >
-                Nurse Queue ({totalCount})
-            </button>
-            {(user?.role === 'ADMIN' || user?.permissions?.includes('/indents/inventory')) && (
-              <button 
-                  onClick={() => setActiveSubTab('stock')}
-                  style={{ 
-                      padding: '0.75rem 0.5rem', background: 'none', border: 'none', whiteSpace: 'nowrap',
-                      borderBottom: activeSubTab === 'stock' ? `3px solid ${projectConfig?.primary_color || 'var(--primary)'}` : '3px solid transparent',
-                      fontWeight: 800, color: activeSubTab === 'stock' ? (projectConfig?.primary_color || 'var(--primary)') : 'var(--text-muted)',
-                      cursor: 'pointer', transition: '0.3s', fontSize: '0.875rem'
-                  }}
-              >
-                  Room Stock
-              </button>
-            )}
+        <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Intake & Nursing Station</h1>
+            <p style={{ color: 'var(--text-muted)' }}>Initial assessment and vital signs monitoring</p>
           </div>
-        </>
+        </header>
       )}
  
 
       <div style={{ gap: '2rem', alignItems: 'start' }}>
         {/* Waiting List - Only show if NO patient is selected */}
-        {!selectedVisit && activeSubTab === 'queue' && (
+        {!selectedVisit && (
           <div className="card fade-in" style={{ padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', minWidth: '0' }}>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                <div>
@@ -913,11 +884,7 @@ const Vitals = () => {
           </div>
         )}
 
-        {!selectedVisit && activeSubTab === 'stock' && (
-          <div className="fade-in">
-             <Indents isEmbed={true} embedRoom="Nurse Room" />
-          </div>
-        )}
+
 
 
         {/* Vitals & Observations Form - Only show if a patient is selected */}
